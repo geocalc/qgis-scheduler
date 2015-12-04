@@ -1,5 +1,5 @@
 
-TARGET=qgis-scheduler
+TARGET=qgis-scheduler.fcgi
 
 SOURCE=main.c
 HEADER=
@@ -18,6 +18,7 @@ OBJECT=$(patsubst %.c,%.o,$(SOURCE))
 all: $(TARGET)
 
 $(TARGET): $(OBJECT)
+	$(CC) $(LDFLAGS) -o $@ $(LOADLIBES) $(LDLIBS) $^
 $(OBJECT): Makefile $(HEADER)
 
 
