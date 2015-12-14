@@ -1,8 +1,8 @@
 
-TARGET=qgis-scheduler.fcgi
+TARGET=qgis-schedulerd
 
-SOURCE=main.c
-HEADER=
+SOURCE=main.c log.c
+HEADER=log.h defaults.h
 
 CFLAGS += -Wall
 CFLAGS += -pipe -ggdb -O0
@@ -10,6 +10,9 @@ CFLAGS += -pipe -ggdb -O0
 #CFLAGS += -pipe -O3 -march=native
 #CFLAGS += -DNDEBUG
 
+CFLAGS += -pthread
+LDFLAGS += -pthread
+LDLIBS += -lfcgi -liniparser
 
 # ---------------------------------
 
