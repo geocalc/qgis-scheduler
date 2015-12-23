@@ -33,6 +33,8 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/select.h>
 
 
 #ifndef _GNU_SOURCE
@@ -59,13 +61,108 @@ void usage(const char *argv0)
     //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
 }
 
+const char *command = NULL;
+int socketfd = -1;
+
+pid_t start_new_child(void)
+{
+    pid_t pid = fork();
+	if (0 == pid)
+	{
+	    /* child */
+
+	    /* close file descriptor stdin = 0
+	     * assign socket file descriptor to fd 0
+	     * fork
+	     * exec
+	     */
+	    int ret = dup2(socketfd, 0);
+	    if (-1 == ret)
+	    {
+		perror("error calling dup2");
+		exit(EXIT_FAILURE);
+	    }
+//	    const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
+//		    CGI_PATH_KEY_DEFAULT);
+
+	    execl(command, command, NULL);
+	    fprintf(stderr, "could not execute '%s': ", command);
+	    perror(NULL);
+	    exit(EXIT_FAILURE);
+	}
+	else if (0 < pid)
+	{
+	    /* parent */
+	}
+	else
+	{
+	    /* error */
+	    perror("can not fork");
+	    exit(EXIT_FAILURE);
+	}
+
+	return pid;
+}
+
+
+//static const int nr_childs = 2;
+#define nr_childs	2
+pid_t child_pid[nr_childs];
+int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
+
+/* act on signals */
+void signalaction(int signal, siginfo_t *info, void *ucontext)
+{
+    switch (signal)
+    {
+    case SIGCHLD:
+    {
+	/* get pid of terminated child process */
+	pid_t pid = info->si_pid;
+	/* get array id of terminated child process */
+	int i;
+	for (i=0; i<nr_childs; i++)
+	{
+	    if (pid == child_pid[i])
+		break;
+	}
+	if (i >= nr_childs)
+	{
+	    /* pid does not belong to our child processes ? */
+	    // TODO print log message
+	}
+	else
+	{
+	    if ( !do_terminate )
+	    {
+		/* child process terminated, restart anew */
+		/* TODO: react on child processes exiting immediately.
+		 * maybe store the creation time and calculate the execution time?
+		 */
+		child_pid[i] = start_new_child();
+	    }
+	    else
+	    {
+		/* mark child process as terminated */
+		child_pid[i] = 0;
+		fprintf(stderr, "process %d ended\n", pid);
+	    }
+	}
+	break;
+    }
+    case SIGTERM:	// fall through
+    case SIGQUIT:
+	/* termination signal, kill all child processes */
+	do_terminate = 1;
+	break;
+    }
+}
 
 int main(int argc, char **argv)
 {
     const int port = 10177;
-    const int nr_childs = 2;
-    const char *command = NULL;
     int no_daemon = 0;
+    memset(child_pid, 0, sizeof(child_pid));
 
     int opt;
 
@@ -98,7 +195,6 @@ int main(int argc, char **argv)
 
     /* prepare inet socket connection for application server process (this)
      */
-    int socketfd;
 
     {
 	struct addrinfo hints;
@@ -178,45 +274,167 @@ int main(int argc, char **argv)
 	}
     }
 
+
+    /* prepare the signal reception.
+     * This way we can start a new child if one has exited on its own,
+     * or we can kill the children if this management process got signal
+     * to terminate.
+     */
+    struct sigaction action;
+    action.sa_sigaction = signalaction;
+    action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
+    sigemptyset(&action.sa_mask);
+    sigaddset(&action.sa_mask, SIGCHLD);
+    sigaddset(&action.sa_mask, SIGTERM);
+    sigaddset(&action.sa_mask, SIGQUIT);
+    retval = sigaction(SIGTERM, &action, NULL);
+    if (retval)
+    {
+	perror("error: can not install signal handler");
+	exit(EXIT_FAILURE);
+    }
+    retval = sigaction(SIGQUIT, &action, NULL);
+    if (retval)
+    {
+	perror("error: can not install signal handler");
+	exit(EXIT_FAILURE);
+    }
+    retval = sigaction(SIGCHLD, &action, NULL);
+    if (retval)
+    {
+	perror("error: can not install signal handler");
+	exit(EXIT_FAILURE);
+    }
+
+
+    /* start the children */
     int i;
     for (i=0; i<nr_childs; i++)
     {
-	int pid = fork();
-	if (0 == pid)
-	{
-	    /* child */
-
-	    /* close file descriptor stdin = 0
-	     * assign socket file descriptor to fd 0
-	     * fork
-	     * exec
-	     */
-	    int ret = dup2(socketfd, 0);
-	    if (-1 == ret)
-	    {
-		perror("error calling dup2");
-		exit(EXIT_FAILURE);
-	    }
-//	    const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
-//		    CGI_PATH_KEY_DEFAULT);
-
-	    execl(command, command, NULL);
-	    fprintf(stderr, "could not execute '%s': ", command);
-	    perror(NULL);
-	    exit(EXIT_FAILURE);
-	}
-	else if (0 < pid)
-	{
-	    /* parent */
-	}
-	else
-	{
-	    /* error */
-	    perror("can not fork");
-	    exit(EXIT_FAILURE);
-	}
+	child_pid[i] = start_new_child();
     }
 
+
+    /* wait for signals of childs exiting (SIGCHLD) or to terminate this
+     * program (SIGTERM, SIGINT).
+     */
+
+    /* set timeout to infinite */
+    struct timeval timeout, *timeout_ptr = NULL;
+    timeout.tv_sec = 10;	// wait 10 seconds for a child process to terminate
+    timeout.tv_usec = 0;
+
+    int has_finished_first_run = 0;
+    int has_finished_second_run = 0;
+    int has_finished = 0;
+    while ( !has_finished )
+    {
+	/* wait for signals or timeout */
+	select(0, NULL,NULL,NULL,timeout_ptr);
+
+	/* over here I expect the main thread to continue AFTER the signal
+	 * handler has ended its thread.
+	 * If this expectation does not fulfill, we have to think over this
+	 * section.
+	 */
+	if ( do_terminate )
+	{
+	    /* On the first run send all child processes the TERM signal,
+	     * then wait for the processes to exit normally. During this
+	     * we are called by the signal handler for the CHLD signal.
+	     * During this we check for all child processes to terminate.
+	     * If all processed have terminated, we do exit this. Else we start
+	     * a second round of killing all processes and then exit this.
+	     */
+
+	    if (has_finished_second_run)
+	    {
+		int i;
+		for (i=0; i<nr_childs; i++)
+		{
+		    if ( 0 != child_pid[i] )
+		    {
+			break;
+		    }
+		    if (i >= nr_childs)
+		    {
+			/* all child processes did exit, we can end this */
+			return EXIT_SUCCESS;
+		    }
+		}
+
+		/* if none of the child processes did terminate on timeout
+		 * we exit with failure
+		 */
+		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+		{
+		    return EXIT_FAILURE;
+		}
+		// else restart the sleep() with remaining timeout
+	    }
+	    else if (has_finished_first_run)
+	    {
+		int i;
+		for (i=0; i<nr_childs; i++)
+		{
+		    if ( 0 != child_pid[i] )
+		    {
+			break;
+		    }
+		}
+		if (i >= nr_childs)
+		{
+		    /* all child processes did exit, we can end this */
+		    return EXIT_SUCCESS;
+		}
+
+		/* if none of the child processes did terminate on timeout
+		 * we can start the next round of sending signals
+		 */
+		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+		{
+		    int children = 0;
+		    for (i=0; i<nr_childs; i++)
+		    {
+			if ( 0 != child_pid[i] )
+			{
+			    kill(child_pid[i], SIGKILL);
+			    children++;
+			}
+		    }
+		    fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+		    timeout.tv_sec = 10;
+		    has_finished_second_run = 1;
+
+		}
+		// else restart the sleep() with remaining timeout
+
+	    }
+	    else
+	    {
+		int children = 0;
+		int i;
+		for (i=0; i<nr_childs; i++)
+		{
+		    if ( 0 != child_pid[i] )
+		    {
+			kill(child_pid[i], SIGTERM);
+			children++;
+		    }
+		}
+		fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+		/* set timeout to "some seconds" */
+		timeout_ptr = &timeout;
+		timeout.tv_sec = 10;
+		has_finished_first_run = 1;
+	    }
+
+	}
+
+    }
+    /* wait some seconds to check if every child has exited.
+     * else send sigkill signal.
+     */
 
     return EXIT_SUCCESS;
 }
