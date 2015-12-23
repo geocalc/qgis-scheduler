@@ -53,7 +53,7 @@ const char *basename(const char *path)
 void usage(const char *argv0)
 {
     //fprintf(stdout, "usage: %s [-h] [-d] [-c <CONFIGFILE>]\n", basename(argv0));
-    fprintf(stdout, "usage: %s [-h] [-d]\n", basename(argv0));
+    fprintf(stdout, "usage: %s [-h] [-d] <command>\n", basename(argv0));
     fprintf(stdout, "\t-h: print this help\n");
     fprintf(stdout, "\t-d: do NOT become daemon\n");
     //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
@@ -63,8 +63,8 @@ void usage(const char *argv0)
 int main(int argc, char **argv)
 {
     const int port = 10177;
-    const int nr_childs = 10;
-    const char command[] = "/usr/bin/qgis_mapserv.fcgi";
+    const int nr_childs = 2;
+    const char *command = NULL;
     int no_daemon = 0;
 
     int opt;
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 	{
 	case 'h':
 	    usage(argv[0]);
-	    break;
+	    return EXIT_SUCCESS;
 	case 'd':
 	    no_daemon = 1;
 	    break;
@@ -87,6 +87,14 @@ int main(int argc, char **argv)
 	    return EXIT_FAILURE;
 	}
     }
+
+    if (optind >= argc)
+    {
+	printf("error: missing command\n");
+	usage(argv[0]);
+	return EXIT_FAILURE;
+    }
+    command = argv[optind++];
 
     /* prepare inet socket connection for application server process (this)
      */
