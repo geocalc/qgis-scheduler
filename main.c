@@ -315,8 +315,8 @@ int main(int argc, char **argv)
     }
 
 
-    /* wait for signals of childs exiting (SIGCHLD) or to terminate this
-     * program (SIGTERM, SIGINT).
+    /* wait for signals of child processes exiting (SIGCHLD) or to terminate
+     * this program (SIGTERM, SIGINT).
      */
 
     /* set timeout to infinite */
@@ -330,7 +330,16 @@ int main(int argc, char **argv)
     while ( !has_finished )
     {
 	/* wait for signals or timeout */
-	select(0, NULL,NULL,NULL,timeout_ptr);
+	/* NOTE: I expect a linux behavior over here:
+	 * If select() is interrupted by a signal handler, the timeout value
+	 * is modified to contain the remaining time.
+	 */
+	retval = select(0, NULL,NULL,NULL,timeout_ptr);
+	if (retval)
+	{
+	    perror("error: calling select");
+	    exit(EXIT_FAILURE);
+	}
 
 	/* over here I expect the main thread to continue AFTER the signal
 	 * handler has ended its thread.
