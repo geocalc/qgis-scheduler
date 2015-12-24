@@ -1,7 +1,7 @@
 
 TARGET=qgis-schedulerd
 
-SOURCE=main.c #log.c
+SOURCE=qgis-schedulerd.c #log.c
 HEADER= #log.h defaults.h
 
 CFLAGS += -Wall
@@ -21,7 +21,7 @@ OBJECT=$(patsubst %.c,%.o,$(SOURCE))
 all: $(TARGET)
 
 $(TARGET): $(OBJECT)
-	$(CC) $(LDFLAGS) -o $@ $(LOADLIBES) $(LDLIBS) $^
+#	$(CC) $(LDFLAGS) -o $@ $(LOADLIBES) $(LDLIBS) $^
 $(OBJECT): Makefile $(HEADER)
 
 
