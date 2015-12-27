@@ -134,6 +134,7 @@ void *thread_handle_connection(void *arg)
      * this thread. here we connect() to the child thread and transfer the data
      * between the network fd and the child process fd and back.
      */
+    assert(arg);
     struct thread_info *tinfo = arg;
     int serversocketfd = tinfo->new_server_fd;
     struct sockaddr_un sockaddr;
@@ -143,7 +144,7 @@ void *thread_handle_connection(void *arg)
     char buffer[buffersize];
 
     fprintf(stderr, "starting new connection thread\n");
-    /* get the address of the socket connecting the child process,
+    /* get the address of the socket transferred to the child process,
      * then connect to it.
      */
     int retval = getsockname(childsocket, &sockaddr, &sockaddrlen);
@@ -158,22 +159,26 @@ void *thread_handle_connection(void *arg)
     retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	perror("error: can not create socket");
+	perror("error: can not create socket to child process");
 	exit(EXIT_FAILURE);
     }
     childfd = retval;
     retval = connect(childfd, &sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
-	perror("error retrieving the name of child process socket");
+	perror("error: can not connect to child process");
 	exit(EXIT_FAILURE);
     }
 
 
     int maxfd = 0;
     fd_set rfds;
+    fd_set wfds;
+    int can_read_networksock = 0;
+    int can_write_networksock = 0;
+    int can_read_unixsock = 0;
+    int can_write_unixsock = 0;
 
-    FD_ZERO(&rfds);
 
     if (serversocketfd > maxfd)
 	maxfd = serversocketfd;
@@ -193,20 +198,47 @@ void *thread_handle_connection(void *arg)
 	/* wait for connections, signals or timeout */
 	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
 	timeout.tv_usec = 0;
-	/* TODO: We should test for the file descriptor being able to write to
-	 * it.
-	 */
+
 	fprintf(stderr, "selecting on network connections\n");
-	FD_SET(serversocketfd, &rfds);
-	FD_SET(childfd, &rfds);
-	retval = select(maxfd, &rfds, NULL, NULL, &timeout);
+	FD_ZERO(&rfds);
+	FD_ZERO(&wfds);
+	if ( !can_read_networksock )
+	    FD_SET(serversocketfd, &rfds);
+	if ( !can_write_networksock )
+	    FD_SET(serversocketfd, &wfds);
+	if ( !can_read_unixsock )
+	    FD_SET(childfd, &rfds);
+	if ( !can_write_unixsock )
+	    FD_SET(childfd, &wfds);
+	retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
 	if (-1 == retval)
 	{
 	    perror("error: thread_handle_connection() calling select");
 	    exit(EXIT_FAILURE);
 	}
 
+	if (FD_ISSET(serversocketfd, &wfds))
+	{
+	    fprintf(stderr, " can write to network socket\n");
+	    can_write_networksock = 1;
+	}
+	if (FD_ISSET(childfd, &wfds))
+	{
+	    fprintf(stderr, " can write to unix socket\n");
+	    can_write_unixsock = 1;
+	}
 	if (FD_ISSET(serversocketfd, &rfds))
+	{
+	    fprintf(stderr, " can read from network socket\n");
+	    can_read_networksock = 1;
+	}
+	if (FD_ISSET(childfd, &rfds))
+	{
+	    fprintf(stderr, " can read from unix socket\n");
+	    can_read_unixsock = 1;
+	}
+
+	if (can_read_networksock && can_write_unixsock)
 	{
 	    fprintf(stderr, " read data from network socket\n");
 	    retval = read(serversocketfd, buffer, buffersize);
@@ -220,15 +252,20 @@ void *thread_handle_connection(void *arg)
 		/* end of file received. exit this thread */
 		break;
 	    }
+	    fprintf(stderr, "network data:\n");
+	    fwrite(buffer, 1, retval, stderr);
+	    fprintf(stderr, "\n");
 	    retval = write(childfd, buffer, retval);
 	    if (-1 == retval)
 	    {
 		perror("error: writing to child process socket");
 		exit(EXIT_FAILURE);
 	    }
+	    can_read_networksock = 0;
+	    can_write_unixsock = 0;
 	}
 
-	if (FD_ISSET(childfd, &rfds))
+	if (can_read_unixsock && can_write_networksock)
 	{
 	    fprintf(stderr, " read data from unix socket\n");
 	    retval = read(childfd, buffer, buffersize);
@@ -242,12 +279,17 @@ void *thread_handle_connection(void *arg)
 		/* end of file received. exit this thread */
 		break;
 	    }
+	    fprintf(stderr, "fcgi data:\n");
+	    fwrite(buffer, 1, retval, stderr);
+	    fprintf(stderr, "\n");
 	    retval = write(serversocketfd, buffer, retval);
 	    if (-1 == retval)
 	    {
 		perror("error: writing to child process socket");
 		exit(EXIT_FAILURE);
 	    }
+	    can_read_unixsock = 0;
+	    can_write_networksock = 0;
 	}
 
     }
@@ -388,7 +430,7 @@ int main(int argc, char **argv)
 	    if (serversocketfd == -1)
 	    {
 		//printf(" could not create socket\n");
-		perror(" could not create socket");
+		perror(" could not create socket for network data");
 		continue;
 	    }
 
@@ -396,14 +438,14 @@ int main(int argc, char **argv)
 		break; /* Success */
 
 	    //printf(" could not bind to socket\n");
-	    perror(" could not bind to socket");
+	    perror(" could not bind to network socket");
 	    close(serversocketfd);
 	}
 
 	if (rp == NULL)
 	{ /* No address succeeded */
 	    //fprintf(stderr, "Could not bind\n"); // TODO better message
-	    perror("could not create socket");
+	    perror("could not create network socket");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -436,7 +478,7 @@ int main(int argc, char **argv)
     retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	perror("can not open socket");
+	perror("can not create socket for fcgi program");
 	exit(EXIT_FAILURE);
     }
     childsocket = retval;
