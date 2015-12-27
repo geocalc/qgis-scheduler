@@ -24,6 +24,7 @@
 
 
 
+#define _GNU_SOURCE
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,7 +36,18 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/select.h>
+#include <pthread.h>
+#include <assert.h>
+#include <errno.h>
 
+struct thread_info
+{
+    int new_server_fd;
+    const char *client_socket_path;
+};
+
+
+static const char base_socket_desc[] = "qgis-schedulerd-socket";
 
 #ifndef _GNU_SOURCE
 const char *basename(const char *path)
@@ -62,57 +74,202 @@ void usage(const char *argv0)
 }
 
 const char *command = NULL;
-int socketfd = -1;
+int childsocket = -1;
 
 pid_t start_new_child(void)
 {
     pid_t pid = fork();
-	if (0 == pid)
+    if (0 == pid)
+    {
+	/* child */
+
+	/* close file descriptor stdin = 0
+	 * assign socket file descriptor to fd 0
+	 * fork
+	 * exec
+	 */
+	assert(childsocket != 0);
+	int ret = dup2(childsocket, 0);
+	if (-1 == ret)
 	{
-	    /* child */
-
-	    /* close file descriptor stdin = 0
-	     * assign socket file descriptor to fd 0
-	     * fork
-	     * exec
-	     */
-	    int ret = dup2(socketfd, 0);
-	    if (-1 == ret)
-	    {
-		perror("error calling dup2");
-		exit(EXIT_FAILURE);
-	    }
-//	    const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
-//		    CGI_PATH_KEY_DEFAULT);
-
-	    execl(command, command, NULL);
-	    fprintf(stderr, "could not execute '%s': ", command);
-	    perror(NULL);
+	    perror("error calling dup2");
 	    exit(EXIT_FAILURE);
 	}
-	else if (0 < pid)
-	{
-	    /* parent */
-	}
-	else
-	{
-	    /* error */
-	    perror("can not fork");
-	    exit(EXIT_FAILURE);
-	}
+//	const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
+//		CGI_PATH_KEY_DEFAULT);
 
-	return pid;
+
+	/* close all file descriptors different from 0. The fd different from
+	 * 1 and 2 are opened during open() and socket() calls with FD_CLOEXEC
+	 * flag enabled. This way, the fds are closed during exec() call.
+	 * TODO: assign an error log file to fd 1 and 2
+	 */
+	close(1);
+	close(2);
+
+
+	execl(command, command, NULL);
+	fprintf(stderr, "could not execute '%s': ", command);
+	perror(NULL);
+	exit(EXIT_FAILURE);
+    }
+    else if (0 < pid)
+    {
+	/* parent */
+    }
+    else
+    {
+	/* error */
+	perror("can not fork");
+	exit(EXIT_FAILURE);
+    }
+
+    return pid;
 }
 
+void *thread_handle_connection(void *arg)
+{
+    /* the main thread has been notified about data on the server network fd.
+     * it accept()ed the new connection and passes the new file descriptor to
+     * this thread. here we connect() to the child thread and transfer the data
+     * between the network fd and the child process fd and back.
+     */
+    struct thread_info *tinfo = arg;
+    int serversocketfd = tinfo->new_server_fd;
+    struct sockaddr_un sockaddr;
+    socklen_t sockaddrlen = sizeof(sockaddr);
+    int childfd;
+    static const int buffersize = 1024;
+    char buffer[buffersize];
+
+    fprintf(stderr, "starting new connection thread\n");
+    /* get the address of the socket connecting the child process,
+     * then connect to it.
+     */
+    int retval = getsockname(childsocket, &sockaddr, &sockaddrlen);
+    if (-1 == retval)
+    {
+	perror("error retrieving the name of child process socket");
+	exit(EXIT_FAILURE);
+    }
+    /* leave the original child socket and create a new one on the opposite
+     * side.
+     */
+    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
+    if (-1 == retval)
+    {
+	perror("error: can not create socket");
+	exit(EXIT_FAILURE);
+    }
+    childfd = retval;
+    retval = connect(childfd, &sockaddr, sizeof(sockaddr));
+    if (-1 == retval)
+    {
+	perror("error retrieving the name of child process socket");
+	exit(EXIT_FAILURE);
+    }
+
+
+    int maxfd = 0;
+    fd_set rfds;
+
+    FD_ZERO(&rfds);
+
+    if (serversocketfd > maxfd)
+	maxfd = serversocketfd;
+    if (childfd > maxfd)
+	maxfd = childfd;
+
+    maxfd++;
+
+    /* set timeout to infinite */
+    struct timeval timeout;
+//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+//    timeout.tv_usec = 0;
+
+    int has_finished = 0;
+    while ( !has_finished )
+    {
+	/* wait for connections, signals or timeout */
+	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	timeout.tv_usec = 0;
+	/* TODO: We should test for the file descriptor being able to write to
+	 * it.
+	 */
+	fprintf(stderr, "selecting on network connections\n");
+	FD_SET(serversocketfd, &rfds);
+	FD_SET(childfd, &rfds);
+	retval = select(maxfd, &rfds, NULL, NULL, &timeout);
+	if (-1 == retval)
+	{
+	    perror("error: thread_handle_connection() calling select");
+	    exit(EXIT_FAILURE);
+	}
+
+	if (FD_ISSET(serversocketfd, &rfds))
+	{
+	    fprintf(stderr, " read data from network socket\n");
+	    retval = read(serversocketfd, buffer, buffersize);
+	    if (-1 == retval)
+	    {
+		perror("error: reading from network socket");
+		exit(EXIT_FAILURE);
+	    }
+	    else if (0 == retval)
+	    {
+		/* end of file received. exit this thread */
+		break;
+	    }
+	    retval = write(childfd, buffer, retval);
+	    if (-1 == retval)
+	    {
+		perror("error: writing to child process socket");
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+	if (FD_ISSET(childfd, &rfds))
+	{
+	    fprintf(stderr, " read data from unix socket\n");
+	    retval = read(childfd, buffer, buffersize);
+	    if (-1 == retval)
+	    {
+		perror("error: reading from network socket");
+		exit(EXIT_FAILURE);
+	    }
+	    else if (0 == retval)
+	    {
+		/* end of file received. exit this thread */
+		break;
+	    }
+	    retval = write(serversocketfd, buffer, retval);
+	    if (-1 == retval)
+	    {
+		perror("error: writing to child process socket");
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+    }
+
+    /* clean up */
+    fprintf(stderr, "end connection thread\n");
+    close (childfd);
+    close (serversocketfd);
+    free(arg);
+
+    return NULL;
+}
 
 //static const int nr_childs = 2;
-#define nr_childs	2
+#define nr_childs	1
 pid_t child_pid[nr_childs];
 int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
 
 /* act on signals */
 void signalaction(int signal, siginfo_t *info, void *ucontext)
 {
+    fprintf(stderr, "got signal %d\n", signal);
     switch (signal)
     {
     case SIGCHLD:
@@ -162,6 +319,7 @@ int main(int argc, char **argv)
 {
     const int port = 10177;
     int no_daemon = 0;
+    int serversocketfd = -1;
     memset(child_pid, 0, sizeof(child_pid));
 
     int opt;
@@ -226,20 +384,20 @@ int main(int argc, char **argv)
 	for (rp = result; rp != NULL; rp = rp->ai_next)
 	{
 	    //printf("try family %d, socket type %d, protocol %d\n",rp->ai_family,rp->ai_socktype,rp->ai_protocol);
-	    socketfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-	    if (socketfd == -1)
+	    serversocketfd = socket(rp->ai_family, rp->ai_socktype|SOCK_NONBLOCK|SOCK_CLOEXEC, rp->ai_protocol);
+	    if (serversocketfd == -1)
 	    {
 		//printf(" could not create socket\n");
 		perror(" could not create socket");
 		continue;
 	    }
 
-	    if (bind(socketfd, rp->ai_addr, rp->ai_addrlen) == 0)
+	    if (bind(serversocketfd, rp->ai_addr, rp->ai_addrlen) == 0)
 		break; /* Success */
 
 	    //printf(" could not bind to socket\n");
 	    perror(" could not bind to socket");
-	    close(socketfd);
+	    close(serversocketfd);
 	}
 
 	if (rp == NULL)
@@ -254,10 +412,50 @@ int main(int argc, char **argv)
 
 
     /* we are server. listen to incoming connections */
-    int retval = listen(socketfd, SOMAXCONN);
+    int retval = listen(serversocketfd, SOMAXCONN);
     if (retval)
     {
 	perror("error: can not listen to socket");
+	exit(EXIT_FAILURE);
+    }
+
+
+    /* prepare socket for fast cgi app */
+    /* NOTE: Linux allows abstract socket names which have no representation
+     * in the filesystem namespace.
+     */
+    char *sock_desc;
+    retval = asprintf(&sock_desc,"%c%s",'\0',base_socket_desc);
+//    retval = asprintf(&sock_desc,"%c%s",'a',base_socket_desc);
+    if (-1 == retval)
+    {
+	perror("error calling string format function");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
+    if (-1 == retval)
+    {
+	perror("can not open socket");
+	exit(EXIT_FAILURE);
+    }
+    childsocket = retval;
+
+   struct sockaddr_un childsockaddr;
+    childsockaddr.sun_family = AF_UNIX;
+    childsockaddr.sun_path[0] = sock_desc[0];
+    strncpy( childsockaddr.sun_path+1, sock_desc+1, sizeof(childsockaddr.sun_path)-1 );
+    retval = bind(childsocket, &childsockaddr, sizeof(childsockaddr));
+    if (-1 == retval)
+    {
+	perror("error calling bind");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = listen(childsocket, SOMAXCONN);
+    if (-1 == retval)
+    {
+	perror("can not listen to socket connecting fast cgi application");
 	exit(EXIT_FAILURE);
     }
 
@@ -316,8 +514,13 @@ int main(int argc, char **argv)
 
 
     /* wait for signals of child processes exiting (SIGCHLD) or to terminate
-     * this program (SIGTERM, SIGINT).
+     * this program (SIGTERM, SIGINT) or clients connecting via network to
+     * this server.
      */
+
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(serversocketfd, &rfds);
 
     /* set timeout to infinite */
     struct timeval timeout, *timeout_ptr = NULL;
@@ -329,15 +532,17 @@ int main(int argc, char **argv)
     int has_finished = 0;
     while ( !has_finished )
     {
-	/* wait for signals or timeout */
+	/* wait for connections, signals or timeout */
 	/* NOTE: I expect a linux behavior over here:
 	 * If select() is interrupted by a signal handler, the timeout value
 	 * is modified to contain the remaining time.
 	 */
-	retval = select(0, NULL,NULL,NULL,timeout_ptr);
-	if (retval)
+	FD_ZERO(&rfds);
+	FD_SET(serversocketfd, &rfds);
+	retval = select(serversocketfd+1, &rfds,NULL,NULL,timeout_ptr);
+	if (-1 == retval)
 	{
-	    perror("error: calling select");
+	    perror("error: main() calling select");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -346,7 +551,7 @@ int main(int argc, char **argv)
 	 * If this expectation does not fulfill, we have to think over this
 	 * section.
 	 */
-	if ( do_terminate )
+	else if ( do_terminate )
 	{
 	    /* On the first run send all child processes the TERM signal,
 	     * then wait for the processes to exit normally. During this
@@ -439,11 +644,42 @@ int main(int argc, char **argv)
 	    }
 
 	}
+	else if (retval)
+	{
+	    /* data available */
+	    if (FD_ISSET(serversocketfd, &rfds))
+	    {
+		struct sockaddr addr;
+		socklen_t addrlen = sizeof(addr);
+		retval = accept(serversocketfd, &addr, &addrlen);
+		if (-1 == retval)
+		{
+		    perror("error: calling accept");
+		    exit(EXIT_FAILURE);
+		}
+
+		/* NOTE: aside from the general rule
+		 * "malloc() and free() within the same function"
+		 * we transfer the responsibility for this info memory
+		 * to the thread itself.
+		 */
+		struct thread_info *ti = malloc(sizeof(*ti));
+		ti->new_server_fd = retval;
+		ti->client_socket_path = sock_desc;
+		pthread_t thread;
+		pthread_create(&thread, NULL, thread_handle_connection, ti);
+	    }
+	}
+	else
+	{
+	    /* no further data available */
+	}
 
     }
     /* wait some seconds to check if every child has exited.
      * else send sigkill signal.
      */
 
+    free(sock_desc);
     return EXIT_SUCCESS;
 }

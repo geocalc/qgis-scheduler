@@ -10,8 +10,8 @@ CFLAGS += -pipe -ggdb -O0
 #CFLAGS += -pipe -O3 -march=native
 #CFLAGS += -DNDEBUG
 
-CFLAGS += #-pthread 
-LDFLAGS += #-pthread
+CFLAGS += -pthread
+LDFLAGS += -pthread
 LDLIBS += #-lfcgi -liniparser
 
 # ---------------------------------
