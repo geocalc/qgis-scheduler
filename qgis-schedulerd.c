@@ -1,9 +1,9 @@
 /*
     Scheduler program for QGis server program. Talks FCGI with web server
-    and FCGI with QGis server. Selects the correct server program based on
+    and FCGI with QGis server. Selects the right QGIS server program based on
     the URL given from web-gis client program.
 
-    Copyright (C) 2015  Jörg Habenicht (jh@mwerk.net)
+    Copyright (C) 2015,2016  Jörg Habenicht (jh@mwerk.net)
 
     This file is part of qgis-server-scheduler
 
@@ -21,6 +21,32 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+
+/* Definition of process status
+ *
+ * A process is IN_USE if it calculates a request.
+ *
+ * A process is OPEN_IDLE if it does not calculate a request and keeps the
+ *  previous used connection open.
+ *
+ * A process is IDLE if it waits for a connection on the socket or network
+ *  file descriptor.
+ */
+
+
+/* Behavior during many connection requests:
+ *
+ * An fcgi connection request arrives via ip network.
+ * All processes (for the given project) are IN_USE.
+ * Start a new process, connect to it, feed it the connection data from
+ * network and deliver its result.
+ *
+ * An fcgi connection request arrives via ip network.
+ * A process (for the given project) is OPEN_IDLE.
+ * Close the current connection to the process and open a new connection to it.
+ * Note: Another approach may be to reuse the existing connection to the
+ * process by giving its corresponding worker thread the new network connection.
+ */
 
 
 
