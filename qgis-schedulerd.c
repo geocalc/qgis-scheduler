@@ -519,7 +519,7 @@ int main(int argc, char **argv)
     }
     childsocket = retval;
 
-   struct sockaddr_un childsockaddr;
+    struct sockaddr_un childsockaddr;
     childsockaddr.sun_family = AF_UNIX;
     childsockaddr.sun_path[0] = sock_desc[0];
     strncpy( childsockaddr.sun_path+1, sock_desc+1, sizeof(childsockaddr.sun_path)-1 );
@@ -597,8 +597,6 @@ int main(int argc, char **argv)
      */
 
     fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(serversocketfd, &rfds);
 
     /* set timeout to infinite */
     struct timeval timeout, *timeout_ptr = NULL;
@@ -724,7 +722,7 @@ int main(int argc, char **argv)
 	}
 	else if (retval)
 	{
-	    /* data available */
+	    /* connection available */
 	    if (FD_ISSET(serversocketfd, &rfds))
 	    {
 		struct sockaddr addr;
@@ -735,7 +733,19 @@ int main(int argc, char **argv)
 		    perror("error: calling accept");
 		    exit(EXIT_FAILURE);
 		}
-
+		{
+		    char hbuf[80], sbuf[10];
+		    int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
+	                       sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+		    if (ret < 0)
+		    {
+			fprintf(stderr, "error: can not convert host address: %s\n", gai_strerror(ret));
+		    }
+		    else
+		    {
+			fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
+		    }
+		}
 		/* NOTE: aside from the general rule
 		 * "malloc() and free() within the same function"
 		 * we transfer the responsibility for this info memory
