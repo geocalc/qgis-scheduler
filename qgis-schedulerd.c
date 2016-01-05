@@ -174,6 +174,7 @@ void *thread_handle_connection(void *arg)
     int childfd;
     static const int buffersize = 1024;
     char buffer[buffersize];
+    const pthread_t thread_id = pthread_self();
 
     fprintf(stderr, "starting new connection thread\n");
     /* get the address of the socket transferred to the child process,
@@ -220,7 +221,7 @@ void *thread_handle_connection(void *arg)
     maxfd++;
 
     /* set timeout to infinite */
-    struct timeval timeout;
+//    struct timeval timeout;
 //    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
 //    timeout.tv_usec = 0;
 
@@ -228,10 +229,10 @@ void *thread_handle_connection(void *arg)
     while ( !has_finished )
     {
 	/* wait for connections, signals or timeout */
-	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	timeout.tv_usec = 0;
+//	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+//	timeout.tv_usec = 0;
 
-	fprintf(stderr, "selecting on network connections\n");
+	fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 	if ( !can_read_networksock )
@@ -251,32 +252,33 @@ void *thread_handle_connection(void *arg)
 
 	if (FD_ISSET(serversocketfd, &wfds))
 	{
-	    fprintf(stderr, " can write to network socket\n");
+	    fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
 	    can_write_networksock = 1;
 	}
 	if (FD_ISSET(childfd, &wfds))
 	{
-	    fprintf(stderr, " can write to unix socket\n");
+	    fprintf(stderr, "[%ld]  can write to unix socket\n", thread_id);
 	    can_write_unixsock = 1;
 	}
 	if (FD_ISSET(serversocketfd, &rfds))
 	{
-	    fprintf(stderr, " can read from network socket\n");
+	    fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
 	    can_read_networksock = 1;
 	}
 	if (FD_ISSET(childfd, &rfds))
 	{
-	    fprintf(stderr, " can read from unix socket\n");
+	    fprintf(stderr, "[%ld]  can read from unix socket\n", thread_id);
 	    can_read_unixsock = 1;
 	}
 
 	if (can_read_networksock && can_write_unixsock)
 	{
-	    fprintf(stderr, " read data from network socket\n");
+	    fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
 	    retval = read(serversocketfd, buffer, buffersize);
+	    fprintf(stderr, "read %d, ", retval);
 	    if (-1 == retval)
 	    {
-		perror("error: reading from network socket");
+		perror("\nerror: reading from network socket");
 		exit(EXIT_FAILURE);
 	    }
 	    else if (0 == retval)
@@ -284,10 +286,11 @@ void *thread_handle_connection(void *arg)
 		/* end of file received. exit this thread */
 		break;
 	    }
-	    fprintf(stderr, "network data:\n");
+	    fprintf(stderr, "\n[%ld] network data:\n", thread_id);
 	    fwrite(buffer, 1, retval, stderr);
 	    fprintf(stderr, "\n");
 	    retval = write(childfd, buffer, retval);
+	    fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
 	    if (-1 == retval)
 	    {
 		perror("error: writing to child process socket");
@@ -299,11 +302,12 @@ void *thread_handle_connection(void *arg)
 
 	if (can_read_unixsock && can_write_networksock)
 	{
-	    fprintf(stderr, " read data from unix socket\n");
+	    fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
 	    retval = read(childfd, buffer, buffersize);
+	    fprintf(stderr, "read %d, ", retval);
 	    if (-1 == retval)
 	    {
-		perror("error: reading from network socket");
+		perror("\nerror: reading from network socket");
 		exit(EXIT_FAILURE);
 	    }
 	    else if (0 == retval)
@@ -311,10 +315,11 @@ void *thread_handle_connection(void *arg)
 		/* end of file received. exit this thread */
 		break;
 	    }
-	    fprintf(stderr, "fcgi data:\n");
-	    fwrite(buffer, 1, retval, stderr);
-	    fprintf(stderr, "\n");
+//	    fprintf(stderr, "fcgi data:\n");
+//	    fwrite(buffer, 1, retval, stderr);
+//	    fprintf(stderr, "\n");
 	    retval = write(serversocketfd, buffer, retval);
+	    fprintf(stderr, "wrote %d\n", retval);
 	    if (-1 == retval)
 	    {
 		perror("error: writing to child process socket");
@@ -327,7 +332,7 @@ void *thread_handle_connection(void *arg)
     }
 
     /* clean up */
-    fprintf(stderr, "end connection thread\n");
+    fprintf(stderr, "[%ld] end connection thread\n", thread_id);
     close (childfd);
     close (serversocketfd);
     free(arg);
@@ -500,7 +505,6 @@ int main(int argc, char **argv)
      */
     char *sock_desc;
     retval = asprintf(&sock_desc,"%c%s",'\0',base_socket_desc);
-//    retval = asprintf(&sock_desc,"%c%s",'a',base_socket_desc);
     if (-1 == retval)
     {
 	perror("error calling string format function");
