@@ -66,6 +66,9 @@
 #include <assert.h>
 #include <errno.h>
 
+#include <fastcgi.h>
+
+
 struct thread_info
 {
     int new_server_fd;
@@ -114,8 +117,8 @@ pid_t start_new_child(void)
 	 * fork
 	 * exec
 	 */
-	assert(childsocket != 0);
-	int ret = dup2(childsocket, 0);
+	assert(childsocket != FCGI_LISTENSOCK_FILENO);
+	int ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == ret)
 	{
 	    perror("error calling dup2");
@@ -160,6 +163,9 @@ void *thread_handle_connection(void *arg)
      * this thread. here we connect() to the child thread and transfer the data
      * between the network fd and the child process fd and back.
      */
+	/* TODO: get the network packet size of this connection and
+	 * adopt the packet transfer size to the network packet size.
+	 */
     assert(arg);
     struct thread_info *tinfo = arg;
     int serversocketfd = tinfo->new_server_fd;
