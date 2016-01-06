@@ -57,14 +57,14 @@
  * socket file descriptor, pid, busy state).
  * We select an idle process and connect to it. If the number of idle processes
  * drops below a threshold, a new process is started, fed with
- * project data and set idle.
+ * project data (state init) and set idle (state idle).
  *
  * To connect to a process we create a new thread, hand over the network file
  * descriptor and the handle to the process entry.
  * The thread writes its id to the process entry and connects to the socket to
  * the child process.
  * If the connection succeeds the thread marks the busy state of the child
- * process to be busy (status busy).
+ * process to be busy (state busy).
  *
  * If the network connection closes the thread ends.
  * If the socket connection closes the thread ends.
