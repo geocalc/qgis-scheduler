@@ -24,15 +24,65 @@
 
 /* Definition of process status
  *
- * A process is IN_USE if it calculates a request.
+ * A process is PROC_BUSY if it calculates a request.
  *
- * A process is OPEN_IDLE if it does not calculate a request and keeps the
- *  previous used connection open.
+ * A process is PROC_OPEN_IDLE if it does not calculate a request and keeps the
+ *  previous used connection open. This should not happen during the execution
+ *  of this program.
  *
- * A process is IDLE if it waits for a connection on the socket or network
+ * A process is PROC_IDLE if it waits for a connection on the socket or network
  *  file descriptor.
+ *
+ * A process is PROC_INIT if it is fed with project data for the first time
+ *  after its start.
+ *
+ * The state diagram show these transitions:
+ * START->PROC_INIT
+ * PROC_INIT->PROC_IDLE	(ready to accept socket connection)
+ * PROC_IDLE->PROC_BUSY (calculating a request)
+ * PROC_BUSY->PROC_IDLE	(ready to accept socket connection)
+ * any state->TERMINATE/END
  */
 
+/* Description of dis-/connect behavior
+ *
+ * A network connection request arrives. The request is accept()ed.
+ * A new thread is spawned and gets the file descriptor of the accepted network
+ * connection.
+ * The thread reads the input from network until the http URL arrives. We parse
+ * the URL for the name of the QGIS project.
+ * With the QGIS project a suitable process list is selected. In this we have
+ * a list of child processes working this project.
+ * Each entry in this process list got the connection data (client-server
+ * socket file descriptor, pid, busy state).
+ * We select an idle process and connect to it. If the number of idle processes
+ * drops below a threshold, a new process is started, fed with
+ * project data and set idle.
+ *
+ * To connect to a process we create a new thread, hand over the network file
+ * descriptor and the handle to the process entry.
+ * The thread writes its id to the process entry and connects to the socket to
+ * the child process.
+ * If the connection succeeds the thread marks the busy state of the child
+ * process to be busy (status busy).
+ *
+ * If the network connection closes the thread ends.
+ * If the socket connection closes the thread ends.
+ * If the data from socket or network sends the FCGI token FCGI_END_REQUEST
+ * the thread ends.
+ * If the data from network sends the FCGI token FCGI_ABORT_REQUEST the thread
+ * ends.
+ *
+ * If the thread ends, the thread id is removed from the process entry
+ * handling the project, the process state is set to idle, the network
+ * connection is closed as well as the socket connection.
+ *
+ * If too many idle processes are lingering around some of them may be closed,
+ * so this programs sends a TERM or KILL signal to the child process.
+ *
+ * If a child process closes itself, a new process is spawned, fed with
+ * project data and set idle.
+ */
 
 /* Behavior during many connection requests:
  *
@@ -394,6 +444,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
     }
 }
 
+
 int main(int argc, char **argv)
 {
     const int port = 10177;
@@ -624,8 +675,8 @@ int main(int argc, char **argv)
 
 	/* over here I expect the main thread to continue AFTER the signal
 	 * handler has ended its thread.
-	 * If this expectation does not fulfill, we have to think over this
-	 * section.
+	 * If this expectation does not fulfill we have to look for a different
+	 * design in this section.
 	 */
 	else if ( do_terminate )
 	{
