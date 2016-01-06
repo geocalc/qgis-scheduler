@@ -115,14 +115,12 @@
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
-
 #include <fastcgi.h>
 
 
 struct thread_info
 {
     int new_server_fd;
-    const char *client_socket_path;
 };
 
 
@@ -152,11 +150,84 @@ void usage(const char *argv0)
     //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
 }
 
-const char *command = NULL;
-int childsocket = -1;
 
-pid_t start_new_child(void)
+/* This global number is counted upwards, overflow included.
+ * Every new unix socket gets this number attached creating a unique socket
+ * path. In the very unlikely case the number is already given to an existing
+ * socket path, the number is counted upwards again until we find a path which
+ * is not assigned to a socket.
+ * I assume here we do not create UINT_MAX number of sockets in this computer..
+ */
+static unsigned int socket_id = 0;
+
+enum process_state_e
 {
+    MY_PROC_START = 0,
+    MY_PROC_INIT,
+    MY_PROC_IDLE,
+    MY_PROC_OPEN_IDLE,
+    MY_PROC_BUSY,
+};
+
+//static const int nr_childs = 2;
+#define nr_childs	1
+pid_t child_pid[nr_childs];
+const char *command = NULL;
+int childsocket[nr_childs] = {-1};
+enum process_state_e status[nr_childs] = {MY_PROC_START};
+
+pid_t start_new_child(int arraynr)
+{
+    /* prepare the socket to connect to this child process only */
+    /* NOTE: Linux allows abstract socket names which have no representation
+     * in the filesystem namespace.
+     */
+    int retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
+    if (-1 == retval)
+    {
+	perror("can not create socket for fcgi program");
+	exit(EXIT_FAILURE);
+    }
+    childsocket[arraynr] = retval;
+
+    for (;;)
+    {
+	int socket_suffix = socket_id++;
+	struct sockaddr_un childsockaddr;
+	childsockaddr.sun_family = AF_UNIX;
+	retval = snprintf( childsockaddr.sun_path, sizeof(childsockaddr.sun_path), "%c%s%u", '\0', base_socket_desc, socket_suffix );
+	if (-1 == retval)
+	{
+	    perror("error calling string format function snprintf");
+	    exit(EXIT_FAILURE);
+	}
+
+	retval = bind(childsocket[arraynr], &childsockaddr, sizeof(childsockaddr));
+	if (-1 == retval)
+	{
+	    if (EADDRINUSE==errno)
+	    {
+		continue;	// reiterate with next number
+	    }
+	    else
+	    {
+		perror("error calling bind");
+		exit(EXIT_FAILURE);
+	    }
+	}
+	break;
+    }
+
+    /* the child process listens for connections, one at a time */
+    retval = listen(childsocket[arraynr], 1);
+    if (-1 == retval)
+    {
+	perror("can not listen to socket connecting fast cgi application");
+	exit(EXIT_FAILURE);
+    }
+
+
+
     pid_t pid = fork();
     if (0 == pid)
     {
@@ -167,8 +238,8 @@ pid_t start_new_child(void)
 	 * fork
 	 * exec
 	 */
-	assert(childsocket != FCGI_LISTENSOCK_FILENO);
-	int ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
+	assert(childsocket[arraynr] != FCGI_LISTENSOCK_FILENO);
+	int ret = dup2(childsocket[arraynr], FCGI_LISTENSOCK_FILENO);
 	if (-1 == ret)
 	{
 	    perror("error calling dup2");
@@ -195,6 +266,8 @@ pid_t start_new_child(void)
     else if (0 < pid)
     {
 	/* parent */
+	child_pid[arraynr] = pid;
+	status[arraynr] = MY_PROC_IDLE;
     }
     else
     {
@@ -225,12 +298,29 @@ void *thread_handle_connection(void *arg)
     static const int buffersize = 1024;
     char buffer[buffersize];
     const pthread_t thread_id = pthread_self();
+    int free_socket;
+
+
 
     fprintf(stderr, "starting new connection thread\n");
+    for (free_socket = 0; free_socket<nr_childs; free_socket++)
+    {
+	if (MY_PROC_IDLE == status[free_socket])
+	    break;
+    }
+    if (nr_childs == free_socket)
+    {
+	/* all child processes busy */
+	fprintf(stderr, "error: all %d child programs are busy. disconnect\n", nr_childs);
+	close(serversocketfd);
+	return NULL;
+    }
+
+
     /* get the address of the socket transferred to the child process,
      * then connect to it.
      */
-    int retval = getsockname(childsocket, &sockaddr, &sockaddrlen);
+    int retval = getsockname(childsocket[free_socket], &sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
 	perror("error retrieving the name of child process socket");
@@ -390,9 +480,6 @@ void *thread_handle_connection(void *arg)
     return NULL;
 }
 
-//static const int nr_childs = 2;
-#define nr_childs	1
-pid_t child_pid[nr_childs];
 int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
 
 /* act on signals */
@@ -425,7 +512,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		child_pid[i] = start_new_child();
+		start_new_child(i);
 	    }
 	    else
 	    {
@@ -550,44 +637,6 @@ int main(int argc, char **argv)
     }
 
 
-    /* prepare socket for fast cgi app */
-    /* NOTE: Linux allows abstract socket names which have no representation
-     * in the filesystem namespace.
-     */
-    char *sock_desc;
-    retval = asprintf(&sock_desc,"%c%s",'\0',base_socket_desc);
-    if (-1 == retval)
-    {
-	perror("error calling string format function");
-	exit(EXIT_FAILURE);
-    }
-
-    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
-    if (-1 == retval)
-    {
-	perror("can not create socket for fcgi program");
-	exit(EXIT_FAILURE);
-    }
-    childsocket = retval;
-
-    struct sockaddr_un childsockaddr;
-    childsockaddr.sun_family = AF_UNIX;
-    childsockaddr.sun_path[0] = sock_desc[0];
-    strncpy( childsockaddr.sun_path+1, sock_desc+1, sizeof(childsockaddr.sun_path)-1 );
-    retval = bind(childsocket, &childsockaddr, sizeof(childsockaddr));
-    if (-1 == retval)
-    {
-	perror("error calling bind");
-	exit(EXIT_FAILURE);
-    }
-
-    retval = listen(childsocket, SOMAXCONN);
-    if (-1 == retval)
-    {
-	perror("can not listen to socket connecting fast cgi application");
-	exit(EXIT_FAILURE);
-    }
-
 
     if ( !no_daemon )
     {
@@ -638,7 +687,7 @@ int main(int argc, char **argv)
     int i;
     for (i=0; i<nr_childs; i++)
     {
-	child_pid[i] = start_new_child();
+	start_new_child(i);
     }
 
 
@@ -804,7 +853,6 @@ int main(int argc, char **argv)
 		 */
 		struct thread_info *ti = malloc(sizeof(*ti));
 		ti->new_server_fd = retval;
-		ti->client_socket_path = sock_desc;
 		pthread_t thread;
 		pthread_create(&thread, NULL, thread_handle_connection, ti);
 	    }
@@ -818,7 +866,5 @@ int main(int argc, char **argv)
     /* wait some seconds to check if every child has exited.
      * else send sigkill signal.
      */
-
-    free(sock_desc);
     return EXIT_SUCCESS;
 }
