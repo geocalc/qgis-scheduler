@@ -118,9 +118,16 @@
 #include <fastcgi.h>
 
 
-struct thread_info
+
+
+struct thread_connection_handler_args
 {
     int new_accepted_inet_fd;
+};
+
+struct thread_start_new_child_args
+{
+    int id;
 };
 
 
@@ -159,6 +166,7 @@ void usage(const char *argv0)
  * I assume here we do not create UINT_MAX number of sockets in this computer..
  */
 static unsigned int socket_id = 0;
+pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 enum process_state_e
 {
@@ -176,8 +184,13 @@ const char *command = NULL;
 int childsocket[nr_childs] = {-1};
 enum process_state_e status[nr_childs] = {MY_PROC_START};
 
-pid_t start_new_child(int arraynr)
+
+void *thread_start_new_child(void *arg)
 {
+    assert(arg);
+    struct thread_start_new_child_args *tinfo = arg;
+    int arraynr = tinfo->id;
+
     /* prepare the socket to connect to this child process only */
     /* NOTE: Linux allows abstract socket names which have no representation
      * in the filesystem namespace.
@@ -192,7 +205,10 @@ pid_t start_new_child(int arraynr)
 
     for (;;)
     {
-	int socket_suffix = socket_id++;
+	pthread_mutex_lock (&socket_id_mutex);
+	unsigned int socket_suffix = socket_id++;
+	pthread_mutex_unlock (&socket_id_mutex);
+
 	struct sockaddr_un childsockaddr;
 	childsockaddr.sun_family = AF_UNIX;
 	retval = snprintf( childsockaddr.sun_path, sizeof(childsockaddr.sun_path), "%c%s%u", '\0', base_socket_desc, socket_suffix );
@@ -276,7 +292,7 @@ pid_t start_new_child(int arraynr)
 	exit(EXIT_FAILURE);
     }
 
-    return pid;
+    return NULL;
 }
 
 void *thread_handle_connection(void *arg)
@@ -290,7 +306,7 @@ void *thread_handle_connection(void *arg)
 	 * adopt the packet transfer size to the network packet size.
 	 */
     assert(arg);
-    struct thread_info *tinfo = arg;
+    struct thread_connection_handler_args *tinfo = arg;
     int inetsocketfd = tinfo->new_accepted_inet_fd;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
@@ -512,7 +528,15 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		start_new_child(i);
+		/* NOTE: aside from the general rule
+		 * "malloc() and free() within the same function"
+		 * we transfer the responsibility for this info memory
+		 * to the thread itself.
+		 */
+		struct thread_start_new_child_args *ti = malloc(sizeof(*ti));
+		ti->id = i;
+		pthread_t thread;
+		pthread_create(&thread, NULL, thread_start_new_child, ti);
 	    }
 	    else
 	    {
@@ -684,11 +708,16 @@ int main(int argc, char **argv)
 
 
     /* start the children */
+    pthread_t threads[nr_childs];
     int i;
     for (i=0; i<nr_childs; i++)
     {
-	start_new_child(i);
+	struct thread_start_new_child_args *ti = malloc(sizeof(*ti));
+	ti->id = i;
+	pthread_create(&threads[i], NULL, thread_start_new_child, ti);
     }
+    for (i=0; i<nr_childs; i++)
+	pthread_join(threads[i], NULL);
 
 
     /* wait for signals of child processes exiting (SIGCHLD) or to terminate
@@ -851,7 +880,7 @@ int main(int argc, char **argv)
 		 * we transfer the responsibility for this info memory
 		 * to the thread itself.
 		 */
-		struct thread_info *ti = malloc(sizeof(*ti));
+		struct thread_connection_handler_args *ti = malloc(sizeof(*ti));
 		ti->new_accepted_inet_fd = retval;
 		pthread_t thread;
 		pthread_create(&thread, NULL, thread_handle_connection, ti);
