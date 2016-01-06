@@ -120,7 +120,7 @@
 
 struct thread_info
 {
-    int new_server_fd;
+    int new_accepted_inet_fd;
 };
 
 
@@ -291,10 +291,10 @@ void *thread_handle_connection(void *arg)
 	 */
     assert(arg);
     struct thread_info *tinfo = arg;
-    int serversocketfd = tinfo->new_server_fd;
+    int inetsocketfd = tinfo->new_accepted_inet_fd;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
-    int childfd;
+    int childunixsocketfd;
     static const int buffersize = 1024;
     char buffer[buffersize];
     const pthread_t thread_id = pthread_self();
@@ -312,7 +312,7 @@ void *thread_handle_connection(void *arg)
     {
 	/* all child processes busy */
 	fprintf(stderr, "error: all %d child programs are busy. disconnect\n", nr_childs);
-	close(serversocketfd);
+	close(inetsocketfd);
 	return NULL;
     }
 
@@ -335,8 +335,8 @@ void *thread_handle_connection(void *arg)
 	perror("error: can not create socket to child process");
 	exit(EXIT_FAILURE);
     }
-    childfd = retval;
-    retval = connect(childfd, &sockaddr, sizeof(sockaddr));
+    childunixsocketfd = retval;
+    retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
 	perror("error: can not connect to child process");
@@ -353,10 +353,10 @@ void *thread_handle_connection(void *arg)
     int can_write_unixsock = 0;
 
 
-    if (serversocketfd > maxfd)
-	maxfd = serversocketfd;
-    if (childfd > maxfd)
-	maxfd = childfd;
+    if (inetsocketfd > maxfd)
+	maxfd = inetsocketfd;
+    if (childunixsocketfd > maxfd)
+	maxfd = childunixsocketfd;
 
     maxfd++;
 
@@ -376,13 +376,13 @@ void *thread_handle_connection(void *arg)
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
 	if ( !can_read_networksock )
-	    FD_SET(serversocketfd, &rfds);
+	    FD_SET(inetsocketfd, &rfds);
 	if ( !can_write_networksock )
-	    FD_SET(serversocketfd, &wfds);
+	    FD_SET(inetsocketfd, &wfds);
 	if ( !can_read_unixsock )
-	    FD_SET(childfd, &rfds);
+	    FD_SET(childunixsocketfd, &rfds);
 	if ( !can_write_unixsock )
-	    FD_SET(childfd, &wfds);
+	    FD_SET(childunixsocketfd, &wfds);
 	retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
 	if (-1 == retval)
 	{
@@ -390,22 +390,22 @@ void *thread_handle_connection(void *arg)
 	    exit(EXIT_FAILURE);
 	}
 
-	if (FD_ISSET(serversocketfd, &wfds))
+	if (FD_ISSET(inetsocketfd, &wfds))
 	{
 	    fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
 	    can_write_networksock = 1;
 	}
-	if (FD_ISSET(childfd, &wfds))
+	if (FD_ISSET(childunixsocketfd, &wfds))
 	{
 	    fprintf(stderr, "[%ld]  can write to unix socket\n", thread_id);
 	    can_write_unixsock = 1;
 	}
-	if (FD_ISSET(serversocketfd, &rfds))
+	if (FD_ISSET(inetsocketfd, &rfds))
 	{
 	    fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
 	    can_read_networksock = 1;
 	}
-	if (FD_ISSET(childfd, &rfds))
+	if (FD_ISSET(childunixsocketfd, &rfds))
 	{
 	    fprintf(stderr, "[%ld]  can read from unix socket\n", thread_id);
 	    can_read_unixsock = 1;
@@ -414,7 +414,7 @@ void *thread_handle_connection(void *arg)
 	if (can_read_networksock && can_write_unixsock)
 	{
 	    fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-	    retval = read(serversocketfd, buffer, buffersize);
+	    retval = read(inetsocketfd, buffer, buffersize);
 	    fprintf(stderr, "read %d, ", retval);
 	    if (-1 == retval)
 	    {
@@ -429,7 +429,7 @@ void *thread_handle_connection(void *arg)
 	    fprintf(stderr, "\n[%ld] network data:\n", thread_id);
 	    fwrite(buffer, 1, retval, stderr);
 	    fprintf(stderr, "\n");
-	    retval = write(childfd, buffer, retval);
+	    retval = write(childunixsocketfd, buffer, retval);
 	    fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
 	    if (-1 == retval)
 	    {
@@ -443,7 +443,7 @@ void *thread_handle_connection(void *arg)
 	if (can_read_unixsock && can_write_networksock)
 	{
 	    fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
-	    retval = read(childfd, buffer, buffersize);
+	    retval = read(childunixsocketfd, buffer, buffersize);
 	    fprintf(stderr, "read %d, ", retval);
 	    if (-1 == retval)
 	    {
@@ -458,7 +458,7 @@ void *thread_handle_connection(void *arg)
 //	    fprintf(stderr, "fcgi data:\n");
 //	    fwrite(buffer, 1, retval, stderr);
 //	    fprintf(stderr, "\n");
-	    retval = write(serversocketfd, buffer, retval);
+	    retval = write(inetsocketfd, buffer, retval);
 	    fprintf(stderr, "wrote %d\n", retval);
 	    if (-1 == retval)
 	    {
@@ -473,8 +473,8 @@ void *thread_handle_connection(void *arg)
 
     /* clean up */
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
-    close (childfd);
-    close (serversocketfd);
+    close (childunixsocketfd);
+    close (inetsocketfd);
     free(arg);
 
     return NULL;
@@ -852,7 +852,7 @@ int main(int argc, char **argv)
 		 * to the thread itself.
 		 */
 		struct thread_info *ti = malloc(sizeof(*ti));
-		ti->new_server_fd = retval;
+		ti->new_accepted_inet_fd = retval;
 		pthread_t thread;
 		pthread_create(&thread, NULL, thread_handle_connection, ti);
 	    }
