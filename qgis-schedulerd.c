@@ -203,11 +203,30 @@ void *thread_start_new_child(void *arg)
     }
     childsocket[arraynr] = retval;
 
+    /* security rope for the really unlikely case
+     * that we got no more numbers free.
+     * To prevent infinite loop
+     */
+    pthread_mutex_lock (&socket_id_mutex);
+    unsigned int socket_suffix_start = socket_id-1;
+    pthread_mutex_unlock (&socket_id_mutex);
+
+
     for (;;)
     {
 	pthread_mutex_lock (&socket_id_mutex);
 	unsigned int socket_suffix = socket_id++;
 	pthread_mutex_unlock (&socket_id_mutex);
+
+	if (socket_suffix == socket_suffix_start)
+	{
+	    /* we tested UINT_MAX numbers without success.
+	     * exit here, because we can not get any more numbers.
+	     * Or we have a programmers error here..
+	     */
+	    fprintf(stderr, "error: out of numbers to create socket name. exit");
+	    exit(EXIT_FAILURE);
+	}
 
 	struct sockaddr_un childsockaddr;
 	childsockaddr.sun_family = AF_UNIX;
