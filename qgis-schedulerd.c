@@ -431,8 +431,22 @@ void *thread_handle_connection(void *arg)
 	retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
 	if (-1 == retval)
 	{
-	    perror("error: thread_handle_connection() calling select");
-	    exit(EXIT_FAILURE);
+	    switch (errno)
+	    {
+	    case EINTR:
+		/* We received a termination signal.
+		 * End this thread, close all file descriptors
+		 * and let the main thread clean up.
+		 */
+		fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		break;
+
+	    default:
+		perror("error: thread_handle_connection() calling select");
+		exit(EXIT_FAILURE);
+		// no break needed
+	    }
+	    break;
 	}
 
 	if (FD_ISSET(inetsocketfd, &wfds))
@@ -577,8 +591,10 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	break;
     }
     case SIGTERM:	// fall through
+    case SIGINT:
     case SIGQUIT:
 	/* termination signal, kill all child processes */
+	fprintf(stderr, "exit program\n");
 	do_terminate = 1;
 	break;
     }
@@ -715,6 +731,7 @@ int main(int argc, char **argv)
     sigemptyset(&action.sa_mask);
     sigaddset(&action.sa_mask, SIGCHLD);
     sigaddset(&action.sa_mask, SIGTERM);
+    sigaddset(&action.sa_mask, SIGINT);
     sigaddset(&action.sa_mask, SIGQUIT);
     retval = sigaction(SIGTERM, &action, NULL);
     if (retval)
@@ -729,6 +746,12 @@ int main(int argc, char **argv)
 	exit(EXIT_FAILURE);
     }
     retval = sigaction(SIGCHLD, &action, NULL);
+    if (retval)
+    {
+	perror("error: can not install signal handler");
+	exit(EXIT_FAILURE);
+    }
+    retval = sigaction(SIGINT, &action, NULL);
     if (retval)
     {
 	perror("error: can not install signal handler");
@@ -776,8 +799,21 @@ int main(int argc, char **argv)
 	retval = select(serversocketfd+1, &rfds,NULL,NULL,timeout_ptr);
 	if (-1 == retval)
 	{
-	    perror("error: main() calling select");
-	    exit(EXIT_FAILURE);
+	    switch (errno)
+	    {
+	    case EINTR:
+		/* We received an interrupt, possibly a termination signal.
+		 * Let the main thread clean up: Wait for all child processes
+		 * to end, close all remaining file descriptors and exit.
+		 */
+		fprintf(stderr, "main() received interrupt\n");
+		break;
+
+	    default:
+		perror("error: main() calling select");
+		exit(EXIT_FAILURE);
+		// no break needed
+	    }
 	}
 
 	/* over here I expect the main thread to continue AFTER the signal
@@ -785,7 +821,7 @@ int main(int argc, char **argv)
 	 * If this expectation does not fulfill we have to look for a different
 	 * design in this section.
 	 */
-	else if ( do_terminate )
+	if ( do_terminate )
 	{
 	    /* On the first run send all child processes the TERM signal,
 	     * then wait for the processes to exit normally. During this
@@ -921,6 +957,10 @@ int main(int argc, char **argv)
 	}
 
     }
+
+    fprintf(stderr, "closing network socket\n");
+    close(serversocketfd);
+
     /* wait some seconds to check if every child has exited.
      * else send sigkill signal.
      */
