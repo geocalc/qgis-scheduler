@@ -311,6 +311,8 @@ void *thread_start_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
 
+    free(arg);
+
     return NULL;
 }
 
@@ -335,7 +337,15 @@ void *thread_handle_connection(void *arg)
     const pthread_t thread_id = pthread_self();
     int free_socket;
 
-
+    /* detach myself from the main thread. This is to collect resources after
+     * this thread ends. Because there is no join() waiting for this thread
+     */
+    int retval = pthread_detach(thread_id);
+    if (-1 == retval)
+    {
+	perror("error detaching thread");
+	exit(EXIT_FAILURE);
+    }
 
     fprintf(stderr, "starting new connection thread\n");
     for (free_socket = 0; free_socket<nr_childs; free_socket++)
@@ -355,7 +365,7 @@ void *thread_handle_connection(void *arg)
     /* get the address of the socket transferred to the child process,
      * then connect to it.
      */
-    int retval = getsockname(childsocket[free_socket], &sockaddr, &sockaddrlen);
+    retval = getsockname(childsocket[free_socket], &sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
 	perror("error retrieving the name of child process socket");
@@ -914,5 +924,6 @@ int main(int argc, char **argv)
     /* wait some seconds to check if every child has exited.
      * else send sigkill signal.
      */
+    pthread_exit(NULL);
     return EXIT_SUCCESS;
 }
