@@ -353,7 +353,7 @@ void *thread_start_new_child(void *arg)
     else if (0 < pid)
     {
 	/* parent */
-	childprocs[arraynr] = new_qgis_process(pid, childsocket);
+	childprocs[arraynr] = qgis_process_new(pid, childsocket);
 
 	/* NOTE: aside from the general rule
 	 * "malloc() and free() within the same function"
@@ -768,7 +768,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	{
 	    fprintf(stderr, "process %d ended\n", pid);
 	    /* Erase the old entry. The process does not exist anymore */
-	    delete_qgis_process(childprocs[i]);
+	    qgis_process_delete(childprocs[i]);
 	    childprocs[i] = NULL;	/* in the time between here and
 					 * creating a new child process this
 					 * entry is defined NULL
@@ -1131,7 +1131,7 @@ int main(int argc, char **argv)
 				    /* child process is not existent anymore.
 				     * erase it from the list of available processes
 				     */
-				    delete_qgis_process(childprocs[i]);
+				    qgis_process_delete(childprocs[i]);
 				    childprocs[i] = NULL;
 				    break;
 				default:
@@ -1181,7 +1181,7 @@ int main(int argc, char **argv)
 				/* child process is not existent anymore.
 				 * erase it from the list of available processes
 				 */
-				delete_qgis_process(childprocs[i]);
+				qgis_process_delete(childprocs[i]);
 				childprocs[i] = NULL;
 				break;
 			    default:

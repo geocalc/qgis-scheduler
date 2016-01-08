@@ -49,8 +49,8 @@ enum qgis_process_state_e
     PROC_BUSY,
 };
 
-struct qgis_process_s *new_qgis_process(pid_t pid, int process_socket_fd);
-void delete_qgis_process(struct qgis_process_s *proc);
+struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd);
+void qgis_process_delete(struct qgis_process_s *proc);
 
 int qgis_process_set_state_idle(struct qgis_process_s *proc);
 int qgis_process_set_state_busy(struct qgis_process_s *proc, pthread_t thread_id);

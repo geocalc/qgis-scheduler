@@ -72,7 +72,7 @@ static const char *get_state_str(enum qgis_process_state_e state)
 }
 
 
-struct qgis_process_s *new_qgis_process(pid_t pid, int process_socket_fd)
+struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
 {
     struct qgis_process_s *proc = calloc(1, sizeof(*proc));
     assert(proc);
@@ -93,7 +93,7 @@ struct qgis_process_s *new_qgis_process(pid_t pid, int process_socket_fd)
 }
 
 
-void delete_qgis_process(struct qgis_process_s *proc)
+void qgis_process_delete(struct qgis_process_s *proc)
 {
     if (proc)
     {
