@@ -1,10 +1,10 @@
 
 TARGET=qgis-schedulerd
 
-SOURCE=qgis-schedulerd.c #log.c
-HEADER= #log.h defaults.h
+SOURCE=qgis-schedulerd.c qgis_process.c #log.c
+HEADER=qgis_process.h #log.h defaults.h
 
-CFLAGS += -Wall
+CFLAGS += -Wall #-Wextra
 CFLAGS += -pipe -ggdb -O0
 #CFLAGS += -pipe -O2
 #CFLAGS += -pipe -O3 -march=native
