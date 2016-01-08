@@ -1194,11 +1194,22 @@ int main(int argc, char **argv)
 			}
 		    }
 		}
-		fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
-		/* set timeout to "some seconds" */
-		timeout_ptr = &timeout;
-		timeout.tv_sec = 10;
-		has_finished_first_run = 1;
+		if (0 < children)
+		{
+		    fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+		    /* set timeout to "some seconds" */
+		    timeout_ptr = &timeout;
+		    timeout.tv_sec = 10;
+		    has_finished_first_run = 1;
+		}
+		else
+		{
+		    /* no more child processes found to send signal.
+		     * exit immediately.
+		     */
+		    fprintf(stderr, "termination signal received, no more processes to signal, shut down\n");
+		    break;
+		}
 	    }
 
 	}
