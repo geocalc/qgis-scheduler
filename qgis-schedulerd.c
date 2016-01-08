@@ -742,9 +742,12 @@ void *thread_handle_connection(void *arg)
 int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
 
 /* act on signals */
+/* TODO: sometimes the program hangs during shutdown.
+ *       we receive a signal (SIGCHLD) but dont react on it?
+ */
 void signalaction(int signal, siginfo_t *info, void *ucontext)
 {
-    fprintf(stderr, "got signal %d\n", signal);
+    fprintf(stderr, "got signal %d from pid %d\n", signal, info->si_pid);
     switch (signal)
     {
     case SIGCHLD:
