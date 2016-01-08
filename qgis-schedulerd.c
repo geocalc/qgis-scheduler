@@ -115,11 +115,11 @@
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
-#include <limits.h>
+#include <stdint.h>
 #include <fastcgi.h>
 
 #include "qgis_process.h"
-
+#include "fcgi_state.h"
 
 #define min(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -131,7 +131,7 @@
      _a > _b ? _a : _b; })
 
 
-#define PRINT_NETWORK_DATA
+//#define PRINT_NETWORK_DATA
 //#define PRINT_SOCKET_DATA
 
 
@@ -534,6 +534,8 @@ void *thread_handle_connection(void *arg)
 	char *buffer = malloc(maxbufsize);
 	assert(buffer);
 
+	int session_start = 1;
+
 	int maxfd = 0;
 	fd_set rfds;
 	fd_set wfds;
@@ -618,26 +620,57 @@ void *thread_handle_connection(void *arg)
 	    if (can_read_networksock && can_write_unixsock)
 	    {
 		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-		retval = read(inetsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", retval);
-		if (-1 == retval)
+		int readbytes = read(inetsocketfd, buffer, maxbufsize);
+		fprintf(stderr, "read %d, ", readbytes);
+		if (-1 == readbytes)
 		{
 		    perror("\nerror: reading from network socket");
 		    exit(EXIT_FAILURE);
 		}
-		else if (0 == retval)
+		else if (0 == readbytes)
 		{
 		    /* end of file received. exit this thread */
 		    break;
 		}
 #ifdef PRINT_NETWORK_DATA
 		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
-		fwrite(buffer, 1, retval, stderr);
+		fwrite(buffer, 1, readbytes, stderr);
 		fprintf(stderr, "\n");
 #endif
-		retval = write(childunixsocketfd, buffer, retval);
-		fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
-		if (-1 == retval)
+		if (session_start)
+		{
+		    /* check the status of this fcgi session
+		     * if this session starts
+		     * and got a flag to keep this session open
+		     * then delete that flag
+		     * and pass the deleted flag message to the child process */
+		    /* TODO: this is slightly incorrect. what if the message is
+		     * incomplete? dont we need a better fcgi session management?
+		     */
+		    struct fcgi_message_s *message = fcgi_state_new_message();
+		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
+		    {
+			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
+			{
+			    int flag =  fcgi_state_get_message_flag(message);
+			    if (flag >= 0)
+			    {
+				if (flag & FCGI_KEEP_CONN)
+				{
+				    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
+				    fcgi_state_set_message_flag(message, flag);
+				    fcgi_state_message_write((unsigned char *)buffer, readbytes, message);
+				}
+			    }
+			}
+		    }
+		    fcgi_state_delete_message(message);
+		    session_start = 0;
+		}
+		int writebytes = write(childunixsocketfd, buffer, readbytes);
+		fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		if (-1 == writebytes)
 		{
 		    perror("error: writing to child process socket");
 		    exit(EXIT_FAILURE);
@@ -649,30 +682,45 @@ void *thread_handle_connection(void *arg)
 	    if (can_read_unixsock && can_write_networksock)
 	    {
 		fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
-		retval = read(childunixsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", retval);
-		if (-1 == retval)
+		int readbytes = read(childunixsocketfd, buffer, maxbufsize);
+		fprintf(stderr, "read %d, ", readbytes);
+		if (-1 == readbytes)
 		{
 		    perror("\nerror: reading from child process socket");
 		    exit(EXIT_FAILURE);
 		}
-		else if (0 == retval)
+		else if (0 == readbytes)
 		{
 		    /* end of file received. exit this thread */
 		    break;
 		}
 #ifdef PRINT_SOCKET_DATA
 		fprintf(stderr, "fcgi data:\n");
-		fwrite(buffer, 1, retval, stderr);
+		fwrite(buffer, 1, readbytes, stderr);
 		fprintf(stderr, "\n");
 #endif
-		retval = write(inetsocketfd, buffer, retval);
-		fprintf(stderr, "wrote %d\n", retval);
-		if (-1 == retval)
+		int writebytes = write(inetsocketfd, buffer, readbytes);
+		fprintf(stderr, "wrote %d\n", writebytes);
+		if (-1 == writebytes)
 		{
 		    perror("error: writing to network socket");
 		    exit(EXIT_FAILURE);
 		}
+//		{
+//		    /* check the status of this fcgi session */
+//		    struct fcgi_message_s *message = fcgi_state_new_message();
+//		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+//		    if (fcgi_state_get_message_parse_done(message))
+//		    {
+//			if (FCGI_END_REQUEST == fcgi_state_get_message_type(message))
+//			{
+//			    fprintf(stderr, "fcgi session end. close connection\n");
+//			    fcgi_state_delete_message(message);
+//			    break;
+//			}
+//		    }
+//		    fcgi_state_delete_message(message);
+//		}
 		can_read_unixsock = 0;
 		can_write_networksock = 0;
 	    }
@@ -680,6 +728,7 @@ void *thread_handle_connection(void *arg)
 	}
 	close (childunixsocketfd);
 	free(buffer);
+	qgis_process_set_state_idle(proc);
     }
 
     /* clean up */
