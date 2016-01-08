@@ -379,9 +379,9 @@ void *thread_handle_connection(void *arg)
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
     static const int buffersize = 1024;
-    char buffer[buffersize];
     const pthread_t thread_id = pthread_self();
-
+    char *buffer = malloc(buffersize);
+    assert(buffer);
 
     /* detach myself from the main thread. Doing this to collect resources after
      * this thread ends. Because there is no join() waiting for this thread.
@@ -624,6 +624,7 @@ void *thread_handle_connection(void *arg)
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
     free(arg);
+    free(buffer);
 
     return NULL;
 }
@@ -1014,9 +1015,20 @@ int main(int argc, char **argv)
 			    children++;
 			}
 		    }
-		    fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
-		    timeout.tv_sec = 10;
-		    has_finished_second_run = 1;
+		    if (0 < children)
+		    {
+			fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+			timeout.tv_sec = 10;
+			has_finished_second_run = 1;
+		    }
+		    else
+		    {
+			/* no more child processes found to send signal.
+			 * exit immediately.
+			 */
+			fprintf(stderr, "termination signal received, shut down\n");
+			break;
+		    }
 
 		}
 		// else restart the sleep() with remaining timeout
@@ -1092,6 +1104,7 @@ int main(int argc, char **argv)
     }
 
     fprintf(stderr, "closing network socket\n");
+    fflush(stderr);
     close(serversocketfd);
 
     /* wait some seconds to check if every child has exited.
