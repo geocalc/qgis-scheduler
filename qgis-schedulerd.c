@@ -1122,8 +1122,26 @@ int main(int argc, char **argv)
 			if ( NULL != childprocs[i] )
 			{
 			    pid_t pid = qgis_process_get_pid(childprocs[i]);
-			    kill(pid, SIGKILL);
-			    children++;
+			    retval = kill(pid, SIGKILL);
+			    if (0 > retval)
+			    {
+				switch(errno)
+				{
+				case ESRCH:
+				    /* child process is not existent anymore.
+				     * erase it from the list of available processes
+				     */
+				    delete_qgis_process(childprocs[i]);
+				    childprocs[i] = NULL;
+				    break;
+				default:
+				    perror("error: could not send kill signal");
+				}
+			    }
+			    else
+			    {
+				children++;
+			    }
 			}
 		    }
 		    if (0 < children)
@@ -1154,8 +1172,26 @@ int main(int argc, char **argv)
 		    if ( NULL != childprocs[i] )
 		    {
 			pid_t pid = qgis_process_get_pid(childprocs[i]);
-			kill(pid, SIGTERM);
-			children++;
+			retval = kill(pid, SIGTERM);
+			if (0 > retval)
+			{
+			    switch(errno)
+			    {
+			    case ESRCH:
+				/* child process is not existent anymore.
+				 * erase it from the list of available processes
+				 */
+				delete_qgis_process(childprocs[i]);
+				childprocs[i] = NULL;
+				break;
+			    default:
+				perror("error: could not send kill signal");
+			    }
+			}
+			else
+			{
+			    children++;
+			}
 		    }
 		}
 		fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
