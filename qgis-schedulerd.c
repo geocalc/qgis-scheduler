@@ -117,8 +117,13 @@
 #include <errno.h>
 #include <fastcgi.h>
 
+#include "qgis_process.h"
 
 
+struct thread_init_new_child_args
+{
+    int id;
+};
 
 struct thread_connection_handler_args
 {
@@ -168,28 +173,51 @@ void usage(const char *argv0)
 static unsigned int socket_id = 0;
 pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-enum process_state_e
-{
-    MY_PROC_START = 0,
-    MY_PROC_INIT,
-    MY_PROC_IDLE,
-    MY_PROC_OPEN_IDLE,
-    MY_PROC_BUSY,
-};
 
 //static const int nr_childs = 2;
 #define nr_childs	1
-pid_t child_pid[nr_childs];
 const char *command = NULL;
-int childsocket[nr_childs] = {-1};
-enum process_state_e status[nr_childs] = {MY_PROC_START};
+struct qgis_process_s *childprocs[nr_childs];
+
+
+void *thread_init_new_child(void *arg)
+{
+    struct thread_init_new_child_args *tinfo = arg;
+    const int arraynr = tinfo->id;
+    const pthread_t thread_id = pthread_self();
+
+    /* detach myself from the main thread. Doing this to collect resources after
+     * this thread ends. Because there is no join() waiting for this thread.
+     */
+    int retval = pthread_detach(thread_id);
+    if (-1 == retval)
+    {
+	perror("error detaching thread");
+	exit(EXIT_FAILURE);
+    }
+
+    fprintf(stderr, "init new spawned child process\n");
+
+    if (childprocs[arraynr])
+    {
+	qgis_process_set_state_idle(childprocs[arraynr]);
+    }
+    else
+    {
+	fprintf(stderr, "no child process found to initialize\n");
+	exit(EXIT_FAILURE);
+    }
+    free(arg);
+
+    return NULL;
+}
 
 
 void *thread_start_new_child(void *arg)
 {
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
-    int arraynr = tinfo->id;
+    const int arraynr = tinfo->id;
 
     /* prepare the socket to connect to this child process only */
     /* NOTE: Linux allows abstract socket names which have no representation
@@ -201,7 +229,16 @@ void *thread_start_new_child(void *arg)
 	perror("can not create socket for fcgi program");
 	exit(EXIT_FAILURE);
     }
-    childsocket[arraynr] = retval;
+    const int childsocket = retval;
+
+
+    /* Create a unique socket name without a file system inode.
+     * The name is "\0qgis-schedulerd-socket0", "..1", etc.
+     * We just count upwards until integer overflow and then start
+     * over at 0.
+     * If one name is already given to a socket, bind() returns EADDRINUSE.
+     * In this case we try again.
+     */
 
     /* security rope for the really unlikely case
      * that we got no more numbers free.
@@ -210,7 +247,6 @@ void *thread_start_new_child(void *arg)
     pthread_mutex_lock (&socket_id_mutex);
     unsigned int socket_suffix_start = socket_id-1;
     pthread_mutex_unlock (&socket_id_mutex);
-
 
     for (;;)
     {
@@ -237,7 +273,7 @@ void *thread_start_new_child(void *arg)
 	    exit(EXIT_FAILURE);
 	}
 
-	retval = bind(childsocket[arraynr], &childsockaddr, sizeof(childsockaddr));
+	retval = bind(childsocket, &childsockaddr, sizeof(childsockaddr));
 	if (-1 == retval)
 	{
 	    if (EADDRINUSE==errno)
@@ -254,7 +290,7 @@ void *thread_start_new_child(void *arg)
     }
 
     /* the child process listens for connections, one at a time */
-    retval = listen(childsocket[arraynr], 1);
+    retval = listen(childsocket, 1);
     if (-1 == retval)
     {
 	perror("can not listen to socket connecting fast cgi application");
@@ -273,8 +309,7 @@ void *thread_start_new_child(void *arg)
 	 * fork
 	 * exec
 	 */
-	assert(childsocket[arraynr] != FCGI_LISTENSOCK_FILENO);
-	int ret = dup2(childsocket[arraynr], FCGI_LISTENSOCK_FILENO);
+	int ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == ret)
 	{
 	    perror("error calling dup2");
@@ -301,8 +336,18 @@ void *thread_start_new_child(void *arg)
     else if (0 < pid)
     {
 	/* parent */
-	child_pid[arraynr] = pid;
-	status[arraynr] = MY_PROC_IDLE;
+	childprocs[arraynr] = new_qgis_process(pid, childsocket);
+
+	/* NOTE: aside from the general rule
+	 * "malloc() and free() within the same function"
+	 * we transfer the responsibility for this memory
+	 * to the thread itself.
+	 */
+	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
+	targs->id = arraynr;
+	pthread_t thread;
+	pthread_create(&thread, NULL, thread_init_new_child, targs);
+
     }
     else
     {
@@ -320,25 +365,26 @@ void *thread_handle_connection(void *arg)
 {
     /* the main thread has been notified about data on the server network fd.
      * it accept()ed the new connection and passes the new file descriptor to
-     * this thread. here we connect() to the child thread and transfer the data
-     * between the network fd and the child process fd and back.
+     * this thread. here we find an idling child process,  connect() to that
+     * process and transfer the data between the network fd and the child
+     * process fd and back.
      */
-	/* TODO: get the network packet size of this connection and
-	 * adopt the packet transfer size to the network packet size.
-	 */
+    /* TODO: get the network packet size of this connection and
+     * adopt the packet transfer size to the network packet size.
+     */
     assert(arg);
     struct thread_connection_handler_args *tinfo = arg;
     int inetsocketfd = tinfo->new_accepted_inet_fd;
+    struct qgis_process_s *proc = NULL;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
-    int childunixsocketfd;
     static const int buffersize = 1024;
     char buffer[buffersize];
     const pthread_t thread_id = pthread_self();
-    int free_socket;
 
-    /* detach myself from the main thread. This is to collect resources after
-     * this thread ends. Because there is no join() waiting for this thread
+
+    /* detach myself from the main thread. Doing this to collect resources after
+     * this thread ends. Because there is no join() waiting for this thread.
      */
     int retval = pthread_detach(thread_id);
     if (-1 == retval)
@@ -347,192 +393,235 @@ void *thread_handle_connection(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr, "starting new connection thread\n");
-    for (free_socket = 0; free_socket<nr_childs; free_socket++)
+    fprintf(stderr, "start a new connection thread\n");
+
+    /* find the next idling process and attach a thread to it */
+    pthread_mutex_t *mutex = NULL;
+    int i;
+    for (i=0; i<nr_childs; i++)
     {
-	if (MY_PROC_IDLE == status[free_socket])
-	    break;
+	if (childprocs[i])
+	{
+	    mutex = qgis_process_get_mutex(childprocs[i]);
+	    pthread_mutex_lock(mutex);
+	    enum qgis_process_state_e state = qgis_process_get_state(childprocs[i]);
+	    if (PROC_IDLE == state)
+	    {
+		/* we found a process idling.
+		 * keep the lock on this process until the thread
+		 * has put itself on the busy list
+		 * of this process
+		 */
+		/* NOTE: This may take some time:
+		 * Get a lock on the mutex if another thread just holds the
+		 * lock. If there are many starting network connections at the
+		 * same time we may see threads waiting on one another. I.e.
+		 * thread1 gets the lock, tries and gets a proc busy state.
+		 * Meanwhile thread2 tries to get the lock and waits for
+		 * thread1. Then thread1 releases the lock, gets the next lock
+		 * and reads the process state information. Meanwhile thread2
+		 * gets the first lock, again reads the state being busy and
+		 * tries to get the lock which is held by thread1.
+		 * How about testing for a lock and if it is held by another
+		 * thread go on to the next?
+		 */
+		proc = childprocs[i];
+		break;
+	    }
+	    pthread_mutex_unlock(mutex);
+	}
     }
-    if (nr_childs == free_socket)
+    if (i>=nr_childs)
     {
-	/* all child processes busy */
-	fprintf(stderr, "error: all %d child programs are busy. disconnect\n", nr_childs);
-	close(inetsocketfd);
-	return NULL;
+	/* Found no idle processes.
+	 * What now?
+	 * All busy, close the network connection.
+	 * Sorry guys.
+	 */
+	fprintf(stderr, "found no free process for network request. close connection\n");
+	// NOTE: no mutex unlock here. we tried all processes, locked and unlocked them all
     }
-
-
-    /* get the address of the socket transferred to the child process,
-     * then connect to it.
-     */
-    retval = getsockname(childsocket[free_socket], &sockaddr, &sockaddrlen);
-    if (-1 == retval)
+    else
     {
-	perror("error retrieving the name of child process socket");
-	exit(EXIT_FAILURE);
-    }
-    /* leave the original child socket and create a new one on the opposite
-     * side.
-     */
-    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
-    if (-1 == retval)
-    {
-	perror("error: can not create socket to child process");
-	exit(EXIT_FAILURE);
-    }
-    childunixsocketfd = retval;
-    retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
-    if (-1 == retval)
-    {
-	perror("error: can not connect to child process");
-	exit(EXIT_FAILURE);
-    }
+	qgis_process_set_state_busy(proc, thread_id);
+	pthread_mutex_unlock(mutex);
+	mutex = NULL;
 
+	int childunixsocketfd;
 
-    int maxfd = 0;
-    fd_set rfds;
-    fd_set wfds;
-    int can_read_networksock = 0;
-    int can_write_networksock = 0;
-    int can_read_unixsock = 0;
-    int can_write_unixsock = 0;
-
-
-    if (inetsocketfd > maxfd)
-	maxfd = inetsocketfd;
-    if (childunixsocketfd > maxfd)
-	maxfd = childunixsocketfd;
-
-    maxfd++;
-
-    /* set timeout to infinite */
-//    struct timeval timeout;
-//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-//    timeout.tv_usec = 0;
-
-    int has_finished = 0;
-    while ( !has_finished )
-    {
-	/* wait for connections, signals or timeout */
-//	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-//	timeout.tv_usec = 0;
-
-	fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-	if ( !can_read_networksock )
-	    FD_SET(inetsocketfd, &rfds);
-	if ( !can_write_networksock )
-	    FD_SET(inetsocketfd, &wfds);
-	if ( !can_read_unixsock )
-	    FD_SET(childunixsocketfd, &rfds);
-	if ( !can_write_unixsock )
-	    FD_SET(childunixsocketfd, &wfds);
-	retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
+	/* get the address of the socket transferred to the child process,
+	 * then connect to it.
+	 */
+	childunixsocketfd = qgis_process_get_socketfd(proc);	// refers to the socket the child process accept()s from
+	retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
-	    switch (errno)
-	    {
-	    case EINTR:
-		/* We received a termination signal.
-		 * End this thread, close all file descriptors
-		 * and let the main thread clean up.
-		 */
-		fprintf(stderr, "thread_handle_connection() received interrupt\n");
-		break;
-
-	    default:
-		perror("error: thread_handle_connection() calling select");
-		exit(EXIT_FAILURE);
-		// no break needed
-	    }
-	    break;
+	    perror("error retrieving the name of child process socket");
+	    exit(EXIT_FAILURE);
+	}
+	/* leave the original child socket and create a new one on the opposite
+	 * side.
+	 */
+	retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
+	if (-1 == retval)
+	{
+	    perror("error: can not create socket to child process");
+	    exit(EXIT_FAILURE);
+	}
+	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
+	retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
+	if (-1 == retval)
+	{
+	    perror("error: can not connect to child process");
+	    exit(EXIT_FAILURE);
 	}
 
-	if (FD_ISSET(inetsocketfd, &wfds))
-	{
-	    fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
-	    can_write_networksock = 1;
-	}
-	if (FD_ISSET(childunixsocketfd, &wfds))
-	{
-	    fprintf(stderr, "[%ld]  can write to unix socket\n", thread_id);
-	    can_write_unixsock = 1;
-	}
-	if (FD_ISSET(inetsocketfd, &rfds))
-	{
-	    fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
-	    can_read_networksock = 1;
-	}
-	if (FD_ISSET(childunixsocketfd, &rfds))
-	{
-	    fprintf(stderr, "[%ld]  can read from unix socket\n", thread_id);
-	    can_read_unixsock = 1;
-	}
 
-	if (can_read_networksock && can_write_unixsock)
+	int maxfd = 0;
+	fd_set rfds;
+	fd_set wfds;
+	int can_read_networksock = 0;
+	int can_write_networksock = 0;
+	int can_read_unixsock = 0;
+	int can_write_unixsock = 0;
+
+
+	if (inetsocketfd > maxfd)
+	    maxfd = inetsocketfd;
+	if (childunixsocketfd > maxfd)
+	    maxfd = childunixsocketfd;
+
+	maxfd++;
+
+	/* set timeout to infinite */
+	//    struct timeval timeout;
+	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	//    timeout.tv_usec = 0;
+
+	int has_finished = 0;
+	while ( !has_finished )
 	{
-	    fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-	    retval = read(inetsocketfd, buffer, buffersize);
-	    fprintf(stderr, "read %d, ", retval);
+	    /* wait for connections, signals or timeout */
+	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	    //	timeout.tv_usec = 0;
+
+	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    FD_ZERO(&rfds);
+	    FD_ZERO(&wfds);
+	    if ( !can_read_networksock )
+		FD_SET(inetsocketfd, &rfds);
+	    if ( !can_write_networksock )
+		FD_SET(inetsocketfd, &wfds);
+	    if ( !can_read_unixsock )
+		FD_SET(childunixsocketfd, &rfds);
+	    if ( !can_write_unixsock )
+		FD_SET(childunixsocketfd, &wfds);
+	    retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
 	    if (-1 == retval)
 	    {
-		perror("\nerror: reading from network socket");
-		exit(EXIT_FAILURE);
-	    }
-	    else if (0 == retval)
-	    {
-		/* end of file received. exit this thread */
-		break;
-	    }
-	    fprintf(stderr, "\n[%ld] network data:\n", thread_id);
-	    fwrite(buffer, 1, retval, stderr);
-	    fprintf(stderr, "\n");
-	    retval = write(childunixsocketfd, buffer, retval);
-	    fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
-	    if (-1 == retval)
-	    {
-		perror("error: writing to child process socket");
-		exit(EXIT_FAILURE);
-	    }
-	    can_read_networksock = 0;
-	    can_write_unixsock = 0;
-	}
+		switch (errno)
+		{
+		case EINTR:
+		    /* We received a termination signal.
+		     * End this thread, close all file descriptors
+		     * and let the main thread clean up.
+		     */
+		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    break;
 
-	if (can_read_unixsock && can_write_networksock)
-	{
-	    fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
-	    retval = read(childunixsocketfd, buffer, buffersize);
-	    fprintf(stderr, "read %d, ", retval);
-	    if (-1 == retval)
-	    {
-		perror("\nerror: reading from network socket");
-		exit(EXIT_FAILURE);
-	    }
-	    else if (0 == retval)
-	    {
-		/* end of file received. exit this thread */
+		default:
+		    perror("error: thread_handle_connection() calling select");
+		    exit(EXIT_FAILURE);
+		    // no break needed
+		}
 		break;
 	    }
-//	    fprintf(stderr, "fcgi data:\n");
-//	    fwrite(buffer, 1, retval, stderr);
-//	    fprintf(stderr, "\n");
-	    retval = write(inetsocketfd, buffer, retval);
-	    fprintf(stderr, "wrote %d\n", retval);
-	    if (-1 == retval)
-	    {
-		perror("error: writing to child process socket");
-		exit(EXIT_FAILURE);
-	    }
-	    can_read_unixsock = 0;
-	    can_write_networksock = 0;
-	}
 
+	    if (FD_ISSET(inetsocketfd, &wfds))
+	    {
+		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
+		can_write_networksock = 1;
+	    }
+	    if (FD_ISSET(childunixsocketfd, &wfds))
+	    {
+		fprintf(stderr, "[%ld]  can write to unix socket\n", thread_id);
+		can_write_unixsock = 1;
+	    }
+	    if (FD_ISSET(inetsocketfd, &rfds))
+	    {
+		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+		can_read_networksock = 1;
+	    }
+	    if (FD_ISSET(childunixsocketfd, &rfds))
+	    {
+		fprintf(stderr, "[%ld]  can read from unix socket\n", thread_id);
+		can_read_unixsock = 1;
+	    }
+
+	    if (can_read_networksock && can_write_unixsock)
+	    {
+		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+		retval = read(inetsocketfd, buffer, buffersize);
+		fprintf(stderr, "read %d, ", retval);
+		if (-1 == retval)
+		{
+		    perror("\nerror: reading from network socket");
+		    exit(EXIT_FAILURE);
+		}
+		else if (0 == retval)
+		{
+		    /* end of file received. exit this thread */
+		    break;
+		}
+		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		fwrite(buffer, 1, retval, stderr);
+		fprintf(stderr, "\n");
+		retval = write(childunixsocketfd, buffer, retval);
+		fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
+		if (-1 == retval)
+		{
+		    perror("error: writing to child process socket");
+		    exit(EXIT_FAILURE);
+		}
+		can_read_networksock = 0;
+		can_write_unixsock = 0;
+	    }
+
+	    if (can_read_unixsock && can_write_networksock)
+	    {
+		fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
+		retval = read(childunixsocketfd, buffer, buffersize);
+		fprintf(stderr, "read %d, ", retval);
+		if (-1 == retval)
+		{
+		    perror("\nerror: reading from network socket");
+		    exit(EXIT_FAILURE);
+		}
+		else if (0 == retval)
+		{
+		    /* end of file received. exit this thread */
+		    break;
+		}
+//		fprintf(stderr, "fcgi data:\n");
+//		fwrite(buffer, 1, retval, stderr);
+//		fprintf(stderr, "\n");
+		retval = write(inetsocketfd, buffer, retval);
+		fprintf(stderr, "wrote %d\n", retval);
+		if (-1 == retval)
+		{
+		    perror("error: writing to child process socket");
+		    exit(EXIT_FAILURE);
+		}
+		can_read_unixsock = 0;
+		can_write_networksock = 0;
+	    }
+
+	}
+	close (childunixsocketfd);
     }
 
     /* clean up */
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
-    close (childunixsocketfd);
     close (inetsocketfd);
     free(arg);
 
@@ -555,7 +644,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	int i;
 	for (i=0; i<nr_childs; i++)
 	{
-	    if (pid == child_pid[i])
+	    if (pid == qgis_process_get_pid(childprocs[i]))
 		break;
 	}
 	if (i >= nr_childs)
@@ -565,8 +654,18 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	}
 	else
 	{
+	    fprintf(stderr, "process %d ended\n", pid);
+	    /* Erase the old entry. The process does not exist anymore */
+	    delete_qgis_process(childprocs[i]);
+	    childprocs[i] = NULL;	/* in the time between here and
+					 * creating a new child process this
+					 * entry is defined NULL
+					 */
+
 	    if ( !do_terminate )
 	    {
+		fprintf(stderr, "restarting process\n");
+
 		/* child process terminated, restart anew */
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
@@ -576,16 +675,44 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 		 * we transfer the responsibility for this info memory
 		 * to the thread itself.
 		 */
+		/* Start the process creation thread in detached state because
+		 * we do not want to wait for it. Different from the handling
+		 * during the program startup there is no join() waiting for
+		 * the end of the thread and collecting its resources.
+		 */
 		struct thread_start_new_child_args *ti = malloc(sizeof(*ti));
 		ti->id = i;
 		pthread_t thread;
-		pthread_create(&thread, NULL, thread_start_new_child, ti);
-	    }
-	    else
-	    {
-		/* mark child process as terminated */
-		child_pid[i] = 0;
-		fprintf(stderr, "process %d ended\n", pid);
+		pthread_attr_t thread_attr;
+		int retval;
+		retval = pthread_attr_init(&thread_attr);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error: pthread_attr_init");
+		    exit(EXIT_FAILURE);
+		}
+		retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
+		    exit(EXIT_FAILURE);
+		}
+		retval = pthread_create(&thread, &thread_attr, thread_start_new_child, ti);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error: pthread_create");
+		    exit(EXIT_FAILURE);
+		}
+		retval = pthread_attr_destroy(&thread_attr);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error: pthread_attr_destroy");
+		    exit(EXIT_FAILURE);
+		}
 	    }
 	}
 	break;
@@ -606,7 +733,7 @@ int main(int argc, char **argv)
     const int port = 10177;
     int no_daemon = 0;
     int serversocketfd = -1;
-    memset(child_pid, 0, sizeof(child_pid));
+    memset(childprocs, 0, sizeof(childprocs));
 
     int opt;
 
@@ -836,7 +963,7 @@ int main(int argc, char **argv)
 		int i;
 		for (i=0; i<nr_childs; i++)
 		{
-		    if ( 0 != child_pid[i] )
+		    if ( NULL != childprocs[i] )
 		    {
 			break;
 		    }
@@ -861,7 +988,7 @@ int main(int argc, char **argv)
 		int i;
 		for (i=0; i<nr_childs; i++)
 		{
-		    if ( 0 != child_pid[i] )
+		    if ( NULL != childprocs[i] )
 		    {
 			break;
 		    }
@@ -880,9 +1007,10 @@ int main(int argc, char **argv)
 		    int children = 0;
 		    for (i=0; i<nr_childs; i++)
 		    {
-			if ( 0 != child_pid[i] )
+			if ( NULL != childprocs[i] )
 			{
-			    kill(child_pid[i], SIGKILL);
+			    pid_t pid = qgis_process_get_pid(childprocs[i]);
+			    kill(pid, SIGKILL);
 			    children++;
 			}
 		    }
@@ -900,9 +1028,10 @@ int main(int argc, char **argv)
 		int i;
 		for (i=0; i<nr_childs; i++)
 		{
-		    if ( 0 != child_pid[i] )
+		    if ( NULL != childprocs[i] )
 		    {
-			kill(child_pid[i], SIGTERM);
+			pid_t pid = qgis_process_get_pid(childprocs[i]);
+			kill(pid, SIGTERM);
 			children++;
 		    }
 		}
@@ -940,15 +1069,19 @@ int main(int argc, char **argv)
 			fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
 		    }
 		}
-		/* NOTE: aside from the general rule
-		 * "malloc() and free() within the same function"
-		 * we transfer the responsibility for this info memory
-		 * to the thread itself.
-		 */
-		struct thread_connection_handler_args *ti = malloc(sizeof(*ti));
-		ti->new_accepted_inet_fd = retval;
-		pthread_t thread;
-		pthread_create(&thread, NULL, thread_handle_connection, ti);
+		int networkfd = retval;
+
+		{
+		    /* NOTE: aside from the general rule
+		     * "malloc() and free() within the same function"
+		     * we transfer the responsibility for this memory
+		     * to the thread itself.
+		     */
+		    struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
+		    targs->new_accepted_inet_fd = networkfd;
+		    pthread_t thread;
+		    pthread_create(&thread, NULL, thread_handle_connection, targs);
+		}
 	    }
 	}
 	else
