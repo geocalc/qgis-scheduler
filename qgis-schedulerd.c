@@ -115,9 +115,24 @@
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <fastcgi.h>
 
 #include "qgis_process.h"
+
+
+#define min(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a < _b ? _a : _b; })
+#define max(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
+
+
+#define PRINT_NETWORK_DATA
+//#define PRINT_SOCKET_DATA
 
 
 struct thread_init_new_child_args
@@ -137,6 +152,8 @@ struct thread_start_new_child_args
 
 
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
+static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
+
 
 #ifndef _GNU_SOURCE
 const char *basename(const char *path)
@@ -369,19 +386,13 @@ void *thread_handle_connection(void *arg)
      * process and transfer the data between the network fd and the child
      * process fd and back.
      */
-    /* TODO: get the network packet size of this connection and
-     * adopt the packet transfer size to the network packet size.
-     */
     assert(arg);
     struct thread_connection_handler_args *tinfo = arg;
     int inetsocketfd = tinfo->new_accepted_inet_fd;
     struct qgis_process_s *proc = NULL;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
-    static const int buffersize = 1024;
     const pthread_t thread_id = pthread_self();
-    char *buffer = malloc(buffersize);
-    assert(buffer);
 
     /* detach myself from the main thread. Doing this to collect resources after
      * this thread ends. Because there is no join() waiting for this thread.
@@ -477,6 +488,52 @@ void *thread_handle_connection(void *arg)
 	}
 
 
+	/* get the maximum read write socket buffer size */
+	int maxbufsize = default_max_transfer_buffer_size;
+	{
+	    int sockbufsize = 0;
+	    socklen_t size = sizeof(sockbufsize);
+	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    size = sizeof(sockbufsize);
+	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    size = sizeof(sockbufsize);
+	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    size = sizeof(sockbufsize);
+	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+
+	}
+	char *buffer = malloc(maxbufsize);
+	assert(buffer);
+
 	int maxfd = 0;
 	fd_set rfds;
 	fd_set wfds;
@@ -561,7 +618,7 @@ void *thread_handle_connection(void *arg)
 	    if (can_read_networksock && can_write_unixsock)
 	    {
 		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-		retval = read(inetsocketfd, buffer, buffersize);
+		retval = read(inetsocketfd, buffer, maxbufsize);
 		fprintf(stderr, "read %d, ", retval);
 		if (-1 == retval)
 		{
@@ -573,9 +630,11 @@ void *thread_handle_connection(void *arg)
 		    /* end of file received. exit this thread */
 		    break;
 		}
+#ifdef PRINT_NETWORK_DATA
 		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
 		fwrite(buffer, 1, retval, stderr);
 		fprintf(stderr, "\n");
+#endif
 		retval = write(childunixsocketfd, buffer, retval);
 		fprintf(stderr, "[%ld] wrote %d\n", thread_id, retval);
 		if (-1 == retval)
@@ -590,11 +649,11 @@ void *thread_handle_connection(void *arg)
 	    if (can_read_unixsock && can_write_networksock)
 	    {
 		fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
-		retval = read(childunixsocketfd, buffer, buffersize);
+		retval = read(childunixsocketfd, buffer, maxbufsize);
 		fprintf(stderr, "read %d, ", retval);
 		if (-1 == retval)
 		{
-		    perror("\nerror: reading from network socket");
+		    perror("\nerror: reading from child process socket");
 		    exit(EXIT_FAILURE);
 		}
 		else if (0 == retval)
@@ -602,14 +661,16 @@ void *thread_handle_connection(void *arg)
 		    /* end of file received. exit this thread */
 		    break;
 		}
-//		fprintf(stderr, "fcgi data:\n");
-//		fwrite(buffer, 1, retval, stderr);
-//		fprintf(stderr, "\n");
+#ifdef PRINT_SOCKET_DATA
+		fprintf(stderr, "fcgi data:\n");
+		fwrite(buffer, 1, retval, stderr);
+		fprintf(stderr, "\n");
+#endif
 		retval = write(inetsocketfd, buffer, retval);
 		fprintf(stderr, "wrote %d\n", retval);
 		if (-1 == retval)
 		{
-		    perror("error: writing to child process socket");
+		    perror("error: writing to network socket");
 		    exit(EXIT_FAILURE);
 		}
 		can_read_unixsock = 0;
@@ -618,13 +679,13 @@ void *thread_handle_connection(void *arg)
 
 	}
 	close (childunixsocketfd);
+	free(buffer);
     }
 
     /* clean up */
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
     free(arg);
-    free(buffer);
 
     return NULL;
 }
