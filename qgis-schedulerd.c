@@ -755,8 +755,9 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	int i;
 	for (i=0; i<nr_childs; i++)
 	{
-	    if (pid == qgis_process_get_pid(childprocs[i]))
-		break;
+	    if (childprocs[i])
+		if (pid == qgis_process_get_pid(childprocs[i]))
+		    break;
 	}
 	if (i >= nr_childs)
 	{
@@ -1127,7 +1128,7 @@ int main(int argc, char **argv)
 		    }
 		    if (0 < children)
 		    {
-			fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+			fprintf(stderr, "termination signal received, sending SIGKILL to %d child processes..\n", children);
 			timeout.tv_sec = 10;
 			has_finished_second_run = 1;
 		    }
