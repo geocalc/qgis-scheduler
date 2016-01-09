@@ -122,6 +122,7 @@ int qgis_process_set_state_idle(struct qgis_process_s *proc)
 	    proc->state = PROC_IDLE;
 	    // no break
 	case PROC_IDLE:
+	    proc->threadid = 0;
 	    retval = 0;
 	    break;
 
@@ -150,6 +151,7 @@ int qgis_process_set_state_busy(struct qgis_process_s *proc, pthread_t thread_id
 	    proc->state = PROC_BUSY;
 	    // no break
 	case PROC_BUSY:
+	    proc->threadid = thread_id;
 	    retval = 0;
 	    break;
 
@@ -180,6 +182,7 @@ int qgis_process_set_state_init(struct qgis_process_s *proc, pthread_t thread_id
 	    proc->state = PROC_INIT;
 	    // no break
 	case PROC_INIT:
+	    proc->threadid = thread_id;
 	    retval = 0;
 	    break;
 
