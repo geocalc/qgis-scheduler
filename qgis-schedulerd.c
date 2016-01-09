@@ -726,7 +726,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	if ( !proc )
 	{
 	    /* pid does not belong to our child processes ? */
-	    // TODO print log message
+	    fprintf(stderr, "pid %d does not belong to us?\n", pid);
 	}
 	else
 	{
@@ -801,6 +801,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 
 int main(int argc, char **argv)
 {
+    int exitvalue = EXIT_SUCCESS;
     const int port = 10177;
     int no_daemon = 0;
     int serversocketfd = -1;
@@ -1035,7 +1036,8 @@ int main(int argc, char **argv)
 		if ( !proc )
 		{
 		    /* all child processes did exit, we can end this */
-		    return EXIT_SUCCESS;
+		    exitvalue = EXIT_SUCCESS;
+		    break;
 		}
 
 		/* if none of the child processes did terminate on timeout
@@ -1043,7 +1045,8 @@ int main(int argc, char **argv)
 		 */
 		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
 		{
-		    return EXIT_FAILURE;
+		    exitvalue = EXIT_FAILURE;
+		    break;
 		}
 		// else restart the sleep() with remaining timeout
 	    }
@@ -1053,7 +1056,8 @@ int main(int argc, char **argv)
 		if ( !proc )
 		{
 		    /* all child processes did exit, we can end this */
-		    return EXIT_SUCCESS;
+		    exitvalue = EXIT_SUCCESS;
+		    break;
 		}
 
 		/* if none of the child processes did terminate on timeout
@@ -1231,5 +1235,5 @@ int main(int argc, char **argv)
      * else send sigkill signal.
      */
     pthread_exit(NULL);
-    return EXIT_SUCCESS;
+    return exitvalue;
 }
