@@ -164,6 +164,24 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	    pthread_mutex_lock(mutex);
 	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
 	    if (state == mystate)
+		/* we found a process idling.
+		 * keep the lock on this process until the thread
+		 * has put itself on the busy list
+		 * of this process
+		 */
+		/* NOTE: This may take some time:
+		 * Get a lock on the mutex if another thread just holds the
+		 * lock. If there are many starting network connections at the
+		 * same time we may see threads waiting on one another. I.e.
+		 * thread1 gets the lock, tries and gets a proc busy state.
+		 * Meanwhile thread2 tries to get the lock and waits for
+		 * thread1. Then thread1 releases the lock, gets the next lock
+		 * and reads the process state information. Meanwhile thread2
+		 * gets the first lock, again reads the state being busy and
+		 * tries to get the lock which is held by thread1.
+		 * How about testing for a lock and if it is held by another
+		 * thread go on to the next?
+		 */
 		return np->proc; // intentionally return entry with mutex locked
 	    pthread_mutex_unlock(mutex);
 	}
