@@ -1,8 +1,8 @@
 
 TARGET=qgis-schedulerd
 
-SOURCE=qgis-schedulerd.c qgis_process.c fcgi_state.c #log.c
-HEADER=qgis_process.h fcgi_state.h #log.h defaults.h
+SOURCE=qgis-schedulerd.c qgis_process.c qgis_process_list.c fcgi_state.c #log.c
+HEADER=qgis_process.h qgis_process_list.h fcgi_state.h #log.h defaults.h
 
 CFLAGS += -Wall #-Wextra
 CFLAGS += -pipe -ggdb -O0
