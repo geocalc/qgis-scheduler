@@ -50,7 +50,6 @@ struct qgis_process_iterator
     struct qgis_process_s *proc;
 };
 
-//typedef struct qgis_procentry qgis_process_iterator;
 
 struct qgis_process_list_s *qgis_process_list_new(void)
 {
@@ -112,6 +111,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 		if (proc == np->proc)
 		{
 		    LIST_REMOVE(np, entries);
+		    free(np);
 		    break;
 		}
 	    }
