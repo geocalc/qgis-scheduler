@@ -156,6 +156,7 @@ struct thread_connection_handler_args
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 5;
+#define nr_of_childs_during_startup	5 //default_min_free_processes
 
 
 #ifndef _GNU_SOURCE
@@ -197,9 +198,8 @@ pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 //static const int nr_childs = 2;
-#define nr_childs	2
 const char *command = NULL;
-struct qgis_process_s *childprocs[nr_childs];
+struct qgis_process_s *childprocs[nr_of_childs_during_startup];
 struct qgis_process_list_s *proclist = NULL;
 
 void *thread_init_new_child(void *arg)
@@ -1013,13 +1013,13 @@ int main(int argc, char **argv)
 
     /* start the children */
     proclist = qgis_process_list_new();
-    pthread_t threads[nr_childs];
+    pthread_t threads[nr_of_childs_during_startup];
     int i;
-    for (i=0; i<nr_childs; i++)
+    for (i=0; i<nr_of_childs_during_startup; i++)
     {
 	pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
     }
-    for (i=0; i<nr_childs; i++)
+    for (i=0; i<nr_of_childs_during_startup; i++)
 	pthread_join(threads[i], NULL);
 
 
