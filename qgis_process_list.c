@@ -325,4 +325,29 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 }
 
 
+int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state)
+{
+    int count = 0;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	pthread_rwlock_rdlock(&list->rwlock);
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
+	    if (state == mystate)
+	    {
+		count++;
+	    }
+	}
+	pthread_rwlock_unlock(&list->rwlock);
+    }
+
+    return count;
+}
+
+
+
 
