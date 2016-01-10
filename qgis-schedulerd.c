@@ -506,8 +506,176 @@ void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	fprintf(stderr, "found no free process for network request. close connection\n");
-	// NOTE: no mutex unlock here. we tried all processes, locked and unlocked them all
+	fprintf(stderr, "found no free process for network request. answer overload and close connection\n");
+	/* NOTE: intentionally no mutex unlock here. We checked all processes,
+	 * locked and unlocked all entries. Now there is no locked mutex left.
+	 */
+
+	/* We wait for the first message from web server to get the request id.
+	 * Then we answer with an overload status end request. After that we
+	 * can close the connection and exit the thread.
+	 */
+
+
+	/* get the maximum read write socket buffer size */
+	int maxbufsize = default_max_transfer_buffer_size;
+	{
+	    int sockbufsize = 0;
+	    socklen_t size = sizeof(sockbufsize);
+	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    size = sizeof(sockbufsize);
+	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+	}
+
+	char *buffer = malloc(maxbufsize);
+	assert(buffer);
+
+
+	int maxfd = 0;
+	fd_set rfds;
+	fd_set wfds;
+	int can_read_networksock = 0;
+	int can_write_networksock = 0;
+
+
+	if (inetsocketfd > maxfd)
+	    maxfd = inetsocketfd;
+
+	maxfd++;
+
+	/* set timeout to infinite */
+	//    struct timeval timeout;
+	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	//    timeout.tv_usec = 0;
+
+	int has_finished = 0;
+	while ( !has_finished )
+	{
+	    /* wait for connections, signals or timeout */
+	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	    //	timeout.tv_usec = 0;
+
+	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    FD_ZERO(&rfds);
+	    FD_ZERO(&wfds);
+	    if ( !can_read_networksock )
+		FD_SET(inetsocketfd, &rfds);
+	    if ( !can_write_networksock )
+		FD_SET(inetsocketfd, &wfds);
+	    retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
+	    if (-1 == retval)
+	    {
+		switch (errno)
+		{
+		case EINTR:
+		    /* We received a termination signal.
+		     * End this thread, close all file descriptors
+		     * and let the main thread clean up.
+		     */
+		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    break;
+
+		default:
+		    perror("error: thread_handle_connection() calling select");
+		    exit(EXIT_FAILURE);
+		    // no break needed
+		}
+		break;
+	    }
+
+	    if (FD_ISSET(inetsocketfd, &wfds))
+	    {
+		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
+		can_write_networksock = 1;
+	    }
+	    if (FD_ISSET(inetsocketfd, &rfds))
+	    {
+		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+		can_read_networksock = 1;
+	    }
+
+	    if (can_read_networksock && can_write_networksock)
+	    {
+		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+		int readbytes = read(inetsocketfd, buffer, maxbufsize);
+		fprintf(stderr, "read %d, ", readbytes);
+		if (-1 == readbytes)
+		{
+		    perror("\nerror: reading from network socket");
+		    exit(EXIT_FAILURE);
+		}
+		else if (0 == readbytes)
+		{
+		    /* end of file received. exit this thread */
+		    break;
+		}
+#ifdef PRINT_NETWORK_DATA
+		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		fwrite(buffer, 1, readbytes, stderr);
+		fprintf(stderr, "\n");
+#endif
+
+		{
+		    /* check the status of this fcgi session
+		     * if this session starts
+		     * and got a flag to keep this session open
+		     * then delete that flag
+		     * and pass the deleted flag message to the child process */
+		    /* TODO: this is slightly incorrect. what if the message is
+		     * incomplete? dont we need a better fcgi session management?
+		     */
+		    struct fcgi_message_s *message = fcgi_state_new_message();
+		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
+		    {
+			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
+			{
+			    unsigned char sendbuffer[sizeof(FCGI_EndRequestRecord)];
+			    uint16_t requestId = fcgi_state_get_message_requestid(message);
+			    struct fcgi_message_s *sendmessage = fcgi_state_new_endrequest_message(requestId, 0, FCGI_OVERLOADED);
+			    retval = fcgi_state_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
+
+			    int writebytes = write(inetsocketfd, sendbuffer, retval);
+			    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+			    if (-1 == writebytes)
+			    {
+				perror("error: writing to child process socket");
+				exit(EXIT_FAILURE);
+			    }
+
+			    /* we are done with the connection. The status
+			     * is send back to the web server. we can close
+			     * down and leave.
+			     */
+			    fcgi_state_delete_message(message);
+			    fcgi_state_delete_message(sendmessage);
+			    break;
+			}
+		    }
+		    fcgi_state_delete_message(message);
+
+		}
+		can_read_networksock = 0;
+	    }
+
+
+	}
+	free(buffer);
 
     }
     else
