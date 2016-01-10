@@ -155,6 +155,7 @@ struct thread_connection_handler_args
 
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
+static const int default_min_free_processes = 5;
 
 
 #ifndef _GNU_SOURCE
@@ -180,6 +181,8 @@ void usage(const char *argv0)
     fprintf(stdout, "\t-d: do NOT become daemon\n");
     //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
 }
+
+
 
 
 /* This global number is counted upwards, overflow included.
@@ -238,6 +241,7 @@ void *thread_init_new_child(void *arg)
 
 void *thread_start_new_child(void *arg)
 {
+    fprintf(stderr, "start new child process\n");
     /* prepare the socket to connect to this child process only */
     /* NOTE: Linux allows abstract socket names which have no representation
      * in the filesystem namespace.
@@ -380,6 +384,56 @@ void *thread_start_new_child(void *arg)
     return NULL;
 }
 
+
+void start_new_process_detached(int num)
+{
+    /* NOTE: aside from the general rule
+     * "malloc() and free() within the same function"
+     * we transfer the responsibility for this info memory
+     * to the thread itself.
+     */
+    /* Start the process creation thread in detached state because
+     * we do not want to wait for it. Different from the handling
+     * during the program startup there is no join() waiting for
+     * the end of the thread and collecting its resources.
+     */
+    pthread_t thread;
+    pthread_attr_t thread_attr;
+
+    int retval = pthread_attr_init(&thread_attr);
+    if (retval)
+    {
+	errno = retval;
+	perror("error: pthread_attr_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+    if (retval)
+    {
+	errno = retval;
+	perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
+	exit(EXIT_FAILURE);
+    }
+    while (num-- > 0)
+    {
+	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, NULL);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error: pthread_create");
+	    exit(EXIT_FAILURE);
+	}
+    }
+    retval = pthread_attr_destroy(&thread_attr);
+    if (retval)
+    {
+	errno = retval;
+	perror("error: pthread_attr_destroy");
+	exit(EXIT_FAILURE);
+    }
+}
+
+
 void *thread_handle_connection(void *arg)
 {
     /* the main thread has been notified about data on the server network fd.
@@ -419,6 +473,38 @@ void *thread_handle_connection(void *arg)
 	 */
 	fprintf(stderr, "found no free process for network request. close connection\n");
 	// NOTE: no mutex unlock here. we tried all processes, locked and unlocked them all
+
+	/* get the number of new started processes which then become idle
+	 * processes.
+	 * Then we can estimate how much new processes need to be started.
+	 */
+	/* NOTE: between the call to qgis_process_list_mutex_find_process_by_status()
+	 * and the last call to qgis_process_list_get_num_process_by_status()
+	 * the numbers may change (significant). Do we need a separate lock?
+	 * I think we do not. Because:
+	 * If the result number is too low we start too much new processes. But
+	 * these processes get killed some time afterwards if we don't need
+	 * them.
+	 * If the result number is too high we got not enough processes. But
+	 * this would mean the number of proc_state_start and proc_state_init
+	 * is too high, which is not the case. Because the processes transit
+	 * from PROC_START over PROC_INIT to PROC_IDLE. So if we have the
+	 * correct numbers of proc_state_start and proc_state_init during
+	 * a moment all these processes certainly become PROC_IDLE. If we
+	 * read_lock the process list during counting the state, there is
+	 * no count error (in transition from PROC_START to PROC_INIT).
+	 * We get the correct number if we first count PROC_INIT and then
+	 * PROC_START, not the other way around.
+	 */
+	int proc_state_init = qgis_process_list_get_num_process_by_status(proclist, PROC_INIT);
+	int proc_state_start = qgis_process_list_get_num_process_by_status(proclist, PROC_START);
+
+	int missing_processes = default_min_free_processes - (proc_state_init + proc_state_start);
+	if (missing_processes > 0)
+	{
+	    /* not enough free processes, start new ones */
+	    start_new_process_detached(missing_processes);
+	}
     }
     else
     {
@@ -708,6 +794,7 @@ void *thread_handle_connection(void *arg)
     return NULL;
 }
 
+
 int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
 
 /* act on signals */
@@ -745,47 +832,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		/* NOTE: aside from the general rule
-		 * "malloc() and free() within the same function"
-		 * we transfer the responsibility for this info memory
-		 * to the thread itself.
-		 */
-		/* Start the process creation thread in detached state because
-		 * we do not want to wait for it. Different from the handling
-		 * during the program startup there is no join() waiting for
-		 * the end of the thread and collecting its resources.
-		 */
-		pthread_t thread;
-		pthread_attr_t thread_attr;
-		int retval;
-		retval = pthread_attr_init(&thread_attr);
-		if (retval)
-		{
-		    errno = retval;
-		    perror("error: pthread_attr_init");
-		    exit(EXIT_FAILURE);
-		}
-		retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
-		if (retval)
-		{
-		    errno = retval;
-		    perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
-		    exit(EXIT_FAILURE);
-		}
-		retval = pthread_create(&thread, &thread_attr, thread_start_new_child, NULL);
-		if (retval)
-		{
-		    errno = retval;
-		    perror("error: pthread_create");
-		    exit(EXIT_FAILURE);
-		}
-		retval = pthread_attr_destroy(&thread_attr);
-		if (retval)
-		{
-		    errno = retval;
-		    perror("error: pthread_attr_destroy");
-		    exit(EXIT_FAILURE);
-		}
+		start_new_process_detached(1);
 	    }
 	}
 	break;
