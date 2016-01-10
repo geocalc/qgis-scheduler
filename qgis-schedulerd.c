@@ -267,15 +267,39 @@ void *thread_start_new_child(void *arg)
      * that we got no more numbers free.
      * To prevent infinite loop
      */
-    pthread_mutex_lock (&socket_id_mutex);
+    retval = pthread_mutex_lock (&socket_id_mutex);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire mutex");
+	exit(EXIT_FAILURE);
+    }
     unsigned int socket_suffix_start = socket_id-1;
-    pthread_mutex_unlock (&socket_id_mutex);
+    retval = pthread_mutex_unlock (&socket_id_mutex);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock mutex");
+	exit(EXIT_FAILURE);
+    }
 
     for (;;)
     {
-	pthread_mutex_lock (&socket_id_mutex);
+	retval = pthread_mutex_lock (&socket_id_mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire mutex");
+	    exit(EXIT_FAILURE);
+	}
 	unsigned int socket_suffix = socket_id++;
-	pthread_mutex_unlock (&socket_id_mutex);
+	retval = pthread_mutex_unlock (&socket_id_mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock mutex");
+	    exit(EXIT_FAILURE);
+	}
 
 	if (socket_suffix == socket_suffix_start)
 	{
@@ -376,7 +400,13 @@ void *thread_start_new_child(void *arg)
 	}
 	targs->proc = childproc;
 	pthread_t thread;
-	pthread_create(&thread, NULL, thread_init_new_child, targs);
+	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error creating thread");
+	    exit(EXIT_FAILURE);
+	}
 
     }
     else
@@ -460,8 +490,9 @@ void *thread_handle_connection(void *arg)
      * this thread ends. Because there is no join() waiting for this thread.
      */
     int retval = pthread_detach(thread_id);
-    if (-1 == retval)
+    if (retval)
     {
+	errno = retval;
 	perror("error detaching thread");
 	exit(EXIT_FAILURE);
     }
@@ -695,7 +726,13 @@ void *thread_handle_connection(void *arg)
     {
 	qgis_process_set_state_busy(proc, thread_id);
 	pthread_mutex_t *mutex = qgis_process_get_mutex(proc);
-	pthread_mutex_unlock(mutex);
+	retval = pthread_mutex_unlock(mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock mutex");
+	    exit(EXIT_FAILURE);
+	}
 	mutex = NULL;
 
 	int childunixsocketfd;
@@ -1216,11 +1253,24 @@ int main(int argc, char **argv)
     int i;
     for (i=0; i<nr_of_childs_during_startup; i++)
     {
-	pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
+	retval = pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error creating thread");
+	    exit(EXIT_FAILURE);
+	}
     }
     for (i=0; i<nr_of_childs_during_startup; i++)
-	pthread_join(threads[i], NULL);
-
+    {
+	retval = pthread_join(threads[i], NULL);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error joining thread");
+	    exit(EXIT_FAILURE);
+	}
+    }
 
     /* wait for signals of child processes exiting (SIGCHLD) or to terminate
      * this program (SIGTERM, SIGINT) or clients connecting via network to
@@ -1472,8 +1522,16 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		    }
 		    targs->new_accepted_inet_fd = networkfd;
+
 		    pthread_t thread;
-		    pthread_create(&thread, NULL, thread_handle_connection, targs);
+		    retval = pthread_create(&thread, NULL, thread_handle_connection, targs);
+		    if (retval)
+		    {
+			errno = retval;
+			perror("error creating thread");
+			exit(EXIT_FAILURE);
+		    }
+
 		}
 	    }
 	}

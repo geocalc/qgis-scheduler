@@ -102,7 +102,13 @@ void qgis_process_delete(struct qgis_process_s *proc)
     {
 	// ignore return value, maybe this file is already closed. I don't care
 	close(proc->process_socket_fd);
-	pthread_mutex_destroy(&proc->mutex);
+	int retval = pthread_mutex_destroy(&proc->mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error delete mutex");
+	    exit(EXIT_FAILURE);
+	}
     }
     free(proc);
 }
