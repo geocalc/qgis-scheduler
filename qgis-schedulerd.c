@@ -544,6 +544,7 @@ void *thread_handle_connection(void *arg)
 
 	char *buffer = malloc(maxbufsize);
 	assert(buffer);
+	struct fcgi_message_s *message = fcgi_state_new_message();
 
 
 	int maxfd = 0;
@@ -631,16 +632,19 @@ void *thread_handle_connection(void *arg)
 #endif
 
 		{
-		    /* check the status of this fcgi session
-		     * if this session starts
-		     * and got a flag to keep this session open
-		     * then delete that flag
-		     * and pass the deleted flag message to the child process */
-		    /* TODO: this is slightly incorrect. what if the message is
-		     * incomplete? dont we need a better fcgi session management?
+		    /* parse and check the incoming message. If it is a
+		     * session initiation message from the web server then
+		     * immediately answer with an overload message and end
+		     * this thread.
 		     */
-		    struct fcgi_message_s *message = fcgi_state_new_message();
+
 		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    /* note: by protocol the begin request message should be the
+		     * first message. if we parse for a different message we have
+		     * to check for "parse complete", and if the message type
+		     * doesn't match we have to delete the message and start over
+		     * parsing with a new message.
+		     */
 		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
 		    {
 			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
@@ -662,20 +666,18 @@ void *thread_handle_connection(void *arg)
 			     * is send back to the web server. we can close
 			     * down and leave.
 			     */
-			    fcgi_state_delete_message(message);
 			    fcgi_state_delete_message(sendmessage);
 			    break;
 			}
 		    }
-		    fcgi_state_delete_message(message);
 
 		}
 		can_read_networksock = 0;
 	    }
 
-
 	}
 	free(buffer);
+	fcgi_state_delete_message(message);
 
     }
     else
@@ -760,6 +762,8 @@ void *thread_handle_connection(void *arg)
 	}
 	char *buffer = malloc(maxbufsize);
 	assert(buffer);
+	struct fcgi_message_s *message = fcgi_state_new_message();
+	assert(message);
 
 	int session_start = 1;
 
@@ -874,8 +878,13 @@ void *thread_handle_connection(void *arg)
 		    /* TODO: this is slightly incorrect. what if the message is
 		     * incomplete? dont we need a better fcgi session management?
 		     */
-		    struct fcgi_message_s *message = fcgi_state_new_message();
 		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    /* note: by protocol the begin request message should be the
+		     * first message. if we parse for a different message we have
+		     * to check for "parse complete", and if the message type
+		     * doesn't match we have to delete the message and start over
+		     * parsing with a new message.
+		     */
 		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
 		    {
 			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
@@ -887,13 +896,18 @@ void *thread_handle_connection(void *arg)
 				{
 				    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
 				    fcgi_state_set_message_flag(message, flag);
+				    /* TODO: this does not work, if the first message is not
+				     * send complete (i.e. 16 bytes complete). Then the next
+				     * command would write into the half complete message buffer
+				     * a full complete message, and overwrite the header of
+				     * the next message.
+				     */
 				    fcgi_state_message_write((unsigned char *)buffer, readbytes, message);
 				}
 			    }
+			    session_start = 0;
 			}
 		    }
-		    fcgi_state_delete_message(message);
-		    session_start = 0;
 		}
 		int writebytes = write(childunixsocketfd, buffer, readbytes);
 		fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
@@ -953,6 +967,7 @@ void *thread_handle_connection(void *arg)
 	    }
 
 	}
+	fcgi_state_delete_message(message);
 	close (childunixsocketfd);
 	free(buffer);
 	qgis_process_set_state_idle(proc);
