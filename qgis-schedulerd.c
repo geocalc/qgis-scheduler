@@ -207,6 +207,8 @@ void *thread_init_new_child(void *arg)
     assert(childproc);
     const pthread_t thread_id = pthread_self();
 
+    qgis_process_set_state_init(childproc, thread_id);
+
     /* detach myself from the main thread. Doing this to collect resources after
      * this thread ends. Because there is no join() waiting for this thread.
      */
@@ -1231,9 +1233,5 @@ int main(int argc, char **argv)
     close(serversocketfd);
     qgis_process_list_delete(proclist);
 
-    /* wait some seconds to check if every child has exited.
-     * else send sigkill signal.
-     */
-    pthread_exit(NULL);
     return exitvalue;
 }
