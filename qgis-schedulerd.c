@@ -368,6 +368,12 @@ void *thread_start_new_child(void *arg)
 	 * to the thread itself.
 	 */
 	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
+	assert(targs);
+	if ( !targs )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	targs->proc = childproc;
 	pthread_t thread;
 	pthread_create(&thread, NULL, thread_init_new_child, targs);
@@ -544,6 +550,11 @@ void *thread_handle_connection(void *arg)
 
 	char *buffer = malloc(maxbufsize);
 	assert(buffer);
+	if ( !buffer )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	struct fcgi_message_s *message = fcgi_state_new_message();
 
 
@@ -762,6 +773,11 @@ void *thread_handle_connection(void *arg)
 	}
 	char *buffer = malloc(maxbufsize);
 	assert(buffer);
+	if ( !buffer )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	struct fcgi_message_s *message = fcgi_state_new_message();
 	assert(message);
 
@@ -1449,6 +1465,12 @@ int main(int argc, char **argv)
 		     * to the thread itself.
 		     */
 		    struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
+		    assert(targs);
+		    if ( !targs )
+		    {
+			perror("could not allocate memory");
+			exit(EXIT_FAILURE);
+		    }
 		    targs->new_accepted_inet_fd = networkfd;
 		    pthread_t thread;
 		    pthread_create(&thread, NULL, thread_handle_connection, targs);

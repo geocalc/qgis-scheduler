@@ -76,17 +76,20 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
 {
     struct qgis_process_s *proc = calloc(1, sizeof(*proc));
     assert(proc);
-    if (proc)
+    if ( !proc )
     {
-	proc->pid = pid;
-	proc->process_socket_fd = process_socket_fd;
-	int retval = pthread_mutex_init(&proc->mutex, NULL);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error: pthread_mutex_init");
-	    exit(EXIT_FAILURE);
-	}
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    proc->pid = pid;
+    proc->process_socket_fd = process_socket_fd;
+    int retval = pthread_mutex_init(&proc->mutex, NULL);
+    if (retval)
+    {
+	errno = retval;
+	perror("error: pthread_mutex_init");
+	exit(EXIT_FAILURE);
     }
 
     return proc;

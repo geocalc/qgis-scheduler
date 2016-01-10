@@ -34,6 +34,7 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <fastcgi.h>
@@ -90,6 +91,12 @@ struct fcgi_message_s
 struct fcgi_message_s *fcgi_state_new_message(void)
 {
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
 
     return message;
 }
@@ -265,6 +272,12 @@ int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_m
 struct fcgi_session_s *fcgi_state_new_session(void)
 {
     struct fcgi_session_s *session = calloc(1, sizeof(*session));
+    assert(session);
+    if ( !session )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
 
     return session;
 }
@@ -280,86 +293,88 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
      * if not enough data is provided, wait for the next data.
      */
     assert(session);
-
     int dataread = 0;
 
-    if (session->bytes_received < sizeof(session->header))
+    if (session)
     {
-	/* parse the header information */
-	FCGI_Header header;
-	int bytes_received;
-
-	/* save already received information in local structure,
-	 * append new data and test for valid data
-	 */
-	memcpy(&header, &session->header, session->bytes_received);
-	dataread = min(len, sizeof(header)-session->bytes_received);
-	memcpy((&header)+session->bytes_received, data, dataread );
-	bytes_received = session->bytes_received + dataread;
-
-	/* not enough data?
-	 * save already received data and
-	 * return to caller to provide more information
-	 */
-	if (bytes_received < sizeof(header))
+	if (session->bytes_received < sizeof(session->header))
 	{
-	    session->bytes_received = bytes_received;
-	    memcpy(&session->header, &header, bytes_received);
+	    /* parse the header information */
+	    FCGI_Header header;
+	    int bytes_received;
 
-	    return dataread;
-	}
+	    /* save already received information in local structure,
+	     * append new data and test for valid data
+	     */
+	    memcpy(&header, &session->header, session->bytes_received);
+	    dataread = min(len, sizeof(header)-session->bytes_received);
+	    memcpy((&header)+session->bytes_received, data, dataread );
+	    bytes_received = session->bytes_received + dataread;
 
-	/* enough data to parse the header */
-	uint16_t requestId = ASSEMBLE_FCGI_NUMBERS16(header.requestId);
+	    /* not enough data?
+	     * save already received data and
+	     * return to caller to provide more information
+	     */
+	    if (bytes_received < sizeof(header))
+	    {
+		session->bytes_received = bytes_received;
+		memcpy(&session->header, &header, bytes_received);
 
-	/* wrong session ? */
-	if ((FCGI_STATE_RUNNING == session->state) && (requestId != session->requestId))
-	{
-	    return -1;
-	}
+		return dataread;
+	    }
 
-	/* if we start a new session, save the parsed data */
-	if (FCGI_STATE_RUNNING != session->state)
-	{
-	    session->state = FCGI_STATE_RUNNING;
-	    session->requestId = requestId;
-	    session->bytes_received = bytes_received;
-	}
+	    /* enough data to parse the header */
+	    uint16_t requestId = ASSEMBLE_FCGI_NUMBERS16(header.requestId);
 
-	len -= dataread;
-	assert(len >= 0);
+	    /* wrong session ? */
+	    if ((FCGI_STATE_RUNNING == session->state) && (requestId != session->requestId))
+	    {
+		return -1;
+	    }
 
-	if (len == 0)
-	    return dataread;
+	    /* if we start a new session, save the parsed data */
+	    if (FCGI_STATE_RUNNING != session->state)
+	    {
+		session->state = FCGI_STATE_RUNNING;
+		session->requestId = requestId;
+		session->bytes_received = bytes_received;
+	    }
 
-	//uint16_t contentLength = ASSEMBLE_FCGI_NUMBERS16(header.contentLength);
+	    len -= dataread;
+	    assert(len >= 0);
 
-	switch(header.type)
-	{
-	case FCGI_BEGIN_REQUEST:
-	{
-	    FCGI_BeginRequestBody body;
-	    int databodylen = min(len, sizeof(body));
-	    memcpy((&body), data+dataread, databodylen );
+	    if (len == 0)
+		return dataread;
 
-	    break;
-	}
-	case FCGI_ABORT_REQUEST:
-	case FCGI_END_REQUEST:
-	case FCGI_PARAMS:
-	case FCGI_STDIN:
-	case FCGI_STDOUT:
-	case FCGI_STDERR:
-	case FCGI_DATA:
-	case FCGI_GET_VALUES:
-	case FCGI_GET_VALUES_RESULT:
-	case FCGI_UNKNOWN_TYPE:
-	    break;
-	default:
-	    return -1;
+	    //uint16_t contentLength = ASSEMBLE_FCGI_NUMBERS16(header.contentLength);
+
+	    switch(header.type)
+	    {
+	    case FCGI_BEGIN_REQUEST:
+	    {
+		FCGI_BeginRequestBody body;
+		int databodylen = min(len, sizeof(body));
+		memcpy((&body), data+dataread, databodylen );
+
+		break;
+	    }
+	    case FCGI_ABORT_REQUEST:
+	    case FCGI_END_REQUEST:
+	    case FCGI_PARAMS:
+	    case FCGI_STDIN:
+	    case FCGI_STDOUT:
+	    case FCGI_STDERR:
+	    case FCGI_DATA:
+	    case FCGI_GET_VALUES:
+	    case FCGI_GET_VALUES_RESULT:
+	    case FCGI_UNKNOWN_TYPE:
+		// TODO: please help yourself if you need other protocol types over here
+		break;
+	    default:
+		return -1;
+	    }
 	}
     }
-
 
 
     return dataread;
@@ -370,6 +385,12 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 struct fcgi_message_s *fcgi_state_new_endrequest_message(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus)
 {
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
 
     message->message.header.version = FCGI_VERSION_1;
     message->message.header.type = FCGI_END_REQUEST;

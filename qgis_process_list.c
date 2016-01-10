@@ -32,9 +32,9 @@
 #include "qgis_process_list.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include <sys/queue.h>
-
 
 
 struct qgis_process_list_s
@@ -54,6 +54,11 @@ struct qgis_process_list_s *qgis_process_list_new(void)
 {
     struct qgis_process_list_s *list = calloc(1, sizeof(*list));
     assert(list);
+    if ( !list )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
     LIST_INIT(&list->head);	// same as calloc(), should we remove this?
     pthread_rwlock_init(&list->rwlock, NULL);
 
@@ -88,6 +93,11 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	{
 	    struct qgis_process_iterator *entry = malloc(sizeof(*entry));
 	    assert(entry);
+	    if ( !entry )
+	    {
+		perror("could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
 	    entry->proc = proc;
 	    pthread_rwlock_wrlock(&list->rwlock);
 	    LIST_INSERT_HEAD(&list->head, entry, entries);      /* Insert at the head. */
@@ -306,6 +316,12 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	}
 
 	pid_t *pidp = calloc(count, sizeof(*pidp));
+	assert(pidp);
+	if ( !pidp )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	int i = 0;
 	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	{
