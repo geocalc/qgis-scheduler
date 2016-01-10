@@ -33,6 +33,7 @@
 #ifndef FCGI_STATE_H_
 #define FCGI_STATE_H_
 
+#include <stdint.h>
 
 /* error codes */
 #define EWRONGSESSION	256
@@ -78,6 +79,8 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
 /* return: message parsing is done (!=0) or not (==0) */
 int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message);
 /* return: message type or -1 in case of error */
+int fcgi_state_get_message_requestid(const struct fcgi_message_s *message);
+/* return: message type or -1 in case of error */
 int fcgi_state_get_message_type(const struct fcgi_message_s *message);
 /* return: message role or -1 in case of error */
 int fcgi_state_get_message_role(const struct fcgi_message_s *message);
@@ -85,6 +88,10 @@ int fcgi_state_get_message_role(const struct fcgi_message_s *message);
 int fcgi_state_get_message_flag(const struct fcgi_message_s *message);
 int fcgi_state_set_message_flag(struct fcgi_message_s *message, unsigned char flags);
 int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message);
+
+/* construct a message */
+struct fcgi_message_s *fcgi_state_new_endrequest_message(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus);
+
 
 #endif /* FCGI_STATE_H_ */
 

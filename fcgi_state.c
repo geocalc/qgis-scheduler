@@ -33,7 +33,6 @@
 #include "fcgi_state.h"
 
 #include <stddef.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -49,6 +48,16 @@
     ( (( variable ## B1 ) << 8) + ( variable ## B0 ))
 #define ASSEMBLE_FCGI_NUMBERS32(variable) \
     ( (( variable ## B3 ) << 32) + (( variable ## B2 ) << 16) + (( variable ## B1 ) << 8) + ( variable ## B0 ))
+
+#define WRITE_FCGI_NUMBER16(variable, value) \
+    ({ ( variable ## B0 ) = ( value ) & 0xff; \
+       ( variable ## B1 ) = ( value ) >> 8; })
+#define WRITE_FCGI_NUMBER32(variable, value) \
+    ({ ( variable ## B0 ) = ( value ) & 0xff; \
+       ( variable ## B1 ) = (( value ) >> 8) & 0xff; \
+       ( variable ## B2 ) = (( value ) >> 16) & 0xff; \
+       ( variable ## B3 ) = (( value ) >> 24) & 0xff; })
+
 
 
 struct fcgi_session_s
@@ -158,6 +167,21 @@ int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message)
 
     return message->parse_done?1:0;
 }
+
+
+int fcgi_state_get_message_requestid(const struct fcgi_message_s *message)
+{
+    assert(message);
+    if ( !message )
+	return -1;
+
+    assert(message->parse_header_done);
+    if ( !message->parse_header_done )
+	return 0;
+
+    return ASSEMBLE_FCGI_NUMBERS16(message->message.header.requestId);
+}
+
 
 /* return: message type or -1 in case of error */
 int fcgi_state_get_message_type(const struct fcgi_message_s *message)
@@ -340,6 +364,21 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 
     return dataread;
 
+}
+
+
+struct fcgi_message_s *fcgi_state_new_endrequest_message(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus)
+{
+    struct fcgi_message_s *message = calloc(1, sizeof(*message));
+
+    message->message.header.version = FCGI_VERSION_1;
+    message->message.header.type = FCGI_END_REQUEST;
+    WRITE_FCGI_NUMBER16(message->message.header.contentLength, sizeof(message->message.endrequestbody));
+    WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
+    WRITE_FCGI_NUMBER32(message->message.endrequestbody.appStatus, appStatus);
+    message->message.endrequestbody.protocolStatus = protocolStatus;
+
+    return message;
 }
 
 
