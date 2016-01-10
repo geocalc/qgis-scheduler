@@ -40,8 +40,7 @@
 struct qgis_process_list_s
 {
     LIST_HEAD(listhead, qgis_process_iterator) head;	/* Linked list head */
-    pthread_mutex_t mutex;	/* mutex used if list structure changes (add, remove, ..) */
-    // TODO maybe better rw_lock over here?
+    pthread_rwlock_t rwlock;	/* lock used to protect list structures (add, remove, find, ..) */
 };
 
 struct qgis_process_iterator
@@ -56,7 +55,7 @@ struct qgis_process_list_s *qgis_process_list_new(void)
     struct qgis_process_list_s *list = calloc(1, sizeof(*list));
     assert(list);
     LIST_INIT(&list->head);	// same as calloc(), should we remove this?
-    pthread_mutex_init(&list->mutex, NULL);
+    pthread_rwlock_init(&list->rwlock, NULL);
 
     return list;
 }
@@ -65,6 +64,7 @@ void qgis_process_list_delete(struct qgis_process_list_s *list)
 {
     if (list)
     {
+	pthread_rwlock_wrlock(&list->rwlock);
 	while (list->head.lh_first != NULL)
 	{
 	    struct qgis_process_iterator *entry = list->head.lh_first;
@@ -72,6 +72,7 @@ void qgis_process_list_delete(struct qgis_process_list_s *list)
 	    qgis_process_delete(entry->proc);
 	    free(entry);
 	}
+	pthread_rwlock_unlock(&list->rwlock);
 	free(list);
     }
 }
@@ -88,9 +89,9 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	    struct qgis_process_iterator *entry = malloc(sizeof(*entry));
 	    assert(entry);
 	    entry->proc = proc;
-	    pthread_mutex_lock(&list->mutex);
+	    pthread_rwlock_wrlock(&list->rwlock);
 	    LIST_INSERT_HEAD(&list->head, entry, entries);      /* Insert at the head. */
-	    pthread_mutex_unlock(&list->mutex);
+	    pthread_rwlock_unlock(&list->rwlock);
 	}
     }
 }
@@ -105,7 +106,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 	if (proc)
 	{
 	    struct qgis_process_iterator *np;
-	    pthread_mutex_lock(&list->mutex);
+	    pthread_rwlock_wrlock(&list->rwlock);
 	    for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	    {
 		if (proc == np->proc)
@@ -115,7 +116,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 		    break;
 		}
 	    }
-	    pthread_mutex_unlock(&list->mutex);
+	    pthread_rwlock_unlock(&list->rwlock);
 	}
     }
 }
@@ -136,34 +137,45 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 
 struct qgis_process_s *qgis_process_list_find_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state)
 {
+    struct qgis_process_s *retval = NULL;
+
     assert(list);
     if (list)
     {
 	struct qgis_process_iterator *np;
+	pthread_rwlock_rdlock(&list->rwlock);
 	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	{
 	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
 	    if (state == mystate)
-		return np->proc;
+	    {
+		retval = np->proc;
+		break;
+	    }
 	}
+	pthread_rwlock_unlock(&list->rwlock);
     }
 
-    return NULL;
+    return retval;
 }
 
 
 struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state)
 {
+    struct qgis_process_s *retval = NULL;
+
     assert(list);
     if (list)
     {
 	struct qgis_process_iterator *np;
+	pthread_rwlock_rdlock(&list->rwlock);
 	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	{
 	    pthread_mutex_t *mutex = qgis_process_get_mutex(np->proc);
 	    pthread_mutex_lock(mutex);
 	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
 	    if (state == mystate)
+	    {
 		/* we found a process idling.
 		 * keep the lock on this process until the thread
 		 * has put itself on the busy list
@@ -182,43 +194,59 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 		 * How about testing for a lock and if it is held by another
 		 * thread go on to the next?
 		 */
-		return np->proc; // intentionally return entry with mutex locked
+		retval = np->proc; // intentionally return entry with mutex locked
+		break;
+	    }
 	    pthread_mutex_unlock(mutex);
 	}
+	pthread_rwlock_unlock(&list->rwlock);
     }
 
-    return NULL;
+    return retval;
 }
 
 
 struct qgis_process_s *qgis_process_list_find_process_by_pid(struct qgis_process_list_s *list, pid_t pid)
 {
+    struct qgis_process_s *retval = NULL;
+
     assert(list);
     if (list)
     {
 	struct qgis_process_iterator *np;
+	pthread_rwlock_rdlock(&list->rwlock);
 	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	{
 	    pid_t mypid = qgis_process_get_pid(np->proc);
 	    if (pid == mypid)
-		return np->proc;
+	    {
+		retval = np->proc;
+		break;
+	    }
 	}
+	pthread_rwlock_unlock(&list->rwlock);
     }
 
-    return NULL;
+    return retval;
 }
 
 
 struct qgis_process_s *qgis_process_list_get_first_process(struct qgis_process_list_s *list)
 {
+    struct qgis_process_s *retval = NULL;
+
     assert(list);
     if (list)
     {
+	pthread_rwlock_rdlock(&list->rwlock);
 	if (list->head.lh_first)
-	    return list->head.lh_first->proc;
+	{
+	    retval = list->head.lh_first->proc;
+	}
+	pthread_rwlock_unlock(&list->rwlock);
     }
 
-    return NULL;
+    return retval;
 }
 
 
@@ -227,7 +255,7 @@ struct qgis_process_iterator *qgis_process_list_get_iterator(struct qgis_process
     assert(list);
     if (list)
     {
-	pthread_mutex_lock(&list->mutex);
+	pthread_rwlock_rdlock(&list->rwlock);
 	return list->head.lh_first;
     }
 
@@ -255,7 +283,7 @@ void qgis_process_list_return_iterator(struct qgis_process_list_s *list)
     assert(list);
     if (list)
     {
-	pthread_mutex_unlock(&list->mutex);
+	pthread_rwlock_unlock(&list->rwlock);
     }
 }
 
@@ -267,10 +295,11 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
     assert(len);
     if (list && pid && len)
     {
-	pthread_mutex_lock(&list->mutex);
-
 	struct qgis_process_iterator *np;
 	int count = 0;
+
+	pthread_rwlock_rdlock(&list->rwlock);
+
 	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
 	{
 	    count++;
@@ -282,9 +311,10 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	{
 	    pidp[i++] = qgis_process_get_pid(np->proc);
 	}
+
+	pthread_rwlock_unlock(&list->rwlock);
 	assert(count == i);
 
-	pthread_mutex_unlock(&list->mutex);
 	*pid = pidp;
 	*len = count;
 
