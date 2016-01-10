@@ -462,18 +462,7 @@ void *thread_handle_connection(void *arg)
 
     fprintf(stderr, "start a new connection thread\n");
 
-    /* find the next idling process and attach a thread to it */
-    proc = qgis_process_list_mutex_find_process_by_status(proclist, PROC_IDLE);
-    if ( !proc )
     {
-	/* Found no idle processes.
-	 * What now?
-	 * All busy, close the network connection.
-	 * Sorry guys.
-	 */
-	fprintf(stderr, "found no free process for network request. close connection\n");
-	// NOTE: no mutex unlock here. we tried all processes, locked and unlocked them all
-
 	/* get the number of new started processes which then become idle
 	 * processes.
 	 * Then we can estimate how much new processes need to be started.
@@ -496,15 +485,30 @@ void *thread_handle_connection(void *arg)
 	 * We get the correct number if we first count PROC_INIT and then
 	 * PROC_START, not the other way around.
 	 */
+	int proc_state_idle = qgis_process_list_get_num_process_by_status(proclist, PROC_IDLE);
 	int proc_state_init = qgis_process_list_get_num_process_by_status(proclist, PROC_INIT);
 	int proc_state_start = qgis_process_list_get_num_process_by_status(proclist, PROC_START);
 
-	int missing_processes = default_min_free_processes - (proc_state_init + proc_state_start);
+	int missing_processes = default_min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones */
 	    start_new_process_detached(missing_processes);
 	}
+    }
+
+    /* find the next idling process and attach a thread to it */
+    proc = qgis_process_list_mutex_find_process_by_status(proclist, PROC_IDLE);
+    if ( !proc )
+    {
+	/* Found no idle processes.
+	 * What now?
+	 * All busy, close the network connection.
+	 * Sorry guys.
+	 */
+	fprintf(stderr, "found no free process for network request. close connection\n");
+	// NOTE: no mutex unlock here. we tried all processes, locked and unlocked them all
+
     }
     else
     {
