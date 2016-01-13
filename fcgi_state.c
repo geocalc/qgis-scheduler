@@ -120,7 +120,7 @@ struct fcgi_message_list_s
 
 struct fcgi_session_s
 {
-    enum fcgi_state_e state;
+    enum fcgi_session_state_e state;
     int bytes_received; // tracks how much bytes we got. This is reset, if bytes_received==contentLength
     uint16_t requestId;
     int keep_messages;
@@ -1097,6 +1097,13 @@ const char *fcgi_session_get_param(const struct fcgi_session_s *session, const c
     }
 
     return retval;
+}
+
+
+enum fcgi_session_state_e fcgi_session_get_state(const struct fcgi_session_s *session)
+{
+    assert(session);
+    return session?session->state:FCGI_SESSION_STATE_ERROR;
 }
 
 

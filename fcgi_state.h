@@ -38,11 +38,12 @@
 /* error codes */
 #define EWRONGSESSION	256
 
-enum fcgi_state_e
+enum fcgi_session_state_e
 {
-    FCGI_STATE_INIT = 0,
-    FCGI_STATE_RUNNING,
-    FCGI_STATE_END,
+    FCGI_SESSION_STATE_INIT = 0,
+    FCGI_SESSION_STATE_RUNNING,
+    FCGI_SESSION_STATE_END,
+    FCGI_SESSION_STATE_ERROR,
 };
 
 
@@ -66,6 +67,10 @@ int fcgi_session_get_id(const struct fcgi_session_s *session);
 int fcgi_session_print(const struct fcgi_session_s *session);
 
 const char *fcgi_session_get_param(const struct fcgi_session_s *session, const char *name);
+
+enum fcgi_session_state_e fcgi_session_get_state(const struct fcgi_session_s *session);
+
+
 
 
 struct fcgi_message_s *fcgi_message_new(void);
