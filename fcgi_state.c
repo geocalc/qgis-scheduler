@@ -961,6 +961,7 @@ void fcgi_session_delete(struct fcgi_session_s *session)
     }
 }
 
+
 int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len)
 {
     /* copy the data into the session header.
@@ -991,6 +992,16 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 			session->paramlist = fcgi_param_list_new();
 
 		    fcgi_param_list_parse(session->paramlist, message);
+		}
+		else if  ( FCGI_STDIN == fcgi_message_get_type(message) )
+		{
+		    /* End of data seems to be signaled by sending a null byte
+		     * on channel "stdin".
+		     * Set state to "parse end".
+		     */
+		    if ( 0 == message->contentLength )
+			session->state = FCGI_SESSION_STATE_END;
+
 		}
 	    }
 	}
@@ -1024,8 +1035,22 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 
 		    fcgi_param_list_parse(session->paramlist, message);
 		}
+		else if  ( FCGI_STDIN == fcgi_message_get_type(message) )
+		{
+		    /* End of data seems to be signaled by sending a null byte
+		     * on channel "stdin".
+		     * Set state to "parse end".
+		     */
+		    if ( 0 == message->contentLength )
+			session->state = FCGI_SESSION_STATE_END;
+
+		}
 	    }
 	}
+
+	/* change fcgi session state to running */
+	if (FCGI_SESSION_STATE_INIT==session->state && dataread>0)
+	    session->state = FCGI_SESSION_STATE_RUNNING;
     }
 
 
