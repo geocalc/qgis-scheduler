@@ -50,7 +50,7 @@ enum fcgi_state_e
 struct fcgi_session_s;
 struct fcgi_message_s;
 
-struct fcgi_session_s *fcgi_state_new_session(void);
+struct fcgi_session_s *fcgi_state_new_session(int keep_messages);
 void fcgi_state_delete_session(struct fcgi_session_s *session);
 
 /* builds up a fcgi session state until all data of 'len' is consumed */
@@ -63,7 +63,7 @@ int fcgi_state_need_more_data(struct fcgi_session_s *session);
  */
 int fcgi_state_get_session_id(const struct fcgi_session_s *session);
 
-
+int fcgi_state_session_print(const struct fcgi_session_s *session);
 
 
 struct fcgi_message_s *fcgi_state_new_message(void);

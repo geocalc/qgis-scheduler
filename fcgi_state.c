@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/queue.h>
 #include <fastcgi.h>
 
 #define min(a,b) \
@@ -44,11 +45,13 @@
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
+#define _STR(x)	# x
+#define STR(x)	_STR(x)
 
 #define ASSEMBLE_FCGI_NUMBERS16(variable) \
     ( (( variable ## B1 ) << 8) + ( variable ## B0 ))
 #define ASSEMBLE_FCGI_NUMBERS32(variable) \
-    ( (( variable ## B3 ) << 32) + (( variable ## B2 ) << 16) + (( variable ## B1 ) << 8) + ( variable ## B0 ))
+    ( (( variable ## B3 ) << 24) + (( variable ## B2 ) << 16) + (( variable ## B1 ) << 8) + ( variable ## B0 ))
 
 #define WRITE_FCGI_NUMBER16(variable, value) \
     ({ ( variable ## B0 ) = ( value ) & 0xff; \
@@ -59,16 +62,9 @@
        ( variable ## B2 ) = (( value ) >> 16) & 0xff; \
        ( variable ## B3 ) = (( value ) >> 24) & 0xff; })
 
+#define MAX_MESSAGE_PRINT_LEN	20
 
 
-struct fcgi_session_s
-{
-    enum fcgi_state_e state;
-    int bytes_received; // tracks how much bytes we got. This is reset, if bytes_received==contentLength
-    uint16_t requestId;
-    uint16_t contentLength;
-    FCGI_Header header;
-};
 
 
 struct fcgi_message_s
@@ -86,7 +82,46 @@ struct fcgi_message_s
 	FCGI_BeginRequestBody beginrequestbody;
     };
     } message;
+    char *content;
 };
+
+struct fcgi_message_list_iterator
+{
+    TAILQ_ENTRY(fcgi_message_list_iterator) entries;          /* Linked list prev./next entry */
+    struct fcgi_message_s *mess;
+};
+
+struct fcgi_message_list_s
+{
+    TAILQ_HEAD(listhead, fcgi_message_list_iterator) head;	/* Linked list head */
+    int bytes_written;	/* count of bytes written in fcgi_message_list_write() buffer */
+    //pthread_rwlock_t rwlock;	/* lock used to protect list structures (add, remove, find, ..) */
+};
+
+struct fcgi_session_s
+{
+    enum fcgi_state_e state;
+    int bytes_received; // tracks how much bytes we got. This is reset, if bytes_received==contentLength
+    uint16_t requestId;
+    uint16_t contentLength;
+    FCGI_Header header;
+    int keep_messages;
+    struct fcgi_message_list_s *messlist;
+};
+
+
+static struct fcgi_message_list_s *fcgi_message_list_new(void);
+static void fcgi_message_list_delete(struct fcgi_message_list_s *messlist);
+static void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct fcgi_message_s *message);
+static struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_list_s *messlist);
+static struct fcgi_message_list_iterator *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list);
+static struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator **iterator);
+static void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list);
+
+
+
+
+
 
 struct fcgi_message_s *fcgi_state_new_message(void)
 {
@@ -103,7 +138,11 @@ struct fcgi_message_s *fcgi_state_new_message(void)
 
 void fcgi_state_delete_message(struct fcgi_message_s *message)
 {
-    free(message);
+    if (message)
+    {
+	free(message->content);
+	free(message);
+    }
 }
 
 int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, int len)
@@ -124,24 +163,60 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
      * read the rest of the message.
      */
 
-    if ( message->bytes_read < sizeof(message->message))
-    //if ( !message->parse_header_done )
+    if ( message->bytes_read < sizeof(message->message.header))
     {
-	dataread = min(len, sizeof(message->message)-message->bytes_read);
-	memcpy((&message->message)+message->bytes_read, data, dataread );
+	dataread = min(len, sizeof(message->message.header)-message->bytes_read);
+	memcpy((&message->message.header)+message->bytes_read, data, dataread );
 
 	/* did we read enough bytes? then go on parsing
 	 * else wait for the next call
 	 */
 	message->bytes_read += dataread;
 
-	if (message->bytes_read < sizeof(message->message))
+	if (message->bytes_read < sizeof(message->message.header))
 	{
 	    return dataread;
 	}
 
+	data += dataread;	// move content pointer to next content
 	message->contentLength = ASSEMBLE_FCGI_NUMBERS16(message->message.header.contentLength);
 	message->parse_header_done = 1;
+
+	/* depending on the FCGI message type we need to allocate some content memory */
+	unsigned char messageType = message->message.header.type;
+	switch (messageType)
+	{
+	case FCGI_BEGIN_REQUEST:	// fall through
+	case FCGI_ABORT_REQUEST:	// fall through
+	case FCGI_END_REQUEST:
+	    break;
+
+	case FCGI_PARAMS:	// fall through
+	case FCGI_STDIN:	// fall through
+	case FCGI_STDOUT:	// fall through
+	case FCGI_STDERR:	// fall through
+	case FCGI_DATA:
+	    if (message->contentLength > 0)
+	    {
+		message->content = calloc(1, message->contentLength);
+		assert(message->content);
+		if ( !message->content )
+		{
+		    perror("could not allocate memory");
+		    exit(EXIT_FAILURE);
+		}
+	    }
+
+	    break;
+
+//	case FCGI_GET_VALUES:
+//	case FCGI_GET_VALUES_RESULT:
+//	case FCGI_UNKNOWN_TYPE:
+	default:
+	    fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	    exit(EXIT_FAILURE);
+
+	}
     }
 
     /* over here we have message->parse_header_done == 1 */
@@ -150,11 +225,64 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
     len -= dataread;
     assert( len >= 0 );
 
-    // note: contentLength is defined as the length of the body, i.e. message struct - header struct.
-    int remaining_length = sizeof(message->message.header) + message->contentLength - message->bytes_read; // this amount needs to be read
-    int content_read = min(len, remaining_length);
-    message->bytes_read += content_read;	// this is the amount we virtually read in this function call
-    dataread += content_read;	// this is the amount we virtually read in this function call
+    /* depending on the FCGI message type we copy into different memory */
+    /* TODO: if we delete the union beginrequestbody and copy the content into
+     *       *content then we can omit this switch() over here
+     */
+    unsigned char messageType = message->message.header.type;
+    switch (messageType)
+    {
+    case FCGI_BEGIN_REQUEST:	// fall through
+    case FCGI_END_REQUEST:
+    {
+	/* here we copy the remaining data into the message body.
+	 * no content copy needed
+	 */
+	assert(message->contentLength == sizeof(message->message.beginrequestbody));
+
+	int copylen = min(sizeof(message->message.beginrequestbody), len);
+	if (copylen > 0)
+	{
+	    memcpy(&message->message.beginrequestbody, data, copylen);
+	    message->bytes_read += copylen;	// this is the amount we virtually read in this function call
+	    dataread += copylen;
+	    len -= copylen;
+	}
+	break;
+    }
+    case FCGI_ABORT_REQUEST:
+	assert(0 == message->contentLength);
+	break;
+
+    case FCGI_PARAMS:	// fall through
+    case FCGI_STDIN:	// fall through
+    case FCGI_STDOUT:	// fall through
+    case FCGI_STDERR:	// fall through
+    case FCGI_DATA:
+    {
+	// note: contentLength is defined as the length of the body, i.e. message struct - header struct.
+	int remaining_length = sizeof(message->message.header) + message->contentLength - message->bytes_read; // this amount needs to be read to entirely fill this message
+	assert(remaining_length >= 0);
+	int content_read = min(len, remaining_length);	// this amount is available to be read
+	assert(content_read >= 0);
+	if (content_read > 0)
+	{
+	    memcpy(message->content, data, content_read);	// copy content into message buffer
+	    message->bytes_read += content_read;	// this is the amount we virtually read in this function call
+	    dataread += content_read;	// this is the amount we virtually read in this function call
+	    len -= content_read;
+	}
+	break;
+    }
+//	case FCGI_GET_VALUES:
+//	case FCGI_GET_VALUES_RESULT:
+//	case FCGI_UNKNOWN_TYPE:
+    default:
+	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	exit(EXIT_FAILURE);
+
+    }
+
 
     /* if the old data read plus the current data read
      * is the same as content length
@@ -165,6 +293,7 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
 
     return dataread;
 }
+
 
 int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message)
 {
@@ -251,7 +380,25 @@ int fcgi_state_set_message_flag(struct fcgi_message_s *message, unsigned char fl
     return 0;
 }
 
+int fcgi_state_get_message_size(const struct fcgi_message_s *message)
+{
+    assert(message);
+    if ( !message )
+	return 0;
 
+    assert(message->parse_header_done);
+    if ( !message->parse_header_done )
+	return 0;
+
+
+    return sizeof(message->message.header) + message->contentLength;
+}
+
+
+
+/* writes message into buffer of size len.
+ * returns the bytes written.
+ */
 int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message)
 {
     assert(buffer);
@@ -261,15 +408,299 @@ int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_m
     if ( !message )
 	return 0;
 
-    int written = min(sizeof(message->message), len);
-    memcpy(buffer, &message->message, written);
+    int written = min(fcgi_state_get_message_size(message), len);
+    unsigned char messageType = message->message.header.type;
+    switch (messageType)
+    {
+    case FCGI_BEGIN_REQUEST:	// fall through
+    case FCGI_ABORT_REQUEST:	// fall through
+    case FCGI_END_REQUEST:
+	// here I assume that the ABORT_REQUEST has contentLength = 0
+	memcpy(buffer, &message->message, written);
+	break;
+
+    case FCGI_PARAMS:	// fall through
+    case FCGI_STDIN:	// fall through
+    case FCGI_STDOUT:	// fall through
+    case FCGI_STDERR:	// fall through
+    case FCGI_DATA:
+	if (written <= sizeof(message->message.header))
+	{
+	    memcpy(buffer, &message->message.header, written);
+	}
+	else
+	{
+	    memcpy(buffer, &message->message.header, sizeof(message->message.header));
+	    memcpy(buffer, message->content, written-sizeof(message->message.header));
+	}
+
+	break;
+
+//    case FCGI_GET_VALUES:
+//    case FCGI_GET_VALUES_RESULT:
+//    case FCGI_UNKNOWN_TYPE:
+    default:
+	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	exit(EXIT_FAILURE);
+    }
 
     return written;
 }
 
 
+/* prints message to stderr
+ * return: number of bytes printed
+ */
+int fcgi_message_print(const struct fcgi_message_s *message)
+{
+    int bytes_printed = 0;
 
-struct fcgi_session_s *fcgi_state_new_session(void)
+    assert(message);
+    assert(message->parse_header_done);
+    if ( message && message->parse_header_done )
+    {
+	int requestId = fcgi_state_get_message_requestid(message);
+	    unsigned char messageType = message->message.header.type;
+	    switch (messageType)
+	    {
+	    case FCGI_BEGIN_REQUEST:
+	    {
+		bytes_printed += fprintf(stderr, "{FCGI_BEGIN_REQUEST, %d, {", requestId);
+		int role = fcgi_state_get_message_role(message);
+		switch (role)
+		{
+		case FCGI_RESPONDER:
+		    bytes_printed += fprintf(stderr, "FCGI_RESPONDER");
+		    break;
+		case FCGI_AUTHORIZER:
+		    bytes_printed += fprintf(stderr, "FCGI_AUTHORIZER");
+		    break;
+		case FCGI_FILTER:
+		    bytes_printed += fprintf(stderr, "FCGI_FILTER");
+		    break;
+		default:
+		    fprintf(stderr, "error: unknown role %d\n", role);
+		    break;
+		}
+		bytes_printed += fprintf(stderr, ", 0x%02x}}\n", message->message.beginrequestbody.flags);
+		break;
+	    }
+	    case FCGI_ABORT_REQUEST:
+		bytes_printed += fprintf(stderr, "{FCGI_ABORT_REQUEST, %d}\n", requestId);
+		break;
+	    case FCGI_END_REQUEST:
+	    {
+		int appStatus = ASSEMBLE_FCGI_NUMBERS32(message->message.endrequestbody.appStatus);
+		bytes_printed += fprintf(stderr, "{FCGI_END_REQUEST, %d, { %d, \n", requestId, appStatus);
+		switch (message->message.endrequestbody.protocolStatus)
+		{
+		case FCGI_REQUEST_COMPLETE:
+		    bytes_printed += fprintf(stderr, "FCGI_REQUEST_COMPLETE}}\n");
+		    break;
+		case FCGI_CANT_MPX_CONN:
+		    bytes_printed += fprintf(stderr, "FCGI_CANT_MPX_CONN}}\n");
+		    break;
+		case FCGI_OVERLOADED:
+		    bytes_printed += fprintf(stderr, "FCGI_OVERLOADED}}\n");
+		    break;
+		case FCGI_UNKNOWN_ROLE:
+		    bytes_printed += fprintf(stderr, "FCGI_UNKNOWN_ROLE}}\n");
+		    break;
+		default:
+		    fprintf(stderr, "error: unknown protocol status %d\n", message->message.endrequestbody.protocolStatus);
+		    break;
+		}
+		break;
+	    }
+	    case FCGI_PARAMS:
+		bytes_printed += fprintf(stderr, "{FCGI_PARAMS, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		break;
+	    case FCGI_STDIN:
+		bytes_printed += fprintf(stderr, "{FCGI_STDIN, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		break;
+	    case FCGI_STDOUT:
+		bytes_printed += fprintf(stderr, "{FCGI_STDOUT, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		break;
+	    case FCGI_STDERR:
+		bytes_printed += fprintf(stderr, "{FCGI_STDERR, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		break;
+	    case FCGI_DATA:
+		bytes_printed += fprintf(stderr, "{FCGI_DATA, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		break;
+
+	//    case FCGI_GET_VALUES:
+	//    case FCGI_GET_VALUES_RESULT:
+	//    case FCGI_UNKNOWN_TYPE:
+	    default:
+		fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+		exit(EXIT_FAILURE);
+	    }
+
+    }
+
+    return bytes_printed;
+}
+
+
+struct fcgi_message_list_s *fcgi_message_list_new(void)
+{
+    struct fcgi_message_list_s *messlist = calloc(1, sizeof(*messlist));
+    assert(messlist);
+    if ( !messlist )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    return messlist;
+}
+
+
+
+void fcgi_message_list_delete(struct fcgi_message_list_s *messlist)
+{
+    if (messlist)
+    {
+	while (messlist->head.tqh_first != NULL)
+	{
+	    struct fcgi_message_list_iterator *entry = messlist->head.tqh_first;
+
+	    TAILQ_REMOVE(&messlist->head, messlist->head.tqh_first, entries);
+	    fcgi_state_delete_message(entry->mess);
+	    free(entry);
+	}
+
+	free(messlist);
+    }
+}
+
+
+
+void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct fcgi_message_s *message)
+{
+    assert(messlist);
+    assert(message);
+    if(messlist && message)
+    {
+	struct fcgi_message_list_iterator *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	entry->mess = message;
+
+	/* if list is empty we have to insert at beginning,
+	 * else insert at the end.
+	 */
+	if (messlist->head.tqh_first)
+	    TAILQ_INSERT_TAIL(&messlist->head, entry, entries);      /* Insert at the end. */
+	else
+	    TAILQ_INSERT_HEAD(&messlist->head, entry, entries);
+    }
+}
+
+
+struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_list_s *messlist)
+{
+    struct fcgi_message_s *message = NULL;
+    assert(messlist);
+    if(messlist)
+    {
+	if (messlist->head.tqh_last)
+	{
+	    struct fcgi_message_list_iterator *np = *messlist->head.tqh_last;
+
+	    message = np->mess;
+	}
+    }
+
+    return message;
+}
+
+
+struct fcgi_message_list_iterator *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	return list->head.tqh_first;
+    }
+
+    return NULL;
+}
+
+
+struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator **iterator)
+{
+    assert(iterator);
+    if (iterator)
+    {
+	if (*iterator)
+	{
+	    struct fcgi_message_s *proc = (*iterator)->mess;
+	    *iterator = (*iterator)->entries.tqe_next;
+	    return proc;
+	}
+    }
+
+    return NULL;
+}
+
+
+void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list)
+{
+
+}
+
+
+
+
+//int fcgi_message_list_write(unsigned char *buffer, int len, const struct fcgi_message_list_s *messlist)
+//{
+//    assert(messlist);
+//    if (messlist)
+//    {
+//	assert(messlist->bytes_written >= 0);
+//	int byteswritten = messlist->bytes_written;
+//	int bufferwritten = 0;
+//
+//	struct fcgi_message_s *message;
+//	struct fcgi_message_list_iterator *np;
+//
+//	for (np = messlist->head.lh_first; np != NULL; np = np->entries.le_next)
+//	{
+//	    message = np->mess;
+//	    assert(message);
+//
+//	    int towrite = min(len, fcgi_state_get_message_size(message));
+//	    byteswritten -= towrite;
+//	    if (byteswritten < 0)
+//	    {
+//		towrite = -byteswritten;
+//
+//		bufferwritten += towrite;
+//		byteswritten = 0;
+//	    }
+//
+//	}
+//
+//
+//	bufferwritten -= messlist->bytes_written;
+//	messlist->bytes_written += bufferwritten;
+//	return bufferwritten;
+//    }
+//
+//    return -1;
+//}
+
+
+
+
+
+struct fcgi_session_s *fcgi_state_new_session(int keep_messages)
 {
     struct fcgi_session_s *session = calloc(1, sizeof(*session));
     assert(session);
@@ -279,12 +710,19 @@ struct fcgi_session_s *fcgi_state_new_session(void)
 	exit(EXIT_FAILURE);
     }
 
+    session->keep_messages = keep_messages;
+    session->messlist = fcgi_message_list_new();
+
     return session;
 }
 
 void fcgi_state_delete_session(struct fcgi_session_s *session)
 {
-    free(session);
+    if (session)
+    {
+	fcgi_message_list_delete(session->messlist);
+	free(session);
+    }
 }
 
 int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
@@ -293,85 +731,49 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
      * if not enough data is provided, wait for the next data.
      */
     assert(session);
+    assert(session->messlist);
     int dataread = 0;
 
-    if (session)
+    if (session && session->messlist)
     {
-	if (session->bytes_received < sizeof(session->header))
+	int bytes_read = 0;
+
+	struct fcgi_message_s *message = fcgi_message_list_get_last_message(session->messlist);
+	if ( message && !fcgi_state_get_message_parse_done(message) )
 	{
-	    /* parse the header information */
-	    FCGI_Header header;
-	    int bytes_received;
-
-	    /* save already received information in local structure,
-	     * append new data and test for valid data
-	     */
-	    memcpy(&header, &session->header, session->bytes_received);
-	    dataread = min(len, sizeof(header)-session->bytes_received);
-	    memcpy((&header)+session->bytes_received, data, dataread );
-	    bytes_received = session->bytes_received + dataread;
-
-	    /* not enough data?
-	     * save already received data and
-	     * return to caller to provide more information
-	     */
-	    if (bytes_received < sizeof(header))
+	    bytes_read = fcgi_state_parse_message(message, data, len);
+	    assert(bytes_read); // if message parse is not done it should read at least one byte
+	    len -= bytes_read;
+	    dataread += bytes_read;
+	    data += bytes_read;
+	    if (fcgi_state_get_message_parse_done(message))
 	    {
-		session->bytes_received = bytes_received;
-		memcpy(&session->header, &header, bytes_received);
-
-		return dataread;
+		fcgi_message_print(message);
 	    }
+	}
 
-	    /* enough data to parse the header */
-	    uint16_t requestId = ASSEMBLE_FCGI_NUMBERS16(header.requestId);
+	if ( len > 0 )
+	{
+	    // if bytes available assure the last parse has finished
+	    if (message)
+		assert(fcgi_state_get_message_parse_done(message));
 
-	    /* wrong session ? */
-	    if ((FCGI_STATE_RUNNING == session->state) && (requestId != session->requestId))
+	    while ( len > 0 )
 	    {
-		return -1;
-	    }
+		message = fcgi_state_new_message();
 
-	    /* if we start a new session, save the parsed data */
-	    if (FCGI_STATE_RUNNING != session->state)
-	    {
-		session->state = FCGI_STATE_RUNNING;
-		session->requestId = requestId;
-		session->bytes_received = bytes_received;
-	    }
+		int readbytes = fcgi_state_parse_message(message, data, len);
+		assert(readbytes);	// if bytes to read are available, the function should read them
+		len -= readbytes;
+		assert(len>=0);		// functions should not read more bytes than available
+		dataread += readbytes;
+		data += readbytes;
+		fcgi_message_list_add_message(session->messlist, message);
 
-	    len -= dataread;
-	    assert(len >= 0);
+		if (!fcgi_state_get_message_parse_done(message))
+		    break;
 
-	    if (len == 0)
-		return dataread;
-
-	    //uint16_t contentLength = ASSEMBLE_FCGI_NUMBERS16(header.contentLength);
-
-	    switch(header.type)
-	    {
-	    case FCGI_BEGIN_REQUEST:
-	    {
-		FCGI_BeginRequestBody body;
-		int databodylen = min(len, sizeof(body));
-		memcpy((&body), data+dataread, databodylen );
-
-		break;
-	    }
-	    case FCGI_ABORT_REQUEST:
-	    case FCGI_END_REQUEST:
-	    case FCGI_PARAMS:
-	    case FCGI_STDIN:
-	    case FCGI_STDOUT:
-	    case FCGI_STDERR:
-	    case FCGI_DATA:
-	    case FCGI_GET_VALUES:
-	    case FCGI_GET_VALUES_RESULT:
-	    case FCGI_UNKNOWN_TYPE:
-		// TODO: please help yourself if you need other protocol types over here
-		break;
-	    default:
-		return -1;
+		fcgi_message_print(message);
 	    }
 	}
     }
@@ -379,6 +781,50 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 
     return dataread;
 
+}
+
+
+int fcgi_state_need_more_data(struct fcgi_session_s *session)
+{
+    assert(session);
+    assert(session->messlist);
+    if (session && session->messlist)
+    {
+	struct fcgi_message_s *message = fcgi_message_list_get_last_message(session->messlist);
+
+	int parse_done = fcgi_state_get_message_parse_done(message);
+	if (parse_done >= 0)
+	    return !parse_done;
+    }
+
+    return -1;
+}
+
+
+//int fcgi_state_get_session_id(const struct fcgi_session_s *session)
+//{
+//
+//}
+
+
+int fcgi_state_session_print(const struct fcgi_session_s *session)
+{
+    int bytes_printed = 0;
+
+    assert(session);
+    assert(session->messlist);
+    if (session && session->messlist)
+    {
+	struct fcgi_message_list_iterator *it = fcgi_message_list_get_iterator(session->messlist);
+	struct fcgi_message_s *message;
+	while ((message = fcgi_message_list_get_next_message(&it)) != NULL)
+	{
+	    bytes_printed += fcgi_message_print(message);
+	}
+	fcgi_message_list_return_iterator(session->messlist);
+    }
+
+    return bytes_printed;
 }
 
 
