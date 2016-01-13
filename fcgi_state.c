@@ -103,8 +103,6 @@ struct fcgi_session_s
     enum fcgi_state_e state;
     int bytes_received; // tracks how much bytes we got. This is reset, if bytes_received==contentLength
     uint16_t requestId;
-    uint16_t contentLength;
-    FCGI_Header header;
     int keep_messages;
     struct fcgi_message_list_s *messlist;
 };
@@ -123,7 +121,7 @@ static void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list);
 
 
 
-struct fcgi_message_s *fcgi_state_new_message(void)
+struct fcgi_message_s *fcgi_message_new(void)
 {
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
     assert(message);
@@ -136,7 +134,7 @@ struct fcgi_message_s *fcgi_state_new_message(void)
     return message;
 }
 
-void fcgi_state_delete_message(struct fcgi_message_s *message)
+void fcgi_message_delete(struct fcgi_message_s *message)
 {
     if (message)
     {
@@ -145,7 +143,7 @@ void fcgi_state_delete_message(struct fcgi_message_s *message)
     }
 }
 
-int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, int len)
+int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len)
 {
     assert(message);
     if (!message)
@@ -213,7 +211,7 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
 	default:
-	    fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	    fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
 	    exit(EXIT_FAILURE);
 
 	}
@@ -278,7 +276,7 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
     default:
-	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
 
     }
@@ -295,7 +293,7 @@ int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, i
 }
 
 
-int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message)
+int fcgi_message_get_parse_done(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -305,7 +303,7 @@ int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message)
 }
 
 
-int fcgi_state_get_message_requestid(const struct fcgi_message_s *message)
+int fcgi_message_get_requestid(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -320,7 +318,7 @@ int fcgi_state_get_message_requestid(const struct fcgi_message_s *message)
 
 
 /* return: message type or -1 in case of error */
-int fcgi_state_get_message_type(const struct fcgi_message_s *message)
+int fcgi_message_get_type(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -334,7 +332,7 @@ int fcgi_state_get_message_type(const struct fcgi_message_s *message)
 }
 
 
-int fcgi_state_get_message_role(const struct fcgi_message_s *message)
+int fcgi_message_get_role(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -351,7 +349,7 @@ int fcgi_state_get_message_role(const struct fcgi_message_s *message)
 }
 
 
-int fcgi_state_get_message_flag(const struct fcgi_message_s *message)
+int fcgi_message_get_flag(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -365,7 +363,7 @@ int fcgi_state_get_message_flag(const struct fcgi_message_s *message)
 }
 
 
-int fcgi_state_set_message_flag(struct fcgi_message_s *message, unsigned char flags)
+int fcgi_message_set_flag(struct fcgi_message_s *message, unsigned char flags)
 {
     assert(message);
     if ( !message )
@@ -380,7 +378,8 @@ int fcgi_state_set_message_flag(struct fcgi_message_s *message, unsigned char fl
     return 0;
 }
 
-int fcgi_state_get_message_size(const struct fcgi_message_s *message)
+
+static int fcgi_message_get_size(const struct fcgi_message_s *message)
 {
     assert(message);
     if ( !message )
@@ -399,7 +398,7 @@ int fcgi_state_get_message_size(const struct fcgi_message_s *message)
 /* writes message into buffer of size len.
  * returns the bytes written.
  */
-int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message)
+int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message)
 {
     assert(buffer);
     if ( !buffer )
@@ -408,7 +407,7 @@ int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_m
     if ( !message )
 	return 0;
 
-    int written = min(fcgi_state_get_message_size(message), len);
+    int written = min(fcgi_message_get_size(message), len);
     unsigned char messageType = message->message.header.type;
     switch (messageType)
     {
@@ -440,7 +439,7 @@ int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_m
 //    case FCGI_GET_VALUES_RESULT:
 //    case FCGI_UNKNOWN_TYPE:
     default:
-	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+	fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
     }
 
@@ -459,14 +458,14 @@ int fcgi_message_print(const struct fcgi_message_s *message)
     assert(message->parse_header_done);
     if ( message && message->parse_header_done )
     {
-	int requestId = fcgi_state_get_message_requestid(message);
+	int requestId = fcgi_message_get_requestid(message);
 	    unsigned char messageType = message->message.header.type;
 	    switch (messageType)
 	    {
 	    case FCGI_BEGIN_REQUEST:
 	    {
 		bytes_printed += fprintf(stderr, "{FCGI_BEGIN_REQUEST, %d, {", requestId);
-		int role = fcgi_state_get_message_role(message);
+		int role = fcgi_message_get_role(message);
 		switch (role)
 		{
 		case FCGI_RESPONDER:
@@ -532,7 +531,7 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 	//    case FCGI_GET_VALUES_RESULT:
 	//    case FCGI_UNKNOWN_TYPE:
 	    default:
-		fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_state_get_message_requestid(message));
+		fprintf(stderr, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
 		exit(EXIT_FAILURE);
 	    }
 
@@ -566,7 +565,7 @@ void fcgi_message_list_delete(struct fcgi_message_list_s *messlist)
 	    struct fcgi_message_list_iterator *entry = messlist->head.tqh_first;
 
 	    TAILQ_REMOVE(&messlist->head, messlist->head.tqh_first, entries);
-	    fcgi_state_delete_message(entry->mess);
+	    fcgi_message_delete(entry->mess);
 	    free(entry);
 	}
 
@@ -700,7 +699,7 @@ void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list)
 
 
 
-struct fcgi_session_s *fcgi_state_new_session(int keep_messages)
+struct fcgi_session_s *fcgi_session_new(int keep_messages)
 {
     struct fcgi_session_s *session = calloc(1, sizeof(*session));
     assert(session);
@@ -716,7 +715,7 @@ struct fcgi_session_s *fcgi_state_new_session(int keep_messages)
     return session;
 }
 
-void fcgi_state_delete_session(struct fcgi_session_s *session)
+void fcgi_session_delete(struct fcgi_session_s *session)
 {
     if (session)
     {
@@ -725,7 +724,7 @@ void fcgi_state_delete_session(struct fcgi_session_s *session)
     }
 }
 
-int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
+int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len)
 {
     /* copy the data into the session header.
      * if not enough data is provided, wait for the next data.
@@ -739,14 +738,14 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 	int bytes_read = 0;
 
 	struct fcgi_message_s *message = fcgi_message_list_get_last_message(session->messlist);
-	if ( message && !fcgi_state_get_message_parse_done(message) )
+	if ( message && !fcgi_message_get_parse_done(message) )
 	{
-	    bytes_read = fcgi_state_parse_message(message, data, len);
+	    bytes_read = fcgi_message_parse(message, data, len);
 	    assert(bytes_read); // if message parse is not done it should read at least one byte
 	    len -= bytes_read;
 	    dataread += bytes_read;
 	    data += bytes_read;
-	    if (fcgi_state_get_message_parse_done(message))
+	    if (fcgi_message_get_parse_done(message))
 	    {
 		fcgi_message_print(message);
 	    }
@@ -756,13 +755,13 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 	{
 	    // if bytes available assure the last parse has finished
 	    if (message)
-		assert(fcgi_state_get_message_parse_done(message));
+		assert(fcgi_message_get_parse_done(message));
 
 	    while ( len > 0 )
 	    {
-		message = fcgi_state_new_message();
+		message = fcgi_message_new();
 
-		int readbytes = fcgi_state_parse_message(message, data, len);
+		int readbytes = fcgi_message_parse(message, data, len);
 		assert(readbytes);	// if bytes to read are available, the function should read them
 		len -= readbytes;
 		assert(len>=0);		// functions should not read more bytes than available
@@ -770,7 +769,7 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 		data += readbytes;
 		fcgi_message_list_add_message(session->messlist, message);
 
-		if (!fcgi_state_get_message_parse_done(message))
+		if (!fcgi_message_get_parse_done(message))
 		    break;
 
 		fcgi_message_print(message);
@@ -784,7 +783,7 @@ int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len)
 }
 
 
-int fcgi_state_need_more_data(struct fcgi_session_s *session)
+int fcgi_session_need_more_data(struct fcgi_session_s *session)
 {
     assert(session);
     assert(session->messlist);
@@ -792,7 +791,7 @@ int fcgi_state_need_more_data(struct fcgi_session_s *session)
     {
 	struct fcgi_message_s *message = fcgi_message_list_get_last_message(session->messlist);
 
-	int parse_done = fcgi_state_get_message_parse_done(message);
+	int parse_done = fcgi_message_get_parse_done(message);
 	if (parse_done >= 0)
 	    return !parse_done;
     }
@@ -807,7 +806,7 @@ int fcgi_state_need_more_data(struct fcgi_session_s *session)
 //}
 
 
-int fcgi_state_session_print(const struct fcgi_session_s *session)
+int fcgi_session_print(const struct fcgi_session_s *session)
 {
     int bytes_printed = 0;
 
@@ -828,7 +827,7 @@ int fcgi_state_session_print(const struct fcgi_session_s *session)
 }
 
 
-struct fcgi_message_s *fcgi_state_new_endrequest_message(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus)
+struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus)
 {
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
     assert(message);

@@ -586,7 +586,7 @@ void *thread_handle_connection(void *arg)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	struct fcgi_message_s *message = fcgi_state_new_message();
+	struct fcgi_message_s *message = fcgi_message_new();
 
 
 	int maxfd = 0;
@@ -680,21 +680,21 @@ void *thread_handle_connection(void *arg)
 		     * this thread.
 		     */
 
-		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    retval = fcgi_message_parse(message, buffer, readbytes);
 		    /* note: by protocol the begin request message should be the
 		     * first message. if we parse for a different message we have
 		     * to check for "parse complete", and if the message type
 		     * doesn't match we have to delete the message and start over
 		     * parsing with a new message.
 		     */
-		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
+		    if (FCGI_BEGIN_REQUEST == fcgi_message_get_type(message))
 		    {
-			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
+			if (FCGI_RESPONDER == fcgi_message_get_role(message))
 			{
 			    unsigned char sendbuffer[sizeof(FCGI_EndRequestRecord)];
-			    uint16_t requestId = fcgi_state_get_message_requestid(message);
-			    struct fcgi_message_s *sendmessage = fcgi_state_new_endrequest_message(requestId, 0, FCGI_OVERLOADED);
-			    retval = fcgi_state_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
+			    uint16_t requestId = fcgi_message_get_requestid(message);
+			    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
+			    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
 
 			    int writebytes = write(inetsocketfd, sendbuffer, retval);
 			    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
@@ -708,7 +708,7 @@ void *thread_handle_connection(void *arg)
 			     * is send back to the web server. we can close
 			     * down and leave.
 			     */
-			    fcgi_state_delete_message(sendmessage);
+			    fcgi_message_delete(sendmessage);
 			    break;
 			}
 		    }
@@ -719,7 +719,7 @@ void *thread_handle_connection(void *arg)
 
 	}
 	free(buffer);
-	fcgi_state_delete_message(message);
+	fcgi_message_delete(message);
 
     }
     else
@@ -815,9 +815,9 @@ void *thread_handle_connection(void *arg)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	struct fcgi_message_s *message = fcgi_state_new_message();
+	struct fcgi_message_s *message = fcgi_message_new();
 	assert(message);
-	struct fcgi_session_s *fcgi_session = fcgi_state_new_session(1);
+	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
 
 	int session_start = 1;
 
@@ -922,7 +922,7 @@ void *thread_handle_connection(void *arg)
 		fwrite(buffer, 1, readbytes, stderr);
 		fprintf(stderr, "\n");
 #endif
-		fcgi_state_parse(fcgi_session, buffer, readbytes);
+		fcgi_session_parse(fcgi_session, buffer, readbytes);
 		if (session_start)
 		{
 		    /* check the status of this fcgi session
@@ -933,7 +933,7 @@ void *thread_handle_connection(void *arg)
 		    /* TODO: this is slightly incorrect. what if the message is
 		     * incomplete? dont we need a better fcgi session management?
 		     */
-		    retval = fcgi_state_parse_message(message, buffer, readbytes);
+		    retval = fcgi_message_parse(message, buffer, readbytes);
 		    /* note: by protocol the begin request message should be the
 		     * first message. if we parse for a different message we have
 		     * to check for "parse complete", and if the message type
@@ -941,24 +941,24 @@ void *thread_handle_connection(void *arg)
 		     * parsing with a new message.
 		     */
 		    fcgi_message_print(message);
-		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
+		    if (FCGI_BEGIN_REQUEST == fcgi_message_get_type(message))
 		    {
-			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
+			if (FCGI_RESPONDER == fcgi_message_get_role(message))
 			{
-			    int flag =  fcgi_state_get_message_flag(message);
+			    int flag =  fcgi_message_get_flag(message);
 			    if (flag >= 0)
 			    {
 				if (flag & FCGI_KEEP_CONN)
 				{
 				    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
-				    fcgi_state_set_message_flag(message, flag);
+				    fcgi_message_set_flag(message, flag);
 				    /* TODO: this does not work, if the first message is not
 				     * send complete (i.e. 16 bytes complete). Then the next
 				     * command would write into the half complete message buffer
 				     * a full complete message, and overwrite the header of
 				     * the next message.
 				     */
-				    fcgi_state_message_write((unsigned char *)buffer, readbytes, message);
+				    fcgi_message_write((unsigned char *)buffer, readbytes, message);
 				    fcgi_message_print(message);
 				}
 			    }
@@ -1024,8 +1024,8 @@ void *thread_handle_connection(void *arg)
 	    }
 
 	}
-	fcgi_state_delete_message(message);
-	fcgi_state_delete_session(fcgi_session);
+	fcgi_message_delete(message);
+	fcgi_session_delete(fcgi_session);
 	close (childunixsocketfd);
 	free(buffer);
 	qgis_process_set_state_idle(proc);

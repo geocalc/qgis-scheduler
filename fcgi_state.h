@@ -50,24 +50,24 @@ enum fcgi_state_e
 struct fcgi_session_s;
 struct fcgi_message_s;
 
-struct fcgi_session_s *fcgi_state_new_session(int keep_messages);
-void fcgi_state_delete_session(struct fcgi_session_s *session);
+struct fcgi_session_s *fcgi_session_new(int keep_messages);
+void fcgi_session_delete(struct fcgi_session_s *session);
 
 /* builds up a fcgi session state until all data of 'len' is consumed */
-int fcgi_state_parse(struct fcgi_session_s *session, const char *data, int len);
+int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len);
 /* return: true (!=0) if message needs data, false (==0) if not */
-int fcgi_state_need_more_data(struct fcgi_session_s *session);
+int fcgi_session_need_more_data(struct fcgi_session_s *session);
 /* return: session id for current session (>0),
  * 	0 if currently no session (i.e. FCGI_STATE_INIT)
  * 	-1 on error
  */
-int fcgi_state_get_session_id(const struct fcgi_session_s *session);
+int fcgi_session_get_id(const struct fcgi_session_s *session);
 
-int fcgi_state_session_print(const struct fcgi_session_s *session);
+int fcgi_session_print(const struct fcgi_session_s *session);
 
 
-struct fcgi_message_s *fcgi_state_new_message(void);
-void fcgi_state_delete_message(struct fcgi_message_s *message);
+struct fcgi_message_s *fcgi_message_new(void);
+void fcgi_message_delete(struct fcgi_message_s *message);
 
 /* parse given content into a fcgi message structure.
  * The message structure has to be initialized by fcgi_state_new_message().
@@ -75,22 +75,22 @@ void fcgi_state_delete_message(struct fcgi_message_s *message);
  * 	or 0 if message is complete parsed
  * 	or -1 on error.
  */
-int fcgi_state_parse_message(struct fcgi_message_s *message, const char *data, int len);
+int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len);
 /* return: message parsing is done (!=0) or not (==0) */
-int fcgi_state_get_message_parse_done(const struct fcgi_message_s *message);
+int fcgi_message_get_parse_done(const struct fcgi_message_s *message);
 /* return: message type or -1 in case of error */
-int fcgi_state_get_message_requestid(const struct fcgi_message_s *message);
+int fcgi_message_get_requestid(const struct fcgi_message_s *message);
 /* return: message type or -1 in case of error */
-int fcgi_state_get_message_type(const struct fcgi_message_s *message);
+int fcgi_message_get_type(const struct fcgi_message_s *message);
 /* return: message role or -1 in case of error */
-int fcgi_state_get_message_role(const struct fcgi_message_s *message);
+int fcgi_message_get_role(const struct fcgi_message_s *message);
 /* return: message flag or -1 in case of error */
-int fcgi_state_get_message_flag(const struct fcgi_message_s *message);
-int fcgi_state_set_message_flag(struct fcgi_message_s *message, unsigned char flags);
-int fcgi_state_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message);
+int fcgi_message_get_flag(const struct fcgi_message_s *message);
+int fcgi_message_set_flag(struct fcgi_message_s *message, unsigned char flags);
+int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message);
 
 /* construct a message */
-struct fcgi_message_s *fcgi_state_new_endrequest_message(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus);
+struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus);
 
 
 #endif /* FCGI_STATE_H_ */
