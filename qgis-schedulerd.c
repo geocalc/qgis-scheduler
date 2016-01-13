@@ -967,6 +967,7 @@ void *thread_handle_connection(void *arg)
 		    }
 		}
 		fcgi_session_print(fcgi_session);
+		fprintf(stderr, "fcgi session state: %d\n", fcgi_session_get_state(fcgi_session));
 
 		int writebytes = write(childunixsocketfd, buffer, readbytes);
 		fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
