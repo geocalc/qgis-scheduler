@@ -62,10 +62,30 @@
        ( variable ## B2 ) = (( value ) >> 16) & 0xff; \
        ( variable ## B3 ) = (( value ) >> 24) & 0xff; })
 
+#define ASSEMBLE_PARAM_LENGTH32( b0, b1, b2, b3 ) \
+    ( ((b3 & 0x7f) << 24) + (b2 << 16) + (b1 << 8) + b0 )
+
 #define MAX_MESSAGE_PRINT_LEN	20
 
 
 
+
+struct fcgi_param_s
+{
+    char *name;
+    char *value;
+};
+
+struct fcgi_param_list_iterator_s
+{
+    TAILQ_ENTRY(fcgi_param_list_iterator_s) entries;          /* Linked list prev./next entry */
+    struct fcgi_param_s param;
+};
+
+struct fcgi_param_list_s
+{
+    TAILQ_HEAD(param_listhead_s, fcgi_param_list_iterator_s) head;	/* Linked list head */
+};
 
 struct fcgi_message_s
 {
@@ -105,8 +125,13 @@ struct fcgi_session_s
     uint16_t requestId;
     int keep_messages;
     struct fcgi_message_list_s *messlist;
+    struct fcgi_param_list_s *paramlist;
 };
 
+
+static struct fcgi_param_list_s *fcgi_param_list_new(void);
+static void fcgi_param_list_delete(struct fcgi_param_list_s *paramlist);
+static int fcgi_param_list_parse(struct fcgi_param_list_s *paramlist, struct fcgi_message_s *message);
 
 static struct fcgi_message_list_s *fcgi_message_list_new(void);
 static void fcgi_message_list_delete(struct fcgi_message_list_s *messlist);
@@ -117,8 +142,219 @@ static struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_mes
 static void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list);
 
 
+int fcgi_param_parse(struct fcgi_param_s *param, const unsigned char *buffer, int len)
+{
+    int dataread = 0;
+
+    assert(param);
+    if ( param && buffer && len>=2 )
+    {
+	int nameLen = *buffer++;
+	len--;
+	dataread++;
+	if (nameLen>>7)
+	{
+	    /* 32 bit number. 3 more bytes following */
+	    nameLen &= 0x7f;
+	    nameLen<<=8;
+	    nameLen += *buffer++;
+	    nameLen<<=8;
+	    nameLen += *buffer++;
+	    nameLen<<=8;
+	    nameLen += *buffer++;
+	    len -= 3;
+	    dataread += 3;
+	}
+
+	if (len < 0)
+	{
+	    return 0;
+	}
+
+	int valueLen = *buffer++;
+	len--;
+	dataread++;
+	if (valueLen>>7)
+	{
+	    /* 32 bit number. 3 more bytes following */
+	    valueLen &= 0x7f;
+	    valueLen<<=8;
+	    valueLen += *buffer++;
+	    valueLen<<=8;
+	    valueLen += *buffer++;
+	    valueLen<<=8;
+	    valueLen += *buffer++;
+	    len -= 3;
+	    dataread += 3;
+	}
+
+	if (len < 0)
+	{
+	    return 0;
+	}
+
+	if ( nameLen + valueLen > len )
+	{
+	    return 0;
+	}
+
+	param->name = malloc(nameLen+1);
+	memcpy(param->name, buffer, nameLen);
+	param->name[nameLen] = '\0';
+	buffer += nameLen;
+
+	param->value = malloc(valueLen+1);
+	memcpy(param->value, buffer, valueLen);
+	param->value[valueLen] = '\0';
+
+	dataread += (nameLen + valueLen);
+    }
+
+    return dataread;
+}
 
 
+struct fcgi_param_list_s *fcgi_param_list_new(void)
+{
+    struct fcgi_param_list_s *list = calloc(1, sizeof(*list));
+    assert(list);
+    if ( !list )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    return list;
+}
+
+
+void fcgi_param_list_delete(struct fcgi_param_list_s *paramlist)
+{
+    if (paramlist)
+    {
+	while (paramlist->head.tqh_first != NULL)
+	{
+	    struct fcgi_param_list_iterator_s *entry = paramlist->head.tqh_first;
+
+	    TAILQ_REMOVE(&paramlist->head, paramlist->head.tqh_first, entries);
+	    free(entry->param.name);
+	    free(entry->param.value);
+	    free(entry);
+	}
+
+	free(paramlist);
+    }
+}
+
+void fcgi_param_list_add_param(struct fcgi_param_list_s *paramlist, struct fcgi_param_s param)
+{
+    assert(paramlist);
+    if(paramlist)
+    {
+	struct fcgi_param_list_iterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	entry->param = param;
+
+	/* if list is empty we have to insert at beginning,
+	 * else insert at the end.
+	 */
+	if (paramlist->head.tqh_first)
+	    TAILQ_INSERT_TAIL(&paramlist->head, entry, entries);      /* Insert at the end. */
+	else
+	    TAILQ_INSERT_HEAD(&paramlist->head, entry, entries);
+    }
+
+}
+
+int fcgi_param_list_parse(struct fcgi_param_list_s *paramlist, struct fcgi_message_s *message)
+{
+    assert(paramlist);
+    assert(message);
+
+    if (paramlist && message)
+    {
+	struct fcgi_param_s param;
+
+	int contentLength = message->contentLength;
+	unsigned char *content = (unsigned char *)message->content;
+	if (content)
+	{
+	    while (contentLength > 0)
+	    {
+		int retval = fcgi_param_parse(&param, content, contentLength);
+		if (retval > 0)
+		{
+		    fcgi_param_list_add_param(paramlist, param);
+		    content += retval;
+		    contentLength -= retval;
+		}
+		else
+		{
+		    break;
+		}
+	    }
+	}
+
+	return 0;
+    }
+
+    return -1;
+}
+
+int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
+{
+    int bytes_printed = 0;
+
+    assert(paramlist);
+    if (paramlist)
+    {
+	struct fcgi_param_list_iterator_s *it = paramlist->head.tqh_first;
+	for (it = paramlist->head.tqh_first; it != NULL; it = it->entries.tqe_next)
+	{
+	    int retval = fprintf(stderr, "%s=%s\n", it->param.name, it->param.value);
+	    if (-1 == retval)
+	    {
+		perror("error fprintf");
+		exit(EXIT_FAILURE);
+	    }
+	    bytes_printed += retval;
+	}
+    }
+
+    return bytes_printed;
+}
+
+
+const char *fcgi_param_list_find(struct fcgi_param_list_s *paramlist, const char *name)
+{
+    const char *value = NULL;
+
+    assert(paramlist);
+    assert(name);
+    if (paramlist && name)
+    {
+	struct fcgi_param_list_iterator_s *it = paramlist->head.tqh_first;
+	for (it = paramlist->head.tqh_first; it != NULL; it = it->entries.tqe_next)
+	{
+
+	    int retval = strcmp(name, it->param.name);
+	    if ( !retval )
+	    {
+		value = it->param.value;
+		break;
+	    }
+	}
+
+    }
+
+    return value;
+}
 
 
 struct fcgi_message_s *fcgi_message_new(void)
@@ -720,6 +956,7 @@ void fcgi_session_delete(struct fcgi_session_s *session)
     if (session)
     {
 	fcgi_message_list_delete(session->messlist);
+	fcgi_param_list_delete(session->paramlist);
 	free(session);
     }
 }
@@ -747,7 +984,14 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 	    data += bytes_read;
 	    if (fcgi_message_get_parse_done(message))
 	    {
-		fcgi_message_print(message);
+		//fcgi_message_print(message);
+		if ( FCGI_PARAMS == fcgi_message_get_type(message) )
+		{
+		    if ( !session->paramlist )
+			session->paramlist = fcgi_param_list_new();
+
+		    fcgi_param_list_parse(session->paramlist, message);
+		}
 	    }
 	}
 
@@ -772,7 +1016,14 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 		if (!fcgi_message_get_parse_done(message))
 		    break;
 
-		fcgi_message_print(message);
+		//fcgi_message_print(message);
+		if ( FCGI_PARAMS == fcgi_message_get_type(message) )
+		{
+		    if ( !session->paramlist )
+			session->paramlist = fcgi_param_list_new();
+
+		    fcgi_param_list_parse(session->paramlist, message);
+		}
 	    }
 	}
     }
@@ -790,6 +1041,9 @@ int fcgi_session_need_more_data(struct fcgi_session_s *session)
     if (session && session->messlist)
     {
 	struct fcgi_message_s *message = fcgi_message_list_get_last_message(session->messlist);
+
+	if ( !message )
+	    return 0;	// if there is no message we don't need more data
 
 	int parse_done = fcgi_message_get_parse_done(message);
 	if (parse_done >= 0)
@@ -821,9 +1075,28 @@ int fcgi_session_print(const struct fcgi_session_s *session)
 	    bytes_printed += fcgi_message_print(message);
 	}
 	fcgi_message_list_return_iterator(session->messlist);
+
+	if (session->paramlist)
+	{
+	    fcgi_param_list_print(session->paramlist);
+	}
     }
 
     return bytes_printed;
+}
+
+
+const char *fcgi_session_get_param(const struct fcgi_session_s *session, const char *name)
+{
+    const char *retval = NULL;
+
+    assert(session);
+    if (session && session->paramlist)
+    {
+	retval = fcgi_param_list_find(session->paramlist, name);
+    }
+
+    return retval;
 }
 
 

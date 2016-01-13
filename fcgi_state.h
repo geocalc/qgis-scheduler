@@ -65,6 +65,8 @@ int fcgi_session_get_id(const struct fcgi_session_s *session);
 
 int fcgi_session_print(const struct fcgi_session_s *session);
 
+const char *fcgi_session_get_param(const struct fcgi_session_s *session, const char *name);
+
 
 struct fcgi_message_s *fcgi_message_new(void);
 void fcgi_message_delete(struct fcgi_message_s *message);
