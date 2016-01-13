@@ -105,15 +105,15 @@ struct fcgi_message_s
     char *content;
 };
 
-struct fcgi_message_list_iterator
+struct fcgi_message_list_iterator_s
 {
-    TAILQ_ENTRY(fcgi_message_list_iterator) entries;          /* Linked list prev./next entry */
+    TAILQ_ENTRY(fcgi_message_list_iterator_s) entries;          /* Linked list prev./next entry */
     struct fcgi_message_s *mess;
 };
 
 struct fcgi_message_list_s
 {
-    TAILQ_HEAD(listhead, fcgi_message_list_iterator) head;	/* Linked list head */
+    TAILQ_HEAD(message_listhead_s, fcgi_message_list_iterator_s) head;	/* Linked list head */
     int bytes_written;	/* count of bytes written in fcgi_message_list_write() buffer */
     //pthread_rwlock_t rwlock;	/* lock used to protect list structures (add, remove, find, ..) */
 };
@@ -137,8 +137,8 @@ static struct fcgi_message_list_s *fcgi_message_list_new(void);
 static void fcgi_message_list_delete(struct fcgi_message_list_s *messlist);
 static void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct fcgi_message_s *message);
 static struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_list_s *messlist);
-static struct fcgi_message_list_iterator *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list);
-static struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator **iterator);
+static struct fcgi_message_list_iterator_s *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list);
+static struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator_s **iterator);
 static void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list);
 
 
@@ -798,7 +798,7 @@ void fcgi_message_list_delete(struct fcgi_message_list_s *messlist)
     {
 	while (messlist->head.tqh_first != NULL)
 	{
-	    struct fcgi_message_list_iterator *entry = messlist->head.tqh_first;
+	    struct fcgi_message_list_iterator_s *entry = messlist->head.tqh_first;
 
 	    TAILQ_REMOVE(&messlist->head, messlist->head.tqh_first, entries);
 	    fcgi_message_delete(entry->mess);
@@ -817,7 +817,7 @@ void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct 
     assert(message);
     if(messlist && message)
     {
-	struct fcgi_message_list_iterator *entry = malloc(sizeof(*entry));
+	struct fcgi_message_list_iterator_s *entry = malloc(sizeof(*entry));
 	assert(entry);
 	if ( !entry )
 	{
@@ -846,7 +846,7 @@ struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_li
     {
 	if (messlist->head.tqh_last)
 	{
-	    struct fcgi_message_list_iterator *np = *messlist->head.tqh_last;
+	    struct fcgi_message_list_iterator_s *np = *messlist->head.tqh_last;
 
 	    message = np->mess;
 	}
@@ -856,7 +856,7 @@ struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_li
 }
 
 
-struct fcgi_message_list_iterator *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list)
+struct fcgi_message_list_iterator_s *fcgi_message_list_get_iterator(struct fcgi_message_list_s *list)
 {
     assert(list);
     if (list)
@@ -868,7 +868,7 @@ struct fcgi_message_list_iterator *fcgi_message_list_get_iterator(struct fcgi_me
 }
 
 
-struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator **iterator)
+struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_list_iterator_s **iterator)
 {
     assert(iterator);
     if (iterator)
@@ -1068,7 +1068,7 @@ int fcgi_session_print(const struct fcgi_session_s *session)
     assert(session->messlist);
     if (session && session->messlist)
     {
-	struct fcgi_message_list_iterator *it = fcgi_message_list_get_iterator(session->messlist);
+	struct fcgi_message_list_iterator_s *it = fcgi_message_list_get_iterator(session->messlist);
 	struct fcgi_message_s *message;
 	while ((message = fcgi_message_list_get_next_message(&it)) != NULL)
 	{
