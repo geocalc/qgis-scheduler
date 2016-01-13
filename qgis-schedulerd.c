@@ -817,6 +817,7 @@ void *thread_handle_connection(void *arg)
 	}
 	struct fcgi_message_s *message = fcgi_state_new_message();
 	assert(message);
+	struct fcgi_session_s *fcgi_session = fcgi_state_new_session(1);
 
 	int session_start = 1;
 
@@ -921,6 +922,7 @@ void *thread_handle_connection(void *arg)
 		fwrite(buffer, 1, readbytes, stderr);
 		fprintf(stderr, "\n");
 #endif
+		fcgi_state_parse(fcgi_session, buffer, readbytes);
 		if (session_start)
 		{
 		    /* check the status of this fcgi session
@@ -938,6 +940,7 @@ void *thread_handle_connection(void *arg)
 		     * doesn't match we have to delete the message and start over
 		     * parsing with a new message.
 		     */
+		    fcgi_message_print(message);
 		    if (FCGI_BEGIN_REQUEST == fcgi_state_get_message_type(message))
 		    {
 			if (FCGI_RESPONDER == fcgi_state_get_message_role(message))
@@ -956,6 +959,7 @@ void *thread_handle_connection(void *arg)
 				     * the next message.
 				     */
 				    fcgi_state_message_write((unsigned char *)buffer, readbytes, message);
+				    fcgi_message_print(message);
 				}
 			    }
 			    session_start = 0;
@@ -1021,6 +1025,7 @@ void *thread_handle_connection(void *arg)
 
 	}
 	fcgi_state_delete_message(message);
+	fcgi_state_delete_session(fcgi_session);
 	close (childunixsocketfd);
 	free(buffer);
 	qgis_process_set_state_idle(proc);
