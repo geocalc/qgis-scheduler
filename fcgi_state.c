@@ -962,6 +962,35 @@ void fcgi_session_delete(struct fcgi_session_s *session)
 }
 
 
+static void fcgi_session_evaluate_message_done(struct fcgi_session_s *session, struct fcgi_message_s *message)
+{
+    assert(session);
+    assert(message);
+
+    int type = fcgi_message_get_type(message);
+    switch (type)
+    {
+    case FCGI_PARAMS:
+	if ( !session->paramlist )
+	    session->paramlist = fcgi_param_list_new();
+
+	fcgi_param_list_parse(session->paramlist, message);
+	    break;
+
+    case FCGI_STDIN:
+	/* End of data seems to be signaled by sending a null byte
+	 * on channel "stdin".
+	 * Set state to "parse end".
+	 */
+	if ( 0 == message->contentLength )
+	    session->state = FCGI_SESSION_STATE_END;
+	break;
+
+    }
+
+}
+
+
 int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len)
 {
     /* copy the data into the session header.
@@ -986,23 +1015,7 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 	    if (fcgi_message_get_parse_done(message))
 	    {
 		//fcgi_message_print(message);
-		if ( FCGI_PARAMS == fcgi_message_get_type(message) )
-		{
-		    if ( !session->paramlist )
-			session->paramlist = fcgi_param_list_new();
-
-		    fcgi_param_list_parse(session->paramlist, message);
-		}
-		else if  ( FCGI_STDIN == fcgi_message_get_type(message) )
-		{
-		    /* End of data seems to be signaled by sending a null byte
-		     * on channel "stdin".
-		     * Set state to "parse end".
-		     */
-		    if ( 0 == message->contentLength )
-			session->state = FCGI_SESSION_STATE_END;
-
-		}
+		fcgi_session_evaluate_message_done(session, message);
 	    }
 	}
 
@@ -1028,23 +1041,7 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 		    break;
 
 		//fcgi_message_print(message);
-		if ( FCGI_PARAMS == fcgi_message_get_type(message) )
-		{
-		    if ( !session->paramlist )
-			session->paramlist = fcgi_param_list_new();
-
-		    fcgi_param_list_parse(session->paramlist, message);
-		}
-		else if  ( FCGI_STDIN == fcgi_message_get_type(message) )
-		{
-		    /* End of data seems to be signaled by sending a null byte
-		     * on channel "stdin".
-		     * Set state to "parse end".
-		     */
-		    if ( 0 == message->contentLength )
-			session->state = FCGI_SESSION_STATE_END;
-
-		}
+		fcgi_session_evaluate_message_done(session, message);
 	    }
 	}
 
