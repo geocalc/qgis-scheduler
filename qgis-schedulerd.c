@@ -1173,6 +1173,13 @@ int main(int argc, char **argv)
 		continue;
 	    }
 
+	    int value = 1;
+	    int retval = setsockopt(serversocketfd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
+	    if (-1 == retval)
+	    {
+		perror(" could not set socket to SOL_SOCKET");
+	    }
+
 	    if (bind(serversocketfd, rp->ai_addr, rp->ai_addrlen) == 0)
 		break; /* Success */
 
