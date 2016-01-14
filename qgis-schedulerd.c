@@ -116,6 +116,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/queue.h>
 #include <fastcgi.h>
 
 #include "qgis_process.h"
@@ -469,6 +470,124 @@ void start_new_process_detached(int num)
     }
 }
 
+struct fcgi_data_s
+{
+    char *data;
+    int len;
+};
+
+struct fcgi_data_list_iterator_s
+{
+    TAILQ_ENTRY(fcgi_data_list_iterator_s) entries;          /* Linked list prev./next entry */
+    struct fcgi_data_s data;
+};
+
+struct fcgi_data_list_s
+{
+    TAILQ_HEAD(data_listhead_s, fcgi_data_list_iterator_s) head;	/* Linked list head */
+};
+
+
+static struct fcgi_data_list_s *fcgi_data_list_new(void)
+{
+    struct fcgi_data_list_s *list = calloc(1, sizeof(*list));
+    assert(list);
+    if ( !list )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    return list;
+}
+
+
+static void fcgi_data_list_delete(struct fcgi_data_list_s *datalist)
+{
+    if (datalist)
+    {
+	while (datalist->head.tqh_first != NULL)
+	{
+	    struct fcgi_data_list_iterator_s *entry = datalist->head.tqh_first;
+
+	    TAILQ_REMOVE(&datalist->head, datalist->head.tqh_first, entries);
+	    free(entry->data.data);
+	    free(entry);
+	}
+
+	free(datalist);
+    }
+}
+
+
+static void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len)
+{
+    assert(datalist);
+    if(datalist)
+    {
+	struct fcgi_data_list_iterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	entry->data.data = data;
+	entry->data.len = len;
+
+	/* if list is empty we have to insert at beginning,
+	 * else insert at the end.
+	 */
+	if (datalist->head.tqh_first)
+	    TAILQ_INSERT_TAIL(&datalist->head, entry, entries);      /* Insert at the end. */
+	else
+	    TAILQ_INSERT_HEAD(&datalist->head, entry, entries);
+    }
+
+}
+
+
+static struct fcgi_data_list_iterator_s *fcgi_data_get_iterator(struct fcgi_data_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	return list->head.tqh_first;
+    }
+
+    return NULL;
+}
+
+
+static const struct fcgi_data_s *fcgi_data_get_next_data(struct fcgi_data_list_iterator_s **iterator)
+{
+    assert(iterator);
+    if (iterator)
+    {
+	if (*iterator)
+	{
+	    struct fcgi_data_s *data = &(*iterator)->data;
+	    *iterator = (*iterator)->entries.tqe_next;
+	    return data;
+	}
+    }
+
+    return NULL;
+}
+
+
+static int fcgi_data_iterator_has_data(const struct fcgi_data_list_iterator_s *iterator)
+{
+    int retval = 0;
+    if (iterator)
+    {
+	retval = 1;
+    }
+
+    return retval;
+}
+
 
 void *thread_handle_connection(void *arg)
 {
@@ -499,6 +618,199 @@ void *thread_handle_connection(void *arg)
 
     fprintf(stderr, "start a new connection thread\n");
 
+
+    /* 1) accept fcgi data from the webserver.
+     * 2) parse fcgi data and extract the query string
+     * 3) parse the query string and extract the project name
+     * 4) select the process list with the project name
+     * 5) get the next idle process from the process list or
+     *    return "server busy"
+     * 6) connect to the idle process
+     * 7) send all received data from the web server
+     * 8) send and receive all data between web serve and fcgi program
+     */
+    /* TODO: if the web server sends a FCGI_GET_VALUES request, we should
+     *       send the results on our own. So we can control the settings
+     *       FCGI_MAX_CONNS=UINT16_MAX, FCGI_MAX_REQS=1, FCGI_MPXS_CONNS=0
+     */
+    /* TODO: if the web server sends a second request with a different
+     *       requestId, we should immediately send FCGI_END_REQUEST with status
+     *       FCGI_CANT_MPX_CONN.
+     */
+    struct fcgi_data_list_s *datalist = fcgi_data_list_new();
+
+    /* here we do point 1, 2, 3, 4 */
+    {
+
+	/* get the maximum read write socket buffer size */
+	int maxbufsize = default_max_transfer_buffer_size;
+	{
+	    int sockbufsize = 0;
+	    socklen_t size = sizeof(sockbufsize);
+//	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
+//	    if (-1 == retval)
+//	    {
+//		perror("error: getsockopt");
+//		exit(EXIT_FAILURE);
+//	    }
+//	    maxbufsize = min(sockbufsize, maxbufsize);
+//
+//	    size = sizeof(sockbufsize);
+	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
+	    if (-1 == retval)
+	    {
+		perror("error: getsockopt");
+		exit(EXIT_FAILURE);
+	    }
+	    maxbufsize = min(sockbufsize, maxbufsize);
+
+	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+	}
+
+	char *buffer = malloc(maxbufsize);
+	assert(buffer);
+	if ( !buffer )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
+
+
+	int maxfd = 0;
+	fd_set rfds;
+//	fd_set wfds;
+	int can_read_networksock = 0;
+//	int can_write_networksock = 0;
+
+
+	if (inetsocketfd > maxfd)
+	    maxfd = inetsocketfd;
+
+	maxfd++;
+
+	/* set timeout to infinite */
+	//    struct timeval timeout;
+	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	//    timeout.tv_usec = 0;
+
+	int has_finished = 0;
+	while ( !has_finished )
+	{
+	    /* wait for connections, signals or timeout */
+	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
+	    //	timeout.tv_usec = 0;
+
+	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    FD_ZERO(&rfds);
+//	    FD_ZERO(&wfds);
+	    if ( !can_read_networksock )
+		FD_SET(inetsocketfd, &rfds);
+//	    if ( !can_write_networksock )
+//		FD_SET(inetsocketfd, &wfds);
+	    retval = select(maxfd, &rfds, NULL/*&wfds*/, NULL, NULL /*&timeout*/);
+	    if (-1 == retval)
+	    {
+		switch (errno)
+		{
+		case EINTR:
+		    /* We received a termination signal.
+		     * End this thread, close all file descriptors
+		     * and let the main thread clean up.
+		     */
+		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    break;
+
+		default:
+		    perror("error: thread_handle_connection() calling select");
+		    exit(EXIT_FAILURE);
+		    // no break needed
+		}
+		break;
+	    }
+
+//	    if (FD_ISSET(inetsocketfd, &wfds))
+//	    {
+//		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
+//		can_write_networksock = 1;
+//	    }
+	    if (FD_ISSET(inetsocketfd, &rfds))
+	    {
+		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+		can_read_networksock = 1;
+	    }
+
+	    if (can_read_networksock)
+	    {
+		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+
+		int readbytes = read(inetsocketfd, buffer, maxbufsize);
+		fprintf(stderr, "read %d, ", readbytes);
+		if (-1 == readbytes)
+		{
+		    perror("\nerror: reading from network socket");
+		    exit(EXIT_FAILURE);
+		}
+		else if (0 == readbytes)
+		{
+		    /* end of file received. exit this thread */
+		    break;
+		}
+#ifdef PRINT_NETWORK_DATA
+		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		fwrite(buffer, 1, readbytes, stderr);
+		fprintf(stderr, "\n");
+#endif
+
+		{
+		    /* allocate data storage here,
+		     * delete it in fcgi_data_list_delete()
+		     */
+		    char *data = malloc(readbytes);
+		    assert(data);
+		    if ( !data )
+		    {
+			perror("could not allocate memory");
+			exit(EXIT_FAILURE);
+		    }
+
+		    memcpy(data, buffer, readbytes);
+		    fcgi_data_add_data(datalist, data, readbytes);
+
+		    fcgi_session_parse(fcgi_session, data, readbytes);
+		    enum fcgi_session_state_e session_state = fcgi_session_get_state(fcgi_session);
+		    switch (session_state)
+		    {
+		    case FCGI_SESSION_STATE_PARAMS_DONE:
+		    case FCGI_SESSION_STATE_END:
+			/* we have the parameters complete.
+			 * TODO: now look for the URL and assign a process list
+			 */
+
+			has_finished = 1;
+			break;
+		    default:
+			/* do nothing, parse on.. */
+			break;
+		    }
+
+
+		}
+		can_read_networksock = 0;
+	    }
+
+	}
+	free(buffer);
+//	fcgi_session_print(fcgi_session);
+	fcgi_session_delete(fcgi_session);
+
+    }
+
+
+
+
+
+    /* here we do point 5 */
     {
 	/* get the number of new started processes which then become idle
 	 * processes.
@@ -567,14 +879,14 @@ void *thread_handle_connection(void *arg)
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
-	    size = sizeof(sockbufsize);
-	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
-	    if (-1 == retval)
-	    {
-		perror("error: getsockopt");
-		exit(EXIT_FAILURE);
-	    }
-	    maxbufsize = min(sockbufsize, maxbufsize);
+//	    size = sizeof(sockbufsize);
+//	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
+//	    if (-1 == retval)
+//	    {
+//		perror("error: getsockopt");
+//		exit(EXIT_FAILURE);
+//	    }
+//	    maxbufsize = min(sockbufsize, maxbufsize);
 
 	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
 	}
@@ -586,7 +898,7 @@ void *thread_handle_connection(void *arg)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	struct fcgi_message_s *message = fcgi_message_new();
+//	struct fcgi_message_s *message = fcgi_message_new();
 
 
 	int maxfd = 0;
@@ -646,27 +958,27 @@ void *thread_handle_connection(void *arg)
 		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
 		can_write_networksock = 1;
 	    }
-	    if (FD_ISSET(inetsocketfd, &rfds))
-	    {
-		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
-		can_read_networksock = 1;
-	    }
+//	    if (FD_ISSET(inetsocketfd, &rfds))
+//	    {
+//		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+//		can_read_networksock = 1;
+//	    }
 
-	    if (can_read_networksock && can_write_networksock)
+	    if (/*can_read_networksock &&*/ can_write_networksock)
 	    {
-		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-		int readbytes = read(inetsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", readbytes);
-		if (-1 == readbytes)
-		{
-		    perror("\nerror: reading from network socket");
-		    exit(EXIT_FAILURE);
-		}
-		else if (0 == readbytes)
-		{
-		    /* end of file received. exit this thread */
-		    break;
-		}
+//		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+//		int readbytes = read(inetsocketfd, buffer, maxbufsize);
+//		fprintf(stderr, "read %d, ", readbytes);
+//		if (-1 == readbytes)
+//		{
+//		    perror("\nerror: reading from network socket");
+//		    exit(EXIT_FAILURE);
+//		}
+//		else if (0 == readbytes)
+//		{
+//		    /* end of file received. exit this thread */
+//		    break;
+//		}
 #ifdef PRINT_NETWORK_DATA
 		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
 		fwrite(buffer, 1, readbytes, stderr);
@@ -679,8 +991,43 @@ void *thread_handle_connection(void *arg)
 		     * immediately answer with an overload message and end
 		     * this thread.
 		     */
+		    	    struct fcgi_data_list_iterator_s *myit = fcgi_data_get_iterator(datalist);
+		    	    assert(myit);
+		    	    char *data = myit->data.data;
+		    	    int len = myit->data.len;
+		    	    struct fcgi_message_s *message = fcgi_message_new();
 
-		    retval = fcgi_message_parse(message, buffer, readbytes);
+		    	    fcgi_message_parse(message, data, len);
+		    	    int parse_done = fcgi_message_get_parse_done(message);
+		    	    /* If the network connection didn't deliver
+		    	     * sizeof(FCGI_BeginRequestRecord) in one part, the assert
+		    	     * below catches.
+		    	     * In this case we have to write a routine which moves the first
+		    	     * entries of the transmission list (datalist) into one entry.
+		    	     */
+		    	    assert(parse_done > 0);
+		    //
+		    //	    int flag =  fcgi_message_get_flag(message);
+		    //	    if (flag >= 0)
+		    //	    {
+		    //		if (flag & FCGI_KEEP_CONN)
+		    //		{
+		    //		    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
+		    //		    fcgi_message_set_flag(message, flag);
+		    //		    /* TODO: this does not work, if the first message is not
+		    //		     * send complete (i.e. 16 bytes complete). Then the next
+		    //		     * command would write into the half complete message buffer
+		    //		     * a full complete message, and overwrite the header of
+		    //		     * the next message.
+		    //		     */
+		    //		    fcgi_message_write((unsigned char *)data, len, message);
+		    ////		    fcgi_message_print(message);
+		    //		}
+		    //	    }
+		    //
+		    //	    fcgi_message_delete(message);
+
+//		    retval = fcgi_message_parse(message, buffer, readbytes);
 		    /* note: by protocol the begin request message should be the
 		     * first message. if we parse for a different message we have
 		     * to check for "parse complete", and if the message type
@@ -700,7 +1047,7 @@ void *thread_handle_connection(void *arg)
 			    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 			    if (-1 == writebytes)
 			    {
-				perror("error: writing to child process socket");
+				perror("error: writing to network socket");
 				exit(EXIT_FAILURE);
 			    }
 
@@ -709,21 +1056,27 @@ void *thread_handle_connection(void *arg)
 			     * down and leave.
 			     */
 			    fcgi_message_delete(sendmessage);
-			    break;
+			    //break;
 			}
 		    }
+	    	    fcgi_message_delete(message);
 
 		}
-		can_read_networksock = 0;
+//		can_read_networksock = 0;
+		has_finished = 1;
 	    }
 
 	}
 	free(buffer);
-	fcgi_message_delete(message);
+//	fcgi_message_delete(message);
 
     }
+    /* here we do point 6, 7, 8 */
     else
     {
+	/* change the state of process to BUSY
+	 * and unlock the mutex protection
+	 */
 	qgis_process_set_state_busy(proc, thread_id);
 	pthread_mutex_t *mutex = qgis_process_get_mutex(proc);
 	retval = pthread_mutex_unlock(mutex);
@@ -734,6 +1087,50 @@ void *thread_handle_connection(void *arg)
 	    exit(EXIT_FAILURE);
 	}
 	mutex = NULL;
+
+
+	/* change the connection flag of the fastcgi connection to not
+	 * FCGI_KEEP_CONN. This way the child process closes the unix socket
+	 * if the work is done, and this thread can release its resources.
+	 */
+	{
+	    struct fcgi_data_list_iterator_s *myit = fcgi_data_get_iterator(datalist);
+	    assert(myit);
+	    char *data = myit->data.data;
+	    int len = myit->data.len;
+	    struct fcgi_message_s *message = fcgi_message_new();
+
+	    fcgi_message_parse(message, data, len);
+	    int parse_done = fcgi_message_get_parse_done(message);
+	    /* If the network connection didn't deliver
+	     * sizeof(FCGI_BeginRequestRecord) in one part, the assert
+	     * below catches.
+	     * In this case we have to write a routine which moves the first
+	     * entries of the transmission list (datalist) into one entry.
+	     */
+	    assert(parse_done > 0);
+
+	    int flag =  fcgi_message_get_flag(message);
+	    if (flag >= 0)
+	    {
+		if (flag & FCGI_KEEP_CONN)
+		{
+		    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
+		    fcgi_message_set_flag(message, flag);
+		    /* TODO: this does not work, if the first message is not
+		     * send complete (i.e. 16 bytes complete). Then the next
+		     * command would write into the half complete message buffer
+		     * a full complete message, and overwrite the header of
+		     * the next message.
+		     */
+		    fcgi_message_write((unsigned char *)data, len, message);
+//		    fcgi_message_print(message);
+		}
+	    }
+
+	    fcgi_message_delete(message);
+	}
+
 
 	int childunixsocketfd;
 
@@ -815,11 +1212,14 @@ void *thread_handle_connection(void *arg)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	struct fcgi_message_s *message = fcgi_message_new();
-	assert(message);
-	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
 
-	int session_start = 1;
+
+	/* get an iterator for the already stored messages
+	 * then flush the fcgi data queue to the socket interface
+	 */
+	struct fcgi_data_list_iterator_s *fcgi_data_iterator = fcgi_data_get_iterator(datalist);
+
+
 
 	int maxfd = 0;
 	fd_set rfds;
@@ -902,82 +1302,177 @@ void *thread_handle_connection(void *arg)
 		can_read_unixsock = 1;
 	    }
 
-	    if (can_read_networksock && can_write_unixsock)
+
+	    if ( fcgi_data_iterator_has_data(fcgi_data_iterator) )
 	    {
-		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
-		int readbytes = read(inetsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", readbytes);
-		if (-1 == readbytes)
+		/* queue data is still available, try to send everything to
+		 * the unix socket.
+		 */
+		if (can_write_unixsock)
 		{
-		    perror("\nerror: reading from network socket");
-		    exit(EXIT_FAILURE);
-		}
-		else if (0 == readbytes)
-		{
-		    /* end of file received. exit this thread */
-		    break;
-		}
-#ifdef PRINT_NETWORK_DATA
-		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
-		fwrite(buffer, 1, readbytes, stderr);
-		fprintf(stderr, "\n");
-#endif
-		fcgi_session_parse(fcgi_session, buffer, readbytes);
-		if (session_start)
-		{
-		    /* check the status of this fcgi session
-		     * if this session starts
-		     * and got a flag to keep this session open
-		     * then delete that flag
-		     * and pass the deleted flag message to the child process */
-		    /* TODO: this is slightly incorrect. what if the message is
-		     * incomplete? dont we need a better fcgi session management?
-		     */
-		    retval = fcgi_message_parse(message, buffer, readbytes);
-		    /* note: by protocol the begin request message should be the
-		     * first message. if we parse for a different message we have
-		     * to check for "parse complete", and if the message type
-		     * doesn't match we have to delete the message and start over
-		     * parsing with a new message.
-		     */
-		    fcgi_message_print(message);
-		    if (FCGI_BEGIN_REQUEST == fcgi_message_get_type(message))
+		    const struct fcgi_data_s *fcgi_data = fcgi_data_get_next_data(&fcgi_data_iterator);
+
+		    char *data = fcgi_data->data;
+		    int datalen = fcgi_data->len;
+		    int writebytes = write(childunixsocketfd, data, datalen);
+		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    if (-1 == writebytes)
 		    {
-			if (FCGI_RESPONDER == fcgi_message_get_role(message))
+			perror("error: writing to child process socket");
+			exit(EXIT_FAILURE);
+		    }
+		    can_write_unixsock = 0;
+		}
+
+		/* NOTE: we have to call fcgi_data_iterator_has_data() twice over
+		 *       here. Because we did change the queue in the previous
+		 *       lines we have to evaluate the queue anew.
+		 *       If the previous call to fcgi_data_iterator_has_data()
+		 *       returned the last data, fcgi_data_iterator evaluates to
+		 *       NULL. If we would add some more data to the queue, the
+		 *       iterator would not return the new appended data.
+		 */
+		if ( fcgi_data_iterator_has_data(fcgi_data_iterator) )
+		{
+		    if (can_read_networksock)
+		    {
+			fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+
+			int readbytes = read(inetsocketfd, buffer, maxbufsize);
+			fprintf(stderr, "read %d, ", readbytes);
+			if (-1 == readbytes)
 			{
-			    int flag =  fcgi_message_get_flag(message);
-			    if (flag >= 0)
-			    {
-				if (flag & FCGI_KEEP_CONN)
-				{
-				    flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
-				    fcgi_message_set_flag(message, flag);
-				    /* TODO: this does not work, if the first message is not
-				     * send complete (i.e. 16 bytes complete). Then the next
-				     * command would write into the half complete message buffer
-				     * a full complete message, and overwrite the header of
-				     * the next message.
-				     */
-				    fcgi_message_write((unsigned char *)buffer, readbytes, message);
-				    fcgi_message_print(message);
-				}
-			    }
-			    session_start = 0;
+			    perror("\nerror: reading from network socket");
+			    exit(EXIT_FAILURE);
 			}
+			else if (0 == readbytes)
+			{
+			    /* end of file received. exit this thread */
+			    break;
+			}
+#ifdef PRINT_NETWORK_DATA
+			fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+			fwrite(buffer, 1, readbytes, stderr);
+			fprintf(stderr, "\n");
+#endif
+
+			{
+			    /* allocate data storage here,
+			     * delete it in fcgi_data_list_delete()
+			     */
+			    char *data = malloc(readbytes);
+			    assert(data);
+			    if ( !data )
+			    {
+				perror("could not allocate memory");
+				exit(EXIT_FAILURE);
+			    }
+
+			    memcpy(data, buffer, readbytes);
+			    fcgi_data_add_data(datalist, data, readbytes);
+
+			}
+			can_read_networksock = 0;
 		    }
 		}
-		fcgi_session_print(fcgi_session);
-		fprintf(stderr, "fcgi session state: %d\n", fcgi_session_get_state(fcgi_session));
 
-		int writebytes = write(childunixsocketfd, buffer, readbytes);
-		fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
-		if (-1 == writebytes)
+	    }
+	    else
+	    {
+		/* all data from the data queue is flushed.
+		 * now we can transfer the data directly from
+		 * network to unix socket.
+		 */
+		if (can_read_networksock && can_write_unixsock)
 		{
-		    perror("error: writing to child process socket");
-		    exit(EXIT_FAILURE);
+		    fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+		    int readbytes = read(inetsocketfd, buffer, maxbufsize);
+		    fprintf(stderr, "read %d, ", readbytes);
+		    if (-1 == readbytes)
+		    {
+			perror("\nerror: reading from network socket");
+			exit(EXIT_FAILURE);
+		    }
+		    else if (0 == readbytes)
+		    {
+			/* end of file received. exit this thread */
+			break;
+		    }
+#ifdef PRINT_NETWORK_DATA
+		    fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		    fwrite(buffer, 1, readbytes, stderr);
+		    fprintf(stderr, "\n");
+#endif
+//		    fcgi_session_parse(fcgi_session, buffer, readbytes);
+//		    if (session_start)
+//		    {
+//			/* check the status of this fcgi session
+//			 * if this session starts
+//			 * and got a flag to keep this session open
+//			 * then delete that flag
+//			 * and pass the deleted flag message to the child process */
+//			/* TODO: this is slightly incorrect. what if the message is
+//			 * incomplete? dont we need a better fcgi session management?
+//			 */
+//			retval = fcgi_message_parse(message, buffer, readbytes);
+//			/* note: by protocol the begin request message should be the
+//			 * first message. if we parse for a different message we have
+//			 * to check for "parse complete", and if the message type
+//			 * doesn't match we have to delete the message and start over
+//			 * parsing with a new message.
+//			 */
+//			fcgi_message_print(message);
+//			if (FCGI_BEGIN_REQUEST == fcgi_message_get_type(message))
+//			{
+//			    if (FCGI_RESPONDER == fcgi_message_get_role(message))
+//			    {
+//				int flag =  fcgi_message_get_flag(message);
+//				if (flag >= 0)
+//				{
+//				    if (flag & FCGI_KEEP_CONN)
+//				    {
+//					flag &= ~FCGI_KEEP_CONN; // delete connection keep flag.
+//					fcgi_message_set_flag(message, flag);
+//					/* TODO: this does not work, if the first message is not
+//					 * send complete (i.e. 16 bytes complete). Then the next
+//					 * command would write into the half complete message buffer
+//					 * a full complete message, and overwrite the header of
+//					 * the next message.
+//					 */
+//					fcgi_message_write((unsigned char *)buffer, readbytes, message);
+//					fcgi_message_print(message);
+//				    }
+//				}
+//				session_start = 0;
+//			    }
+//			}
+//		    }
+//		    fcgi_session_print(fcgi_session);
+//		    const enum fcgi_session_state_e fcgi_state = fcgi_session_get_state(fcgi_session);
+//		    fprintf(stderr, "fcgi session state: %d\n", fcgi_state);
+//		    switch (fcgi_state)
+//		    {
+//		    case FCGI_SESSION_STATE_PARAMS_DONE:	// fall through
+//		    case FCGI_SESSION_STATE_END:
+//		    {
+//			const char *query_str = fcgi_session_get_param(fcgi_session, "QUERY_STRING");
+//			fprintf(stderr, "setup session for query=\"%s\"\n", query_str);
+//			break;
+//		    }
+//		    default:
+//			break;
+//		    }
+
+		    int writebytes = write(childunixsocketfd, buffer, readbytes);
+		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    if (-1 == writebytes)
+		    {
+			perror("error: writing to child process socket");
+			exit(EXIT_FAILURE);
+		    }
+		    can_read_networksock = 0;
+		    can_write_unixsock = 0;
 		}
-		can_read_networksock = 0;
-		can_write_unixsock = 0;
 	    }
 
 	    if (can_read_unixsock && can_write_networksock)
@@ -1007,28 +1502,12 @@ void *thread_handle_connection(void *arg)
 		    perror("error: writing to network socket");
 		    exit(EXIT_FAILURE);
 		}
-//		{
-//		    /* check the status of this fcgi session */
-//		    struct fcgi_message_s *message = fcgi_state_new_message();
-//		    retval = fcgi_state_parse_message(message, buffer, readbytes);
-//		    if (fcgi_state_get_message_parse_done(message))
-//		    {
-//			if (FCGI_END_REQUEST == fcgi_state_get_message_type(message))
-//			{
-//			    fprintf(stderr, "fcgi session end. close connection\n");
-//			    fcgi_state_delete_message(message);
-//			    break;
-//			}
-//		    }
-//		    fcgi_state_delete_message(message);
-//		}
+
 		can_read_unixsock = 0;
 		can_write_networksock = 0;
 	    }
 
 	}
-	fcgi_message_delete(message);
-	fcgi_session_delete(fcgi_session);
 	close (childunixsocketfd);
 	free(buffer);
 	qgis_process_set_state_idle(proc);
@@ -1037,6 +1516,7 @@ void *thread_handle_connection(void *arg)
     /* clean up */
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
+    fcgi_data_list_delete(datalist);
     free(arg);
 
     return NULL;
