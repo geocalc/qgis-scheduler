@@ -975,7 +975,14 @@ static void fcgi_session_evaluate_message_done(struct fcgi_session_s *session, s
 	    session->paramlist = fcgi_param_list_new();
 
 	fcgi_param_list_parse(session->paramlist, message);
-	    break;
+
+	/* if we get a session parameter message with 0 content,
+	 * no more session parameters will be delivered within this session
+	 */
+	if (FCGI_SESSION_STATE_END != session->state && 0==message->contentLength)
+	    session->state = FCGI_SESSION_STATE_PARAMS_DONE;
+
+	break;
 
     case FCGI_STDIN:
 	/* End of data seems to be signaled by sending a null byte
@@ -1145,6 +1152,9 @@ struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t 
     WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
     WRITE_FCGI_NUMBER32(message->message.endrequestbody.appStatus, appStatus);
     message->message.endrequestbody.protocolStatus = protocolStatus;
+
+    message->parse_header_done = 1;
+    message->parse_done = 1;
 
     return message;
 }
