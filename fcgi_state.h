@@ -63,7 +63,8 @@ int fcgi_session_need_more_data(struct fcgi_session_s *session);
  * 	0 if currently no session (i.e. FCGI_STATE_INIT)
  * 	-1 on error
  */
-int fcgi_session_get_id(const struct fcgi_session_s *session);
+int fcgi_session_get_requestid(const struct fcgi_session_s *session);
+int fcgi_session_get_role(const struct fcgi_session_s *session);
 
 int fcgi_session_print(const struct fcgi_session_s *session);
 

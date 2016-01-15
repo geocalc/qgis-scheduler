@@ -123,6 +123,7 @@ struct fcgi_session_s
     enum fcgi_session_state_e state;
     int bytes_received; // tracks how much bytes we got. This is reset, if bytes_received==contentLength
     uint16_t requestId;
+    uint16_t role;
     int keep_messages;
     struct fcgi_message_list_s *messlist;
     struct fcgi_param_list_s *paramlist;
@@ -993,6 +994,10 @@ static void fcgi_session_evaluate_message_done(struct fcgi_session_s *session, s
 	    session->state = FCGI_SESSION_STATE_END;
 	break;
 
+    case FCGI_BEGIN_REQUEST:
+	session->requestId = fcgi_message_get_requestid(message);
+	session->role = fcgi_message_get_role(message);
+	break;
     }
 
 }
@@ -1083,10 +1088,34 @@ int fcgi_session_need_more_data(struct fcgi_session_s *session)
 }
 
 
-//int fcgi_state_get_session_id(const struct fcgi_session_s *session)
-//{
-//
-//}
+int fcgi_session_get_requestid(const struct fcgi_session_s *session)
+{
+    int rid = -1;
+
+    assert(session);
+    if (session)
+    {
+	assert(session->requestId);
+	return session->requestId;
+    }
+
+    return rid;
+}
+
+
+int fcgi_session_get_role(const struct fcgi_session_s *session)
+{
+    int rid = -1;
+
+    assert(session);
+    if (session)
+    {
+	assert(session->role);
+	return session->role;
+    }
+
+    return rid;
+}
 
 
 int fcgi_session_print(const struct fcgi_session_s *session)
