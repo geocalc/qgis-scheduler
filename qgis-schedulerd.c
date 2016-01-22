@@ -118,10 +118,13 @@
 #include <stdint.h>
 #include <sys/queue.h>
 #include <fastcgi.h>
+#include <regex.h>
 
 #include "qgis_process.h"
 #include "qgis_process_list.h"
 #include "fcgi_state.h"
+#include "qgis_config.h"
+
 
 #define min(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -135,6 +138,9 @@
 
 //#define PRINT_NETWORK_DATA
 //#define PRINT_SOCKET_DATA
+#ifndef DEFAULT_CONFIG_PATH
+# define DEFAULT_CONFIG_PATH	"/etc/qgis-scheduler/qgis-scheduler.conf"
+#endif
 
 
 struct thread_init_new_child_args
@@ -156,8 +162,11 @@ struct thread_connection_handler_args
 
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
-static const int default_min_free_processes = 5;
-#define nr_of_childs_during_startup	5 //default_min_free_processes
+static const int default_min_free_processes = 1;
+//static const char DEFAULT_CONFIG_PATH[] = "/etc/qgis-scheduler/qgis-scheduler.conf";
+static const int daemon_no_change_dir = 0;
+static const int daemon_no_close_streams = 1;
+
 
 
 #ifndef _GNU_SOURCE
@@ -183,6 +192,7 @@ void usage(const char *argv0)
     fprintf(stdout, "\t-d: do NOT become daemon\n");
     //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
 }
+
 
 
 
@@ -240,7 +250,17 @@ void *thread_init_new_child(void *arg)
 
 void *thread_start_new_child(void *arg)
 {
+    const char *command = config_get_process( NULL );
+    const char *args = config_get_process_args( NULL );
+
     fprintf(stderr, "start new child process\n");
+
+    if (NULL == command || 0 == strlen(command))
+    {
+	fprintf(stderr, "error: no process path specified. Not starting any process\n");
+	return NULL;
+    }
+
     /* prepare the socket to connect to this child process only */
     /* NOTE: Linux allows abstract socket names which have no representation
      * in the filesystem namespace.
@@ -367,7 +387,7 @@ void *thread_start_new_child(void *arg)
 
 	/* close all file descriptors different from 0. The fd different from
 	 * 1 and 2 are opened during open() and socket() calls with FD_CLOEXEC
-	 * flag enabled. This way, the fds are closed during exec() call.
+	 * flag enabled. This way, all fds are closed during exec() call.
 	 * TODO: assign an error log file to fd 1 and 2
 	 */
 	close(1);
@@ -638,6 +658,7 @@ void *thread_handle_connection(void *arg)
      *       FCGI_CANT_MPX_CONN.
      */
     struct fcgi_data_list_s *datalist = fcgi_data_list_new();
+    const char *request_project_name = NULL;
 
     /* here we do point 1, 2, 3, 4 */
     {
@@ -759,17 +780,82 @@ void *thread_handle_connection(void *arg)
 		    fcgi_data_add_data(datalist, data, readbytes);
 
 		    fcgi_session_parse(fcgi_session, data, readbytes);
+
 		    enum fcgi_session_state_e session_state = fcgi_session_get_state(fcgi_session);
 		    switch (session_state)
 		    {
-		    case FCGI_SESSION_STATE_PARAMS_DONE:
+		    case FCGI_SESSION_STATE_PARAMS_DONE:	// fall through
 		    case FCGI_SESSION_STATE_END:
 			/* we have the parameters complete.
 			 * TODO: now look for the URL and assign a process list
 			 */
+		    {
+			int num_proj = config_get_num_projects();
+			int i;
+			for (i=0; i<num_proj; i++)
+			{
+			    const char *proj_name = config_get_name_project(i);
+			    if (proj_name)
+			    {
+				const char *key = config_get_scan_parameter_key(proj_name);
+				if ( key )
+				{
+				    const char *param = fcgi_session_get_param(fcgi_session, key);
+				    const char *scanregex = config_get_scan_parameter_regex(proj_name);
+				    fprintf(stderr, "use regex %s\n", scanregex);
+				    regex_t regex;
+				    /* Compile regular expression */
+				    retval = regcomp(&regex, scanregex, REG_EXTENDED);
+				    if( retval )
+				    {
+					size_t len = regerror(retval, &regex, NULL, 0);
+					char *buffer = malloc(len);
+					(void) regerror (retval, &regex, buffer, len);
 
+					fprintf(stderr, "Could not compile regular expression: %s\n", buffer);
+					free(buffer);
+					exit(EXIT_FAILURE);
+				    }
+
+				    /* Execute regular expression */
+				    retval = regexec(&regex, param, 0, NULL, 0);
+				    if( !retval ){
+					// Match
+					regfree(&regex);
+					request_project_name = proj_name;
+					break;
+				    }
+				    else if( retval == REG_NOMATCH ){
+					// No match, go on with next project
+				    }
+				    else{
+					size_t len = regerror(retval, &regex, NULL, 0);
+					char *buffer = malloc(len);
+					(void) regerror (retval, &regex, buffer, len);
+
+					fprintf(stderr, "Could not match regular expression: %s\n", buffer);
+					free(buffer);
+					exit(EXIT_FAILURE);
+				    }
+
+				    regfree(&regex);
+				}
+				else
+				{
+				    // TODO: do not overflow the log with this message, do parse the config file at program start
+				    fprintf(stderr, "error: no regular expression found for project '%s'\n", proj_name);
+				}
+
+			    }
+			    else
+			    {
+				fprintf(stderr, "error: no name for project number %d in configuration found\n", i);
+			    }
+			}
+			fprintf(stderr, "found project '%s' in query string\n", request_project_name);
 			has_finished = 1;
 			break;
+		    }
 		    default:
 			/* do nothing, parse on.. */
 			break;
@@ -925,34 +1011,32 @@ void *thread_handle_connection(void *arg)
 	    if (can_write_networksock)
 	    {
 
+		/* parse and check the incoming message. If it is a
+		 * session initiation message from the web server then
+		 * immediately answer with an overload message and end
+		 * this thread.
+		 */
+		if (FCGI_RESPONDER == role)
 		{
-		    /* parse and check the incoming message. If it is a
-		     * session initiation message from the web server then
-		     * immediately answer with an overload message and end
-		     * this thread.
+		    unsigned char sendbuffer[sizeof(FCGI_EndRequestRecord)];
+		    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
+		    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
+
+		    int writebytes = write(inetsocketfd, sendbuffer, retval);
+		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    if (-1 == writebytes)
+		    {
+			perror("error: writing to network socket");
+			exit(EXIT_FAILURE);
+		    }
+
+		    /* we are done with the connection. The status
+		     * is send back to the web server. we can close
+		     * down and leave.
 		     */
-			if (FCGI_RESPONDER == role)
-			{
-			    unsigned char sendbuffer[sizeof(FCGI_EndRequestRecord)];
-			    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
-			    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
-
-			    int writebytes = write(inetsocketfd, sendbuffer, retval);
-			    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
-			    if (-1 == writebytes)
-			    {
-				perror("error: writing to network socket");
-				exit(EXIT_FAILURE);
-			    }
-
-			    /* we are done with the connection. The status
-			     * is send back to the web server. we can close
-			     * down and leave.
-			     */
-			    fcgi_message_delete(sendmessage);
-			}
-
+		    fcgi_message_delete(sendmessage);
 		}
+
 		has_finished = 1;
 	    }
 
@@ -1352,13 +1436,13 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 int main(int argc, char **argv)
 {
     int exitvalue = EXIT_SUCCESS;
-    const int port = 10177;
     int no_daemon = 0;
     int serversocketfd = -1;
+    const char *config_path = DEFAULT_CONFIG_PATH;
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "hd")) != -1)
+    while ((opt = getopt(argc, argv, "hdc:")) != -1)
     {
 	switch (opt)
 	{
@@ -1368,9 +1452,9 @@ int main(int argc, char **argv)
 	case 'd':
 	    no_daemon = 1;
 	    break;
-//	case 'c':
-//	    config_path = optarg;
-//	    break;
+	case 'c':
+	    config_path = optarg;
+	    break;
 	default: /* '?' */
 	    usage(argv[0]);
 	    return EXIT_FAILURE;
@@ -1385,15 +1469,24 @@ int main(int argc, char **argv)
     }
     command = argv[optind++];
 
+
+    int retval = config_load(config_path);
+    if (retval)
+    {
+	perror("can not load config file");
+	exit(EXIT_FAILURE);
+    }
+
+
+
+
+
     /* prepare inet socket connection for application server process (this)
      */
 
     {
 	struct addrinfo hints;
 	struct addrinfo *result = NULL, *rp = NULL;
-	const int port_len = 10;
-	char str_port[port_len];
-	snprintf(str_port,port_len,"%d",port);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
@@ -1404,7 +1497,9 @@ int main(int argc, char **argv)
 	//hints.ai_addr = NULL;
 	//hints.ai_next = NULL;
 
-	int s = getaddrinfo(NULL, str_port, &hints, &result);
+	const char *net_listen = config_get_network_listen();
+	const char *net_port = config_get_network_port();
+	int s = getaddrinfo(net_listen, net_port, &hints, &result);
 	if (s != 0)
 	{
 	    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
@@ -1453,7 +1548,7 @@ int main(int argc, char **argv)
 
 
     /* we are server. listen to incoming connections */
-    int retval = listen(serversocketfd, SOMAXCONN);
+    retval = listen(serversocketfd, SOMAXCONN);
     if (retval)
     {
 	perror("error: can not listen to socket");
@@ -1464,9 +1559,7 @@ int main(int argc, char **argv)
 
     if ( !no_daemon )
     {
-	const int no_change_dir = 0;
-	const int no_close_streams = 1;
-	retval = daemon(no_change_dir,no_close_streams);
+	retval = daemon(daemon_no_change_dir,daemon_no_close_streams);
 	if (retval)
 	{
 	    perror("error: can not become daemon");
@@ -1515,27 +1608,31 @@ int main(int argc, char **argv)
 
 
     /* start the children */
-    proclist = qgis_process_list_new();
-    pthread_t threads[nr_of_childs_during_startup];
     int i;
-    for (i=0; i<nr_of_childs_during_startup; i++)
     {
-	retval = pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
-	if (retval)
+	int nr_of_childs_during_startup	= config_get_min_idle_processes(NULL);
+
+	proclist = qgis_process_list_new();
+	pthread_t threads[nr_of_childs_during_startup];
+	for (i=0; i<nr_of_childs_during_startup; i++)
 	{
-	    errno = retval;
-	    perror("error creating thread");
-	    exit(EXIT_FAILURE);
+	    retval = pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
+	    if (retval)
+	    {
+		errno = retval;
+		perror("error creating thread");
+		exit(EXIT_FAILURE);
+	    }
 	}
-    }
-    for (i=0; i<nr_of_childs_during_startup; i++)
-    {
-	retval = pthread_join(threads[i], NULL);
-	if (retval)
+	for (i=0; i<nr_of_childs_during_startup; i++)
 	{
-	    errno = retval;
-	    perror("error joining thread");
-	    exit(EXIT_FAILURE);
+	    retval = pthread_join(threads[i], NULL);
+	    if (retval)
+	    {
+		errno = retval;
+		perror("error joining thread");
+		exit(EXIT_FAILURE);
+	    }
 	}
     }
 
@@ -1813,6 +1910,7 @@ int main(int argc, char **argv)
     fflush(stderr);
     close(serversocketfd);
     qgis_process_list_delete(proclist);
+    config_shutdown();
 
     return exitvalue;
 }
