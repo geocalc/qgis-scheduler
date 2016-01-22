@@ -118,6 +118,14 @@ int config_get_num_projects(void)
 }
 
 
+char *config_get_name_project(int num)
+{
+    assert(config_opts);
+    assert(num >= 0);
+    return iniparser_getsecname(config_opts, num);
+}
+
+
 const char *config_get_network_listen(void)
 {
     assert(config_opts);
@@ -132,24 +140,64 @@ const char *config_get_network_port(void)
 }
 
 
-const char *config_get_process(void)
-{
-    assert(config_opts);
-    return iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
-}
-
-
-const char *config_get_process_args(void)
-{
-    assert(config_opts);
-    return iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
-}
-
-
 const char *config_get_user(void)
 {
     assert(config_opts);
     return iniparser_getstring(config_opts, CONFIG_USER_KEY, DEFAULT_CONFIG_USER_VALUE);
+}
+
+
+const char *config_get_process(const char *project)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    const char *retval = DEFAULT_CONFIG_PROCESS_VALUE;
+
+    assert(config_opts);
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key = astrcat(project, CONFIG_PROCESS_KEY);
+	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_VALUE);
+	free (key);
+    }
+
+    if (DEFAULT_CONFIG_PROCESS_VALUE == retval)
+	retval = iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
+
+    return retval;
+}
+
+
+const char *config_get_process_args(const char *project)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    const char *retval = DEFAULT_CONFIG_PROCESS_ARGS_VALUE;
+
+    assert(config_opts);
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key = astrcat(project, CONFIG_PROCESS_ARGS_KEY);
+	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
+	free (key);
+    }
+
+    if (DEFAULT_CONFIG_PROCESS_ARGS_VALUE == retval)
+	retval = iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
+
+    return retval;
 }
 
 

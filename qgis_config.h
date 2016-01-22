@@ -35,13 +35,14 @@
 int config_load(const char *path);
 void config_shutdown(void);
 int config_get_num_projects(void);
+char *config_get_name_project(int num);
 const char *config_get_network_listen(void);
 const char *config_get_network_port(void);
-const char *config_get_process(void);
-const char *config_get_process_args(void);
 const char *config_get_user(void);
 
 
+const char *config_get_process(const char *project);
+const char *config_get_process_args(const char *project);
 int config_get_min_idle_processes(const char *project);
 int config_get_max_idle_processes(const char *project);
 const char *config_get_scan_parameter_key(const char *project);
