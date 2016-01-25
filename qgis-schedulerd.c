@@ -187,10 +187,10 @@ const char *basename(const char *path)
 void usage(const char *argv0)
 {
     //fprintf(stdout, "usage: %s [-h] [-d] [-c <CONFIGFILE>]\n", basename(argv0));
-    fprintf(stdout, "usage: %s [-h] [-d] <command>\n", basename(argv0));
+    fprintf(stdout, "usage: %s [-h] [-d]\n", basename(argv0));
     fprintf(stdout, "\t-h: print this help\n");
     fprintf(stdout, "\t-d: do NOT become daemon\n");
-    //fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
+    fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
 }
 
 
@@ -1461,13 +1461,13 @@ int main(int argc, char **argv)
 	}
     }
 
-    if (optind >= argc)
-    {
-	printf("error: missing command\n");
-	usage(argv[0]);
-	return EXIT_FAILURE;
-    }
-    command = argv[optind++];
+//    if (optind >= argc)
+//    {
+//	printf("error: missing command\n");
+//	usage(argv[0]);
+//	return EXIT_FAILURE;
+//    }
+//    command = argv[optind++];
 
 
     int retval = config_load(config_path);
