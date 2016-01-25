@@ -372,12 +372,21 @@ void *thread_start_new_child(void *arg)
     {
 	/* child */
 
-	/* close file descriptor stdin = 0
+	/* change working dir
+	 * close file descriptor stdin = 0
 	 * assign socket file descriptor to fd 0
 	 * fork
 	 * exec
 	 */
-	int ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
+	// TODO: change "NULL" to real project name
+	int ret = chdir(config_get_working_directory(NULL));
+	if (-1 == ret)
+	{
+	    perror("error calling chdir");
+	}
+
+
+	ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == ret)
 	{
 	    perror("error calling dup2");
@@ -1571,6 +1580,17 @@ int main(int argc, char **argv)
 	exit(EXIT_FAILURE);
     }
 
+
+    /* be a good server and change your working directory to root '/'.
+     * Each child process may set its own working directory by changing
+     * the value of cwd=
+     */
+    retval = chdir("/");
+    if (retval)
+    {
+	perror("error: can not change working directory to '/'");
+	exit(EXIT_FAILURE);
+    }
 
 
     if ( !no_daemon )
