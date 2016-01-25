@@ -54,6 +54,8 @@
 #define DEFAULT_CONFIG_SCAN_PARAM	NULL
 #define CONFIG_SCAN_REGEX		":scan_regex"
 #define DEFAULT_CONFIG_SCAN_REGEX	NULL
+#define CONFIG_CWD			":cwd"
+#define DEFAULT_CONFIG_CWD		"/"
 
 
 
@@ -65,6 +67,7 @@
 # error unknown __WORDSIZE defined
 #endif
 
+#define INVALID_STRING	((char *)-1)
 
 
 
@@ -303,6 +306,33 @@ const char *config_get_scan_parameter_regex(const char *project)
 }
 
 
+const char *config_get_working_directory(const char *project)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    const char *retval = DEFAULT_CONFIG_CWD;
+
+    assert(config_opts);
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key = astrcat(project, CONFIG_CWD);
+	retval = iniparser_getstring(config_opts, key, INVALID_STRING);
+	free (key);
+	if (INVALID_STRING != retval)
+	    return retval;
+    }
+
+    retval = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
+
+    return retval;
+
+}
 
 
 
