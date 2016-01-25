@@ -153,11 +153,10 @@ struct thread_connection_handler_args
     int new_accepted_inet_fd;
 };
 
-//struct thread_start_new_child_args
-//{
-//    int id;
-//    struct qgis_process_s *proc;
-//};
+struct thread_start_new_child_args
+{
+    struct qgis_process_list_s *list;
+};
 
 
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
@@ -250,8 +249,11 @@ void *thread_init_new_child(void *arg)
 
 void *thread_start_new_child(void *arg)
 {
+    assert(arg);
+    struct thread_start_new_child_args *tinfo = arg;
+    struct qgis_process_list_s *proclist = tinfo->list;
     const char *command = config_get_process( NULL );
-    const char *args = config_get_process_args( NULL );
+//    const char *args = config_get_process_args( NULL );
 
     fprintf(stderr, "start new child process\n");
 
@@ -435,7 +437,7 @@ void *thread_start_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-
+    free(arg);
     return NULL;
 }
 
@@ -471,7 +473,21 @@ void start_new_process_detached(int num)
     }
     while (num-- > 0)
     {
-	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, NULL);
+	/* NOTE: aside from the general rule
+	 * "malloc() and free() within the same function"
+	 * we transfer the responsibility for this memory
+	 * to the thread itself.
+	 */
+	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+	assert(targs);
+	if ( !targs )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	targs->list = proclist;
+
+	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);
 	if (retval)
 	{
 	    errno = retval;
@@ -1616,7 +1632,21 @@ int main(int argc, char **argv)
 	pthread_t threads[nr_of_childs_during_startup];
 	for (i=0; i<nr_of_childs_during_startup; i++)
 	{
-	    retval = pthread_create(&threads[i], NULL, thread_start_new_child, NULL);
+	    /* NOTE: aside from the general rule
+	     * "malloc() and free() within the same function"
+	     * we transfer the responsibility for this memory
+	     * to the thread itself.
+	     */
+	    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+	    assert(targs);
+	    if ( !targs )
+	    {
+		perror("could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    targs->list = proclist;
+
+	    retval = pthread_create(&threads[i], NULL, thread_start_new_child, targs);
 	    if (retval)
 	    {
 		errno = retval;
