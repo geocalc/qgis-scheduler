@@ -34,6 +34,8 @@
 #include <stdint.h>
 #include <assert.h>
 #include <iniparser.h>
+#include <errno.h>
+#include <pthread.h>
 
 
 #define CONFIG_LISTEN_KEY		":listen"
@@ -56,6 +58,8 @@
 #define DEFAULT_CONFIG_SCAN_REGEX	NULL
 #define CONFIG_CWD			":cwd"
 #define DEFAULT_CONFIG_CWD		"/"
+#define CONFIG_PROJ_CONFIG_PATH		":config_file"
+#define DEFAULT_CONFIG_PROJ_CONFIG_PATH	NULL
 
 
 
@@ -72,6 +76,7 @@
 
 
 static dictionary *config_opts = NULL;
+static pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 
 /* Copy content of s1 and s2 into a new allocated string.
@@ -98,7 +103,24 @@ int config_load(const char *path)
      * return: 0 if all is well, -1 if not and errno is set
      */
     assert(path);
+
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     config_opts = iniparser_load(path);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
     if (!config_opts)
 	return -1;
 
@@ -109,7 +131,25 @@ int config_load(const char *path)
 void config_shutdown(void)
 {
     // no assert: it's ok to call this with config_opts==NULL
+
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     iniparser_freedict(config_opts);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     config_opts = NULL;
 }
 
@@ -117,36 +157,131 @@ void config_shutdown(void)
 int config_get_num_projects(void)
 {
     assert(config_opts);
-    return iniparser_getnsec(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int ret = iniparser_getnsec(config_opts);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
-char *config_get_name_project(int num)
+const char *config_get_name_project(int num)
 {
     assert(config_opts);
     assert(num >= 0);
-    return iniparser_getsecname(config_opts, num);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getsecname(config_opts, num);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
 const char *config_get_network_listen(void)
 {
     assert(config_opts);
-    return iniparser_getstring(config_opts, CONFIG_LISTEN_KEY, DEFAULT_CONFIG_LISTEN_VALUE);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_LISTEN_KEY, DEFAULT_CONFIG_LISTEN_VALUE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
 const char *config_get_network_port(void)
 {
     assert(config_opts);
-    return iniparser_getstring(config_opts, CONFIG_PORT_KEY, DEFAULT_CONFIG_PORT_VALUE);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_PORT_KEY, DEFAULT_CONFIG_PORT_VALUE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
 const char *config_get_user(void)
 {
     assert(config_opts);
-    return iniparser_getstring(config_opts, CONFIG_USER_KEY, DEFAULT_CONFIG_USER_VALUE);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_USER_KEY, DEFAULT_CONFIG_USER_VALUE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -155,9 +290,18 @@ const char *config_get_process(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    const char *retval = DEFAULT_CONFIG_PROCESS_VALUE;
+    const char *ret = DEFAULT_CONFIG_PROCESS_VALUE;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -166,14 +310,22 @@ const char *config_get_process(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_PROCESS_KEY);
-	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_VALUE);
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_VALUE);
 	free (key);
     }
 
-    if (DEFAULT_CONFIG_PROCESS_VALUE == retval)
-	retval = iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
+    if (DEFAULT_CONFIG_PROCESS_VALUE == ret)
+	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -182,9 +334,18 @@ const char *config_get_process_args(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    const char *retval = DEFAULT_CONFIG_PROCESS_ARGS_VALUE;
+    const char *ret = DEFAULT_CONFIG_PROCESS_ARGS_VALUE;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -193,14 +354,22 @@ const char *config_get_process_args(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_PROCESS_ARGS_KEY);
-	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
 	free (key);
     }
 
-    if (DEFAULT_CONFIG_PROCESS_ARGS_VALUE == retval)
-	retval = iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
+    if (DEFAULT_CONFIG_PROCESS_ARGS_VALUE == ret)
+	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -209,9 +378,18 @@ int config_get_min_idle_processes(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    int retval;
+    int ret;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -220,15 +398,23 @@ int config_get_min_idle_processes(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_MIN_PROCESS);
-	retval = iniparser_getint(config_opts, key, INT32_MIN);
+	ret = iniparser_getint(config_opts, key, INT32_MIN);
 	free (key);
-	if (INT32_MIN != retval)
-	    return retval;
+	if (INT32_MIN != ret)
+	    return ret;
     }
 
-    retval = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
+    ret = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -237,9 +423,18 @@ int config_get_max_idle_processes(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    int retval;
+    int ret;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -248,15 +443,23 @@ int config_get_max_idle_processes(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_MAX_PROCESS);
-	retval = iniparser_getint(config_opts, key, INT32_MIN);
+	ret = iniparser_getint(config_opts, key, INT32_MIN);
 	free (key);
-	if (INT32_MIN != retval)
-	    return retval;
+	if (INT32_MIN != ret)
+	    return ret;
     }
 
-    retval = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
+    ret = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -264,9 +467,18 @@ const char *config_get_scan_parameter_key(const char *project)
 {
     /* if project != NULL we first test the project section.
      * if project == NULL we return default */
-    const char *retval = DEFAULT_CONFIG_SCAN_PARAM;
+    const char *ret = DEFAULT_CONFIG_SCAN_PARAM;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -275,11 +487,19 @@ const char *config_get_scan_parameter_key(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_SCAN_PARAM);
-	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_PARAM);
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_PARAM);
 	free (key);
     }
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -287,9 +507,18 @@ const char *config_get_scan_parameter_regex(const char *project)
 {
     /* if project != NULL we first test the project section.
      * if project == NULL we return default */
-    const char *retval = DEFAULT_CONFIG_SCAN_REGEX;
+    const char *ret = DEFAULT_CONFIG_SCAN_REGEX;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -298,11 +527,19 @@ const char *config_get_scan_parameter_regex(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_SCAN_REGEX);
-	retval = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_REGEX);
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_REGEX);
 	free (key);
     }
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -311,9 +548,18 @@ const char *config_get_working_directory(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    const char *retval = DEFAULT_CONFIG_CWD;
+    const char *ret = DEFAULT_CONFIG_CWD;
 
     assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
     if (project)
     {
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -322,16 +568,64 @@ const char *config_get_working_directory(const char *project)
 	 * effort. Just use dynamic memory.
 	 */
 	char *key = astrcat(project, CONFIG_CWD);
-	retval = iniparser_getstring(config_opts, key, INVALID_STRING);
+	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
 	free (key);
-	if (INVALID_STRING != retval)
-	    return retval;
+	if (INVALID_STRING != ret)
+	    return ret;
     }
 
-    retval = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
+    ret = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
 
-    return retval;
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
 
+    return ret;
+
+}
+
+
+const char *config_get_project_config_path(const char *project)
+{
+    /* if project != NULL we first test the project section.
+     * if project == NULL we return default */
+    const char *ret = DEFAULT_CONFIG_PROJ_CONFIG_PATH;
+
+    assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key = astrcat(project, CONFIG_PROJ_CONFIG_PATH);
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_CONFIG_PATH);
+	free (key);
+    }
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
