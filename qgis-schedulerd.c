@@ -120,8 +120,10 @@
 #include <fastcgi.h>
 #include <regex.h>
 
-#include "qgis_process.h"
-#include "qgis_process_list.h"
+#include "qgis_project_list.h"
+//#include "qgis_project.h"
+//#include "qgis_process.h"
+//#include "qgis_process_list.h"
 #include "fcgi_state.h"
 #include "qgis_config.h"
 
@@ -156,6 +158,7 @@ struct thread_connection_handler_args
 struct thread_start_new_child_args
 {
     struct qgis_process_list_s *list;
+    struct qgis_project_s *project;
 };
 
 
@@ -233,7 +236,8 @@ pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 const char *command = NULL;
-struct qgis_process_list_s *proclist = NULL;
+//struct qgis_process_list_s *proclist = NULL;
+struct qgis_project_list_s *projectlist = NULL;
 
 void *thread_init_new_child(void *arg)
 {
@@ -277,6 +281,7 @@ void *thread_start_new_child(void *arg)
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
     struct qgis_process_list_s *proclist = tinfo->list;
+    struct qgis_project_s *project = tinfo->project;
     const char *command = config_get_process( NULL );
 //    const char *args = config_get_process_args( NULL );
 
@@ -439,7 +444,10 @@ void *thread_start_new_child(void *arg)
     {
 	/* parent */
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
-	qgis_process_list_add_process(proclist, childproc);
+	if (project)
+	    qgis_project_add_process(project, childproc);
+	else
+	    qgis_process_list_add_process(proclist, childproc);
 
 	/* NOTE: aside from the general rule
 	 * "malloc() and free() within the same function"
@@ -476,7 +484,7 @@ void *thread_start_new_child(void *arg)
 }
 
 
-void start_new_process_detached(int num)
+void start_new_process_detached(int num, struct qgis_project_s *project)
 {
     /* NOTE: aside from the general rule
      * "malloc() and free() within the same function"
@@ -519,7 +527,9 @@ void start_new_process_detached(int num)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	targs->list = proclist;
+//	targs->list = proclist;
+	targs->list = qgis_project_get_process_list(project);
+	targs->project = project;
 
 	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);
 	if (retval)
@@ -708,10 +718,12 @@ void *thread_handle_connection(void *arg)
      *       FCGI_CANT_MPX_CONN.
      */
     struct fcgi_data_list_s *datalist = fcgi_data_list_new();
-    const char *request_project_name = NULL;
+    struct qgis_project_s *project = NULL;
 
     /* here we do point 1, 2, 3, 4 */
     {
+
+	const char *request_project_name = NULL;
 
 	/* get the maximum read write socket buffer size */
 	int maxbufsize = default_max_transfer_buffer_size;
@@ -925,14 +937,19 @@ void *thread_handle_connection(void *arg)
 //	fcgi_session_print(fcgi_session);
 	fcgi_session_delete(fcgi_session);
 
+
+	/* find the relevant project by name */
+	project = find_project_by_name(projectlist, request_project_name);
+
     }
 
 
 
-
+    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
 
     /* here we do point 5 */
     {
+
 	/* get the number of new started processes which then become idle
 	 * processes.
 	 * Then we can estimate how much new processes need to be started.
@@ -958,12 +975,12 @@ void *thread_handle_connection(void *arg)
 	int proc_state_idle = qgis_process_list_get_num_process_by_status(proclist, PROC_IDLE);
 	int proc_state_init = qgis_process_list_get_num_process_by_status(proclist, PROC_INIT);
 	int proc_state_start = qgis_process_list_get_num_process_by_status(proclist, PROC_START);
-
+// TODO: use project specific min process number
 	int missing_processes = default_min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones */
-	    start_new_process_detached(missing_processes);
+	    start_new_process_detached(missing_processes, NULL);
 	}
     }
 
@@ -1446,8 +1463,10 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	/* get pid of terminated child process */
 	pid_t pid = info->si_pid;
 	/* get array id of terminated child process */
-	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
-	if ( !proc )
+	struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+	//struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
+	//if ( !proc )
+	if ( !project )
 	{
 	    /* pid does not belong to our child processes ? */
 	    fprintf(stderr, "pid %d does not belong to us?\n", pid);
@@ -1456,6 +1475,8 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	{
 	    fprintf(stderr, "process %d ended\n", pid);
 	    /* Erase the old entry. The process does not exist anymore */
+	    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+	    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
 	    qgis_process_list_remove_process(proclist, proc);
 	    qgis_process_delete(proc);
 
@@ -1467,7 +1488,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		start_new_process_detached(1);
+		start_new_process_detached(1, NULL);
 	    }
 	}
 	break;
@@ -1677,47 +1698,71 @@ int main(int argc, char **argv)
     }
 
 
+    projectlist = qgis_proj_list_new();
+
     /* start the children */
-    int i;
     {
-	int nr_of_childs_during_startup	= config_get_min_idle_processes(NULL);
-
-	proclist = qgis_process_list_new();
-	pthread_t threads[nr_of_childs_during_startup];
-	for (i=0; i<nr_of_childs_during_startup; i++)
+	int i;
+	/* get the sections of the configuration file and start child processes
+	 * for every section in there.
+	 */
+	int num_proj = config_get_num_projects();
+	for (i=0; i<num_proj; i++)
 	{
-	    /* NOTE: aside from the general rule
-	     * "malloc() and free() within the same function"
-	     * we transfer the responsibility for this memory
-	     * to the thread itself.
-	     */
-	    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-	    assert(targs);
-	    if ( !targs )
-	    {
-		perror("could not allocate memory");
-		exit(EXIT_FAILURE);
-	    }
-	    targs->list = proclist;
+	    const char *projname = config_get_name_project(i);
+	    fprintf(stderr, "found project '%s'. Startup child processes\n", projname);
 
-	    retval = pthread_create(&threads[i], NULL, thread_start_new_child, targs);
-	    if (retval)
+	    const char *configpath = config_get_project_config_path(projname);
+	    struct qgis_project_s *project = qgis_project_new(projname, configpath);
+
 	    {
-		errno = retval;
-		perror("error creating thread");
-		exit(EXIT_FAILURE);
+		int k;
+		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
+
+		struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+		pthread_t threads[nr_of_childs_during_startup];
+		for (k=0; k<nr_of_childs_during_startup; k++)
+		{
+		    /* NOTE: aside from the general rule
+		     * "malloc() and free() within the same function"
+		     * we transfer the responsibility for this memory
+		     * to the thread itself.
+		     */
+		    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+		    assert(targs);
+		    if ( !targs )
+		    {
+			perror("could not allocate memory");
+			exit(EXIT_FAILURE);
+		    }
+		    targs->list = proclist;
+		    targs->project = project;
+
+		    retval = pthread_create(&threads[k], NULL, thread_start_new_child, targs);
+		    if (retval)
+		    {
+			errno = retval;
+			perror("error creating thread");
+			exit(EXIT_FAILURE);
+		    }
+		}
+		for (k=0; k<nr_of_childs_during_startup; k++)
+		{
+		    retval = pthread_join(threads[k], NULL);
+		    if (retval)
+		    {
+			errno = retval;
+			perror("error joining thread");
+			exit(EXIT_FAILURE);
+		    }
+		}
 	    }
+	    qgis_proj_list_add_project(projectlist, project);
+
 	}
-	for (i=0; i<nr_of_childs_during_startup; i++)
-	{
-	    retval = pthread_join(threads[i], NULL);
-	    if (retval)
-	    {
-		errno = retval;
-		perror("error joining thread");
-		exit(EXIT_FAILURE);
-	    }
-	}
+
+
+
     }
 
     /* wait for signals of child processes exiting (SIGCHLD) or to terminate
@@ -1781,14 +1826,23 @@ int main(int argc, char **argv)
 
 	    if (has_finished_second_run)
 	    {
-		struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-
-		if ( !proc )
+		struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		while ( projiterator )
 		{
-		    /* all child processes did exit, we can end this */
-		    exitvalue = EXIT_SUCCESS;
-		    break;
+		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+		    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+		    struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
+
+		    if ( !proc )
+		    {
+			/* all child processes did exit, we can end this */
+			exitvalue = EXIT_SUCCESS;
+			//break; // TODO: this breaks the inner loop not the outer one
+		    }
+		    else
+			break;
 		}
+		qgis_proj_list_return_iterator(projectlist);
 
 		/* if none of the child processes did terminate on timeout
 		 * we exit with failure
@@ -1799,38 +1853,56 @@ int main(int argc, char **argv)
 		    break;
 		}
 		// else restart the sleep() with remaining timeout
+
 	    }
 	    else if (has_finished_first_run)
 	    {
-		struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-		if ( !proc )
+		int children = 0;
+
+		struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		while ( projiterator )
 		{
-		    /* all child processes did exit, we can end this */
-		    exitvalue = EXIT_SUCCESS;
-		    break;
+		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+		    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+
+		    struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
+		    if ( !proc )
+		    {
+			/* all child processes did exit, we can end this */
+			exitvalue = EXIT_SUCCESS;
+
+		    }
+		    else
+			break; // TODO: this breaks the inner loop not the outer one
 		}
+		qgis_proj_list_return_iterator(projectlist);
 
 		/* if none of the child processes did terminate on timeout
 		 * we can start the next round of sending signals
 		 */
 		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
 		{
-		    int children = 0;
-		    pid_t *pidlist = NULL;
-		    int pidlen = 0;
-		    retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
-		    for(i=0; i<pidlen; i++)
+		    projiterator = qgis_proj_list_get_iterator(projectlist);
+		    while ( projiterator )
 		    {
-			pid_t pid = pidlist[i];
-			retval = kill(pid, SIGKILL);
-			if (0 > retval)
+			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+			int i;
+			pid_t *pidlist = NULL;
+			int pidlen = 0;
+			retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
+			for(i=0; i<pidlen; i++)
 			{
-			    switch(errno)
+			    pid_t pid = pidlist[i];
+			    retval = kill(pid, SIGKILL);
+			    if (0 > retval)
 			    {
-			    case ESRCH:
-				/* child process is not existent anymore.
-				 * erase it from the list of available processes
-				 */
+				switch(errno)
+				{
+				case ESRCH:
+				    /* child process is not existent anymore.
+				     * erase it from the list of available processes
+				     */
 				{
 				    struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
 				    if (myproc)
@@ -1840,54 +1912,68 @@ int main(int argc, char **argv)
 				    }
 				}
 				break;
-			    default:
-				perror("error: could not send KILL signal");
+				default:
+				    perror("error: could not send KILL signal");
+				}
 			    }
-			}
-			else
-			{
-			    children++;
-			}
+			    else
+			    {
+				children++;
+			    }
 
+			}
+			free(pidlist);
 		    }
-		    free(pidlist);
-		    if (0 < children)
-		    {
-			fprintf(stderr, "termination signal received, sending SIGKILL to %d child processes..\n", children);
-			timeout.tv_sec = 10;
-			has_finished_second_run = 1;
-		    }
-		    else
-		    {
-			/* no more child processes found to send signal.
-			 * exit immediately.
-			 */
-			fprintf(stderr, "termination signal received, shut down\n");
-			break;
-		    }
+		    qgis_proj_list_return_iterator(projectlist);
 
+		}
+
+		if (0 < children)
+		{
+		    fprintf(stderr, "termination signal received, sending SIGKILL to %d child processes..\n", children);
+		    timeout.tv_sec = 10;
+		    has_finished_second_run = 1;
+		}
+		else
+		{
+		    /* no more child processes found to send signal.
+		     * exit immediately.
+		     */
+		    fprintf(stderr, "termination signal received, shut down\n");
+		    has_finished = 1;
+		    break;
 		}
 		// else restart the sleep() with remaining timeout
 
 	    }
 	    else
 	    {
+		/* got the signal to shut down this scheduler
+		 * signal all projects to shut down the list of processes
+		 */
 		int children = 0;
-		pid_t *pidlist = NULL;
-		int pidlen = 0;
-		retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
-		for(i=0; i<pidlen; i++)
+
+		struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		while ( projiterator )
 		{
-		    pid_t pid = pidlist[i];
-		    retval = kill(pid, SIGTERM);
-		    if (0 > retval)
+		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+		    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+		    int i;
+		    pid_t *pidlist = NULL;
+		    int pidlen = 0;
+		    retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
+		    for(i=0; i<pidlen; i++)
 		    {
-			switch(errno)
+			pid_t pid = pidlist[i];
+			retval = kill(pid, SIGTERM);
+			if (0 > retval)
 			{
-			case ESRCH:
-			    /* child process is not existent anymore.
-			     * erase it from the list of available processes
-			     */
+			    switch(errno)
+			    {
+			    case ESRCH:
+				/* child process is not existent anymore.
+				 * erase it from the list of available processes
+				 */
 			    {
 				struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
 				if (myproc)
@@ -1897,17 +1983,19 @@ int main(int argc, char **argv)
 				}
 			    }
 			    break;
-			default:
-			    perror("error: could not send TERM signal");
+			    default:
+				perror("error: could not send TERM signal");
+			    }
 			}
-		    }
-		    else
-		    {
-			children++;
-		    }
+			else
+			{
+			    children++;
+			}
 
+		    }
+		    free(pidlist);
 		}
-		free(pidlist);
+		qgis_proj_list_return_iterator(projectlist);
 
 		if (0 < children)
 		{
@@ -1925,6 +2013,7 @@ int main(int argc, char **argv)
 		    fprintf(stderr, "termination signal received, no more processes to signal, shut down\n");
 		    break;
 		}
+
 	    }
 
 	}
@@ -1993,7 +2082,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "closing network socket\n");
     fflush(stderr);
     close(serversocketfd);
-    qgis_process_list_delete(proclist);
+//    qgis_process_list_delete(proclist);
+    qgis_proj_list_delete(projectlist);
 
     {
 	const char *pidfile = config_get_pid_path();
