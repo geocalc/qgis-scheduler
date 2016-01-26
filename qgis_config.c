@@ -44,6 +44,8 @@
 #define DEFAULT_CONFIG_PORT_VALUE	"10177"
 #define CONFIG_USER_KEY			":user"
 #define DEFAULT_CONFIG_USER_VALUE	"root"
+#define CONFIG_PID_KEY			":pidfile"
+#define DEFAULT_CONFIG_PID_VALUE	NULL
 #define CONFIG_PROCESS_KEY		":process"
 #define DEFAULT_CONFIG_PROCESS_VALUE	NULL
 #define CONFIG_PROCESS_ARGS_KEY		":process_args"
@@ -272,6 +274,32 @@ const char *config_get_user(void)
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_USER_KEY, DEFAULT_CONFIG_USER_VALUE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_pid_path(void)
+{
+    assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_PID_KEY, DEFAULT_CONFIG_PID_VALUE);
 
     retval = pthread_rwlock_unlock(&config_rwlock);
     if (retval)

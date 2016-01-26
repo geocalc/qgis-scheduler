@@ -193,7 +193,32 @@ void usage(const char *argv0)
 }
 
 
+void write_pid_file(const char *path)
+{
+    FILE *f = fopen(path, "w");
+    if (NULL == f)
+    {
+	fprintf(stderr, "can not open pidfile '%s': ", path);
+	perror(NULL);
+	exit(EXIT_FAILURE);
+    }
 
+    pid_t pid = getpid();
+    fprintf(f, "%d", pid);
+    fclose(f);
+}
+
+
+void remove_pid_file(const char *path)
+{
+    int retval = unlink(path);
+    if (-1 == retval)
+    {
+	fprintf(stderr, "can not remove pidfile '%s': ", path);
+	perror(NULL);
+	// intentionally no exit() call
+    }
+}
 
 
 /* This global number is counted upwards, overflow included.
@@ -1604,6 +1629,15 @@ int main(int argc, char **argv)
     }
 
 
+    {
+	const char *pidfile = config_get_pid_path();
+	if (pidfile)
+	{
+	    write_pid_file(pidfile);
+	}
+    }
+
+
     /* prepare the signal reception.
      * This way we can start a new child if one has exited on its own,
      * or we can kill the children if this management process got signal
@@ -1960,7 +1994,16 @@ int main(int argc, char **argv)
     fflush(stderr);
     close(serversocketfd);
     qgis_process_list_delete(proclist);
+
+    {
+	const char *pidfile = config_get_pid_path();
+	if (pidfile)
+	{
+	    remove_pid_file(pidfile);
+	}
+    }
     config_shutdown();
+
 
     return exitvalue;
 }
