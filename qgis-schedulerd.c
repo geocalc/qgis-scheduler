@@ -125,6 +125,7 @@
 //#include "qgis_process.h"
 //#include "qgis_process_list.h"
 #include "fcgi_state.h"
+#include "fcgi_data.h"
 #include "qgis_config.h"
 
 
@@ -546,124 +547,6 @@ void start_new_process_detached(int num, struct qgis_project_s *project)
 	perror("error: pthread_attr_destroy");
 	exit(EXIT_FAILURE);
     }
-}
-
-struct fcgi_data_s
-{
-    char *data;
-    int len;
-};
-
-struct fcgi_data_list_iterator_s
-{
-    TAILQ_ENTRY(fcgi_data_list_iterator_s) entries;          /* Linked list prev./next entry */
-    struct fcgi_data_s data;
-};
-
-struct fcgi_data_list_s
-{
-    TAILQ_HEAD(data_listhead_s, fcgi_data_list_iterator_s) head;	/* Linked list head */
-};
-
-
-static struct fcgi_data_list_s *fcgi_data_list_new(void)
-{
-    struct fcgi_data_list_s *list = calloc(1, sizeof(*list));
-    assert(list);
-    if ( !list )
-    {
-	perror("could not allocate memory");
-	exit(EXIT_FAILURE);
-    }
-
-    return list;
-}
-
-
-static void fcgi_data_list_delete(struct fcgi_data_list_s *datalist)
-{
-    if (datalist)
-    {
-	while (datalist->head.tqh_first != NULL)
-	{
-	    struct fcgi_data_list_iterator_s *entry = datalist->head.tqh_first;
-
-	    TAILQ_REMOVE(&datalist->head, datalist->head.tqh_first, entries);
-	    free(entry->data.data);
-	    free(entry);
-	}
-
-	free(datalist);
-    }
-}
-
-
-static void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len)
-{
-    assert(datalist);
-    if(datalist)
-    {
-	struct fcgi_data_list_iterator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    perror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-
-	entry->data.data = data;
-	entry->data.len = len;
-
-	/* if list is empty we have to insert at beginning,
-	 * else insert at the end.
-	 */
-	if (datalist->head.tqh_first)
-	    TAILQ_INSERT_TAIL(&datalist->head, entry, entries);      /* Insert at the end. */
-	else
-	    TAILQ_INSERT_HEAD(&datalist->head, entry, entries);
-    }
-
-}
-
-
-static struct fcgi_data_list_iterator_s *fcgi_data_get_iterator(struct fcgi_data_list_s *list)
-{
-    assert(list);
-    if (list)
-    {
-	return list->head.tqh_first;
-    }
-
-    return NULL;
-}
-
-
-static const struct fcgi_data_s *fcgi_data_get_next_data(struct fcgi_data_list_iterator_s **iterator)
-{
-    assert(iterator);
-    if (iterator)
-    {
-	if (*iterator)
-	{
-	    struct fcgi_data_s *data = &(*iterator)->data;
-	    *iterator = (*iterator)->entries.tqe_next;
-	    return data;
-	}
-    }
-
-    return NULL;
-}
-
-
-static int fcgi_data_iterator_has_data(const struct fcgi_data_list_iterator_s *iterator)
-{
-    int retval = 0;
-    if (iterator)
-    {
-	retval = 1;
-    }
-
-    return retval;
 }
 
 
@@ -1135,8 +1018,12 @@ void *thread_handle_connection(void *arg)
 	{
 	    struct fcgi_data_list_iterator_s *myit = fcgi_data_get_iterator(datalist);
 	    assert(myit);
-	    char *data = myit->data.data;
-	    int len = myit->data.len;
+	    const struct fcgi_data_s *fcgidata = fcgi_data_get_next_data(&myit);
+	    assert(fcgidata);
+
+	    const char *data = fcgi_data_get_data(fcgidata);
+	    int len = fcgi_data_get_datalen(fcgidata);
+
 	    struct fcgi_message_s *message = fcgi_message_new();
 
 	    fcgi_message_parse(message, data, len);
@@ -1351,8 +1238,8 @@ void *thread_handle_connection(void *arg)
 		{
 		    const struct fcgi_data_s *fcgi_data = fcgi_data_get_next_data(&fcgi_data_iterator);
 
-		    char *data = fcgi_data->data;
-		    int datalen = fcgi_data->len;
+		    const char *data = fcgi_data_get_data(fcgi_data);
+		    int datalen = fcgi_data_get_datalen(fcgi_data);
 		    int writebytes = write(childunixsocketfd, data, datalen);
 		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
