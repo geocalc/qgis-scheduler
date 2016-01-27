@@ -150,25 +150,12 @@
 #endif
 
 
-struct thread_init_new_child_args
-{
-    struct qgis_process_s *proc;
-    const char *project_name;
-};
-
 struct thread_connection_handler_args
 {
     int new_accepted_inet_fd;
 };
 
-struct thread_start_new_child_args
-{
-    struct qgis_process_list_s *list; // TODO: remove this!!
-    struct qgis_project_s *project;
-};
 
-
-static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 1;
 //static const char DEFAULT_CONFIG_PATH[] = "/etc/qgis-scheduler/qgis-scheduler.conf";
@@ -230,528 +217,10 @@ void remove_pid_file(const char *path)
 }
 
 
-/* This global number is counted upwards, overflow included.
- * Every new unix socket gets this number attached creating a unique socket
- * path. In the very unlikely case the number is already given to an existing
- * socket path, the number is counted upwards again until we find a path which
- * is not assigned to a socket.
- * I assume here we do not create UINT_MAX number of sockets in this computer..
- */
-static unsigned int socket_id = 0;
-pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 
 const char *command = NULL;
 //struct qgis_process_list_s *proclist = NULL;
 struct qgis_project_list_s *projectlist = NULL;
-
-void *thread_init_new_child(void *arg)
-{
-    assert(arg);
-    struct thread_init_new_child_args *tinfo = arg;
-    struct qgis_process_s *childproc = tinfo->proc;
-    assert(childproc);
-    const char *projname = tinfo->project_name;
-    assert(projname);
-    const pthread_t thread_id = pthread_self();
-    char *buffer ;
-
-    qgis_process_set_state_init(childproc, thread_id);
-
-    /* detach myself from the main thread. Doing this to collect resources after
-     * this thread ends. Because there is no join() waiting for this thread.
-     */
-    int retval = pthread_detach(thread_id);
-    if (-1 == retval)
-    {
-	perror("error detaching thread");
-	exit(EXIT_FAILURE);
-    }
-
-    fprintf(stderr, "init new spawned child process for project '%s'\n", projname);
-
-
-//    char debugfile[256];
-//    sprintf(debugfile, "/tmp/threadinit.%lu.dump", thread_id);
-//    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
-//    if (-1 == debugfd)
-//    {
-//	fprintf(stderr, "error can not open file '%s': ", debugfile);
-//	perror(NULL);
-//	exit(EXIT_FAILURE);
-//    }
-
-
-    /* open the socket to the child process */
-
-    struct sockaddr_un sockaddr;
-    socklen_t sockaddrlen = sizeof(sockaddr);
-    int childunixsocketfd = qgis_process_get_socketfd(childproc);
-
-    retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
-    if (-1 == retval)
-    {
-	perror("error retrieving the name of child process socket");
-	exit(EXIT_FAILURE);
-    }
-    /* leave the original child socket and create a new one on the opposite
-     * side.
-     */
-    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
-    if (-1 == retval)
-    {
-	perror("error: can not create socket to child process");
-	exit(EXIT_FAILURE);
-    }
-    childunixsocketfd = retval;	// refers to the socket this program connects to the child process
-    retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
-    if (-1 == retval)
-    {
-	perror("error: can not connect to child process");
-	exit(EXIT_FAILURE);
-    }
-
-
-
-    /* create the fcgi data and
-     * send the fcgi data to the child process
-     */
-    static const int maxbufferlen = 4096;
-    buffer = malloc(maxbufferlen);
-    assert(buffer);
-    if ( !buffer )
-    {
-	perror("could not allocate memory");
-	exit(EXIT_FAILURE);
-    }
-
-    static const int requestid = 1;
-    int len;
-    struct fcgi_message_s *message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	perror("error: can not write to child process");
-	exit(EXIT_FAILURE);
-    }
-    //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
-    fcgi_message_delete(message);
-
-    {
-	char *parambuffer = (char *)buffer;
-	int remain_len = maxbufferlen;
-
-	int i;
-	for (i=0; i<128; i++)
-	{
-	    const char *key = config_get_init_key(projname, i);
-	    if (!key)
-		break;
-	    const char *value = config_get_init_value(projname, i);
-	    if (!value)
-		break;
-	    fprintf(stderr, "Param %s=%s\n", key, value);
-
-	    retval = fcgi_param_list_write(parambuffer, remain_len, key, value);
-	    if (-1 == retval)
-	    {
-		// TODO: be more flexible if buffer too small
-		fprintf(stderr, "fcgi parameter buffer too small (%d)\n", maxbufferlen);
-		exit(EXIT_FAILURE);
-
-	    }
-
-	    parambuffer += retval;
-	    remain_len -= retval;
-
-	}
-	len = maxbufferlen - remain_len;
-
-	if (i>=128)
-	{
-	    fprintf(stderr, "fcgi parameter too many key/value pairs\n");
-	    exit(EXIT_FAILURE);
-
-	}
-    }
-
-    /* send parameter list */
-    message = fcgi_message_new_parameter(requestid, buffer, len);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	perror("error: can not write to child process");
-	exit(EXIT_FAILURE);
-    }
-    fcgi_message_delete(message);
-
-    /* send empty parameter list to signal EOP */
-    message = fcgi_message_new_parameter(requestid, "", 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	perror("error: can not write to child process");
-	exit(EXIT_FAILURE);
-    }
-    fcgi_message_delete(message);
-
-
-    message = fcgi_message_new_stdin(requestid, "", 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)
-    {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	perror("error: can not write to child process");
-	exit(EXIT_FAILURE);
-    }
-    // write stdin = "" twice
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	perror("error: can not write to child process");
-	exit(EXIT_FAILURE);
-    }
-    fcgi_message_delete(message);
-
-
-    /* now read from socket into void until no more data
-     * we do it to make sure that the child process has completed the request
-     * and filled up its cache.
-     */
-    retval = 1;
-    while (retval>0)
-    {
-	retval = read(childunixsocketfd, buffer, maxbufferlen);
-    }
-
-
-    /* ok, we did read each and every byte from child process.
-     * now close this and set idle
-     */
-    close(childunixsocketfd);
-//    close(debugfd);
-    fprintf(stderr, "init child process for project '%s' done. waiting for input..\n", projname);
-
-    // TODO: do we need this distinction over here?
-    if (childproc)
-    {
-	qgis_process_set_state_idle(childproc);
-    }
-    else
-    {
-	fprintf(stderr, "no child process found to initialize\n");
-	exit(EXIT_FAILURE);
-    }
-    free(buffer);
-    free(arg);
-
-    return NULL;
-}
-
-
-void *thread_start_new_child(void *arg)
-{
-    assert(arg);
-    struct thread_start_new_child_args *tinfo = arg;
-    struct qgis_process_list_s *proclist = tinfo->list;
-    struct qgis_project_s *project = tinfo->project;
-    const char *project_name = qgis_project_get_name(project);
-    const char *command = config_get_process( project_name );
-//    const char *args = config_get_process_args( NULL );
-
-    fprintf(stderr, "start new child process\n");
-
-    if (NULL == command || 0 == strlen(command))
-    {
-	fprintf(stderr, "error: no process path specified. Not starting any process\n");
-	return NULL;
-    }
-
-    /* prepare the socket to connect to this child process only */
-    /* NOTE: Linux allows abstract socket names which have no representation
-     * in the filesystem namespace.
-     */
-    int retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
-    if (-1 == retval)
-    {
-	perror("can not create socket for fcgi program");
-	exit(EXIT_FAILURE);
-    }
-    const int childsocket = retval;
-
-
-    /* Create a unique socket name without a file system inode.
-     * The name is "\0qgis-schedulerd-socket0", "..1", etc.
-     * We just count upwards until integer overflow and then start
-     * over at 0.
-     * If one name is already given to a socket, bind() returns EADDRINUSE.
-     * In this case we try again.
-     */
-
-    /* security rope for the really unlikely case
-     * that we got no more numbers free.
-     * To prevent infinite loop
-     */
-    retval = pthread_mutex_lock (&socket_id_mutex);
-    if (retval)
-    {
-	errno = retval;
-	perror("error acquire mutex");
-	exit(EXIT_FAILURE);
-    }
-    unsigned int socket_suffix_start = socket_id-1;
-    retval = pthread_mutex_unlock (&socket_id_mutex);
-    if (retval)
-    {
-	errno = retval;
-	perror("error unlock mutex");
-	exit(EXIT_FAILURE);
-    }
-
-    for (;;)
-    {
-	retval = pthread_mutex_lock (&socket_id_mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error acquire mutex");
-	    exit(EXIT_FAILURE);
-	}
-	unsigned int socket_suffix = socket_id++;
-	retval = pthread_mutex_unlock (&socket_id_mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error unlock mutex");
-	    exit(EXIT_FAILURE);
-	}
-
-	if (socket_suffix == socket_suffix_start)
-	{
-	    /* we tested UINT_MAX numbers without success.
-	     * exit here, because we can not get any more numbers.
-	     * Or we have a programmers error here..
-	     */
-	    fprintf(stderr, "error: out of numbers to create socket name. exit");
-	    exit(EXIT_FAILURE);
-	}
-
-	struct sockaddr_un childsockaddr;
-	childsockaddr.sun_family = AF_UNIX;
-	retval = snprintf( childsockaddr.sun_path, sizeof(childsockaddr.sun_path), "%c%s%u", '\0', base_socket_desc, socket_suffix );
-	if (-1 == retval)
-	{
-	    perror("error calling string format function snprintf");
-	    exit(EXIT_FAILURE);
-	}
-
-	retval = bind(childsocket, &childsockaddr, sizeof(childsockaddr));
-	if (-1 == retval)
-	{
-	    if (EADDRINUSE==errno)
-	    {
-		continue;	// reiterate with next number
-	    }
-	    else
-	    {
-		perror("error calling bind");
-		exit(EXIT_FAILURE);
-	    }
-	}
-	break;
-    }
-
-    /* the child process listens for connections, one at a time */
-    retval = listen(childsocket, 1);
-    if (-1 == retval)
-    {
-	perror("can not listen to socket connecting fast cgi application");
-	exit(EXIT_FAILURE);
-    }
-
-
-
-    pid_t pid = fork();
-    if (0 == pid)
-    {
-	/* child */
-
-	/* change working dir
-	 * close file descriptor stdin = 0
-	 * assign socket file descriptor to fd 0
-	 * fork
-	 * exec
-	 */
-	// TODO: change "NULL" to real project name
-	int ret = chdir(config_get_working_directory(NULL));
-	if (-1 == ret)
-	{
-	    perror("error calling chdir");
-	}
-
-
-	ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
-	if (-1 == ret)
-	{
-	    perror("error calling dup2");
-	    exit(EXIT_FAILURE);
-	}
-//	const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
-//		CGI_PATH_KEY_DEFAULT);
-
-
-	/* close all file descriptors different from 0. The fd different from
-	 * 1 and 2 are opened during open() and socket() calls with FD_CLOEXEC
-	 * flag enabled. This way, all fds are closed during exec() call.
-	 * TODO: assign an error log file to fd 1 and 2
-	 */
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-
-
-	execl(command, command, NULL);
-	fprintf(stderr, "could not execute '%s': ", command);
-	perror(NULL);
-	exit(EXIT_FAILURE);
-    }
-    else if (0 < pid)
-    {
-	/* parent */
-	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
-	if (project)
-	    qgis_project_add_process(project, childproc);
-	else // TODO remove this!!
-	    qgis_process_list_add_process(proclist, childproc);
-
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
-	 */
-	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
-	{
-	    perror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-	targs->proc = childproc;
-	targs->project_name = project_name;
-
-	pthread_t thread;
-	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error creating thread");
-	    exit(EXIT_FAILURE);
-	}
-
-    }
-    else
-    {
-	/* error */
-	perror("can not fork");
-	exit(EXIT_FAILURE);
-    }
-
-    free(arg);
-    return NULL;
-}
-
-
-void start_new_process_detached(int num, struct qgis_project_s *project)
-{
-    /* NOTE: aside from the general rule
-     * "malloc() and free() within the same function"
-     * we transfer the responsibility for this info memory
-     * to the thread itself.
-     */
-    /* Start the process creation thread in detached state because
-     * we do not want to wait for it. Different from the handling
-     * during the program startup there is no join() waiting for
-     * the end of the thread and collecting its resources.
-     */
-    pthread_t thread;
-    pthread_attr_t thread_attr;
-
-    int retval = pthread_attr_init(&thread_attr);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_init");
-	exit(EXIT_FAILURE);
-    }
-    retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
-	exit(EXIT_FAILURE);
-    }
-    while (num-- > 0)
-    {
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
-	 */
-	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
-	{
-	    perror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-//	targs->list = proclist;
-	targs->list = qgis_project_get_process_list(project);
-	targs->project = project;
-
-	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error: pthread_create");
-	    exit(EXIT_FAILURE);
-	}
-    }
-    retval = pthread_attr_destroy(&thread_attr);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_destroy");
-	exit(EXIT_FAILURE);
-    }
-}
-
 
 void *thread_handle_connection(void *arg)
 {
@@ -1802,46 +1271,48 @@ int main(int argc, char **argv)
 	    struct qgis_project_s *project = qgis_project_new(projname, configpath);
 
 	    {
-		int k;
+//		int k;
 		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
 
-		struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-		pthread_t threads[nr_of_childs_during_startup];
-		for (k=0; k<nr_of_childs_during_startup; k++)
-		{
-		    /* NOTE: aside from the general rule
-		     * "malloc() and free() within the same function"
-		     * we transfer the responsibility for this memory
-		     * to the thread itself.
-		     */
-		    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-		    assert(targs);
-		    if ( !targs )
-		    {
-			perror("could not allocate memory");
-			exit(EXIT_FAILURE);
-		    }
-		    targs->list = proclist;
-		    targs->project = project;
+		start_new_process_wait(nr_of_childs_during_startup, project);
 
-		    retval = pthread_create(&threads[k], NULL, thread_start_new_child, targs);
-		    if (retval)
-		    {
-			errno = retval;
-			perror("error creating thread");
-			exit(EXIT_FAILURE);
-		    }
-		}
-		for (k=0; k<nr_of_childs_during_startup; k++)
-		{
-		    retval = pthread_join(threads[k], NULL);
-		    if (retval)
-		    {
-			errno = retval;
-			perror("error joining thread");
-			exit(EXIT_FAILURE);
-		    }
-		}
+//		struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+//		pthread_t threads[nr_of_childs_during_startup];
+//		for (k=0; k<nr_of_childs_during_startup; k++)
+//		{
+//		    /* NOTE: aside from the general rule
+//		     * "malloc() and free() within the same function"
+//		     * we transfer the responsibility for this memory
+//		     * to the thread itself.
+//		     */
+//		    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+//		    assert(targs);
+//		    if ( !targs )
+//		    {
+//			perror("could not allocate memory");
+//			exit(EXIT_FAILURE);
+//		    }
+//		    targs->list = proclist;
+//		    targs->project = project;
+//
+//		    retval = pthread_create(&threads[k], NULL, thread_start_new_child, targs);
+//		    if (retval)
+//		    {
+//			errno = retval;
+//			perror("error creating thread");
+//			exit(EXIT_FAILURE);
+//		    }
+//		}
+//		for (k=0; k<nr_of_childs_during_startup; k++)
+//		{
+//		    retval = pthread_join(threads[k], NULL);
+//		    if (retval)
+//		    {
+//			errno = retval;
+//			perror("error joining thread");
+//			exit(EXIT_FAILURE);
+//		    }
+//		}
 	    }
 	    qgis_proj_list_add_project(projectlist, project);
 
