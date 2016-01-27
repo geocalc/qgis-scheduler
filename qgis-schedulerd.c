@@ -2103,7 +2103,7 @@ int main(int argc, char **argv)
 	    }
 
 	}
-	else if (retval)
+	else if (retval > 0)
 	{
 	    /* connection available */
 	    if (FD_ISSET(serversocketfd, &rfds))
@@ -2116,6 +2116,7 @@ int main(int argc, char **argv)
 		    perror("error: calling accept");
 		    exit(EXIT_FAILURE);
 		}
+		else
 		{
 		    char hbuf[80], sbuf[10];
 		    int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
@@ -2128,10 +2129,10 @@ int main(int argc, char **argv)
 		    {
 			fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
 		    }
-		}
-		int networkfd = retval;
 
-		{
+		    int networkfd = retval;
+
+
 		    /* NOTE: aside from the general rule
 		     * "malloc() and free() within the same function"
 		     * we transfer the responsibility for this memory
