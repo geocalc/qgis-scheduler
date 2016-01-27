@@ -1575,22 +1575,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	else
 	{
 	    fprintf(stderr, "process %d ended\n", pid);
-	    /* Erase the old entry. The process does not exist anymore */
-	    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-	    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
-	    qgis_process_list_remove_process(proclist, proc);
-	    qgis_process_delete(proc);
-
-	    if ( !get_program_shutdown() )
-	    {
-		fprintf(stderr, "restarting process\n");
-
-		/* child process terminated, restart anew */
-		/* TODO: react on child processes exiting immediately.
-		 * maybe store the creation time and calculate the execution time?
-		 */
-		start_new_process_detached(1, NULL);
-	    }
+	    qgis_project_process_died(project, pid);
 	}
 	break;
     }
