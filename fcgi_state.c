@@ -714,7 +714,7 @@ static int fcgi_message_get_size(const struct fcgi_message_s *message)
 /* writes message into buffer of size len.
  * returns the bytes written.
  */
-int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message)
+int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *message)
 {
     assert(buffer);
     if ( !buffer )

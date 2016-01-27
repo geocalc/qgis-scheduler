@@ -647,7 +647,7 @@ void *thread_handle_connection(void *arg)
 		 */
 		if (FCGI_RESPONDER == role)
 		{
-		    unsigned char sendbuffer[sizeof(FCGI_EndRequestRecord)];
+		    char sendbuffer[sizeof(FCGI_EndRequestRecord)];
 		    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
 		    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
 
@@ -728,7 +728,7 @@ void *thread_handle_connection(void *arg)
 		     * a full complete message, and overwrite the header of
 		     * the next message.
 		     */
-		    fcgi_message_write((unsigned char *)data, len, message);
+		    fcgi_message_write((char *)data, len, message); // remove constant flag from "data" to write into this buffer
 //		    fcgi_message_print(message);
 		}
 	    }

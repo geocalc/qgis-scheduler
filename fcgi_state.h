@@ -96,7 +96,7 @@ int fcgi_message_get_role(const struct fcgi_message_s *message);
 /* return: message flag or -1 in case of error */
 int fcgi_message_get_flag(const struct fcgi_message_s *message);
 int fcgi_message_set_flag(struct fcgi_message_s *message, unsigned char flags);
-int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message);
+int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *message);
 
 /* construct a message */
 struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role, unsigned char flags);
