@@ -50,6 +50,8 @@ const char *config_get_scan_parameter_key(const char *project);
 const char *config_get_scan_parameter_regex(const char *project);
 const char *config_get_working_directory(const char *project);
 const char *config_get_project_config_path(const char *project);
+const char *config_get_init_key(const char *project, int num);
+const char *config_get_init_value(const char *project, int num);
 
 
 #endif /* QGIS_CONFIG_H_ */

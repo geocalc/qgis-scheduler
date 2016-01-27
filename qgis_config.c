@@ -31,6 +31,8 @@
 
 #include "qgis_config.h"
 
+#define _GNU_SOURCE
+#include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
 #include <iniparser.h>
@@ -62,6 +64,10 @@
 #define DEFAULT_CONFIG_CWD		"/"
 #define CONFIG_PROJ_CONFIG_PATH		":config_file"
 #define DEFAULT_CONFIG_PROJ_CONFIG_PATH	NULL
+#define CONFIG_PROJ_INITVAR		":initvar"
+#define DEFAULT_CONFIG_PROJ_INITVAR	NULL
+#define CONFIG_PROJ_INITDATA		":initdata"
+#define DEFAULT_CONFIG_PROJ_INITDATA	NULL
 
 
 
@@ -642,6 +648,96 @@ const char *config_get_project_config_path(const char *project)
 	 */
 	char *key = astrcat(project, CONFIG_PROJ_CONFIG_PATH);
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_CONFIG_PATH);
+	free (key);
+    }
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_init_key(const char *project, int num)
+{
+    const char *ret = DEFAULT_CONFIG_PROJ_INITVAR;
+
+    assert(config_opts);
+    assert(project);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key;
+	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITVAR, num);
+	if (-1 == retval)
+	{
+	    perror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITVAR);
+	free (key);
+    }
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_init_value(const char *project, int num)
+{
+    const char *ret = DEFAULT_CONFIG_PROJ_INITDATA;
+
+    assert(config_opts);
+    assert(project);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key;
+	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITDATA, num);
+	if (-1 == retval)
+	{
+	    perror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITDATA);
 	free (key);
     }
 
