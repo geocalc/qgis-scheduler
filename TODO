@@ -29,3 +29,5 @@
 
 + create a whole fcgi session from input data in one function call, so we do not care about 16bit message sizes
 
++ add include= key to config file, to include a whole subdirectory of files. Better administration when adding projects to the configuration
+
