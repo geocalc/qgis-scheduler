@@ -1290,8 +1290,16 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
     WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
     message->contentLength = len;
     if (len>0)
-	message->content = memcpy(malloc(len), parameter, len);
-#warning check malloc
+    {
+	message->content = malloc(len);
+	if ( !message->content )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	memcpy(message->content, parameter, len);
+    }
     message->parse_header_done = 1;
     message->parse_done = 1;
 
@@ -1315,8 +1323,16 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
     WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
     message->contentLength = len;
     if (len>0)
-	message->content = memcpy(malloc(len), stdindata, len);
-#warning check malloc
+    {
+	message->content = malloc(len);
+	if ( !message->content )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	memcpy(message->content, stdindata, len);
+    }
     message->parse_header_done = 1;
     message->parse_done = 1;
 
@@ -1340,8 +1356,16 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
     WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
     message->contentLength = len;
     if (len>0)
-	message->content = memcpy(malloc(len), data, len);
-#warning check malloc
+    {
+	message->content = malloc(len);
+	if ( !message->content )
+	{
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	memcpy(message->content, data, len);
+    }
     message->parse_header_done = 1;
     message->parse_done = 1;
 
