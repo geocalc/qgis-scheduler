@@ -33,6 +33,7 @@
 #include "fcgi_state.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -355,6 +356,84 @@ const char *fcgi_param_list_find(struct fcgi_param_list_s *paramlist, const char
     }
 
     return value;
+}
+
+
+int fcgi_param_list_write(char *buffer, int len, const char *name, const char *value)
+{
+    assert(buffer);
+    assert(len>=0);
+    assert(name);
+    assert(value);
+
+    char *origbuffer = buffer;
+
+    int byteswritten = 0;
+
+
+    int namelen = strlen(name);
+    if (namelen > INT8_MAX)
+    {
+	if (len < (namelen + 4))
+	    return -1;
+	int namelen_copy = namelen;
+	buffer[3] = namelen_copy & 0xff;
+	namelen_copy>>=8;
+	buffer[2] = namelen_copy & 0xff;
+	namelen_copy>>=8;
+	buffer[1] = namelen_copy & 0xff;
+	namelen_copy>>=8;
+	buffer[0] = (namelen_copy & 0x7f) | 0x80 ; // leading bit set indicates 32bit number
+
+	buffer += 4;
+	len -= 4;
+    }
+    else
+    {
+	if (len < (namelen + 1))
+	    return -1;
+	buffer[0] = namelen & 0x7f; // leading bit missing indicates 8bit number
+	buffer++;
+	len--;
+    }
+
+
+    int datalen = strlen(value);
+    if (datalen > INT8_MAX)
+    {
+	if (len < (namelen+ datalen + 4))
+	    return -1;
+	int datalen_copy = datalen;
+	buffer[3] = datalen_copy & 0xff;
+	datalen_copy>>=8;
+	buffer[2] = datalen_copy & 0xff;
+	datalen_copy>>=8;
+	buffer[1] = datalen_copy & 0xff;
+	datalen_copy>>=8;
+	buffer[0] = (datalen_copy & 0x7f) | 0x80 ; // leading bit set indicates 32bit number
+
+	buffer += 4;
+	len -= 4;
+    }
+    else
+    {
+	if (len < (namelen+ datalen + 1))
+	    return -1;
+	buffer[0] = datalen & 0x7f; // leading bit missing indicates 8bit number
+	buffer++;
+	len--;
+    }
+
+    assert(len > namelen);
+    memcpy(buffer, name, namelen);
+    buffer += namelen;
+    len -= namelen;
+    assert(len > datalen);
+    memcpy(buffer, value, datalen);
+
+    byteswritten = buffer - origbuffer + datalen;
+
+    return byteswritten;
 }
 
 
@@ -1166,6 +1245,110 @@ enum fcgi_session_state_e fcgi_session_get_state(const struct fcgi_session_s *se
 }
 
 
+struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role, unsigned char flags)
+{
+    struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    message->message.header.version = FCGI_VERSION_1;
+    message->message.header.type = FCGI_BEGIN_REQUEST;
+    WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
+    WRITE_FCGI_NUMBER16(message->message.header.contentLength, sizeof(message->message.beginrequestbody));
+    WRITE_FCGI_NUMBER16(message->message.beginrequestbody.role, role);
+    message->message.beginrequestbody.flags = flags;
+
+    message->contentLength = sizeof(message->message.beginrequestbody);
+    message->parse_header_done = 1;
+    message->parse_done = 1;
+
+    return message;
+}
+
+
+struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char *parameter, uint16_t len)
+{
+    assert(requestId>0);
+    assert(parameter);
+    assert(len>=0);
+
+    struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    message->message.header.version = FCGI_VERSION_1;
+    message->message.header.type = FCGI_PARAMS;
+    WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
+    WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
+    message->contentLength = len;
+    if (len>0)
+	message->content = memcpy(malloc(len), parameter, len);
+#warning check malloc
+    message->parse_header_done = 1;
+    message->parse_done = 1;
+
+    return message;
+}
+
+
+struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *stdindata, uint16_t len)
+{
+    struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    message->message.header.version = FCGI_VERSION_1;
+    message->message.header.type = FCGI_STDIN;
+    WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
+    WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
+    message->contentLength = len;
+    if (len>0)
+	message->content = memcpy(malloc(len), stdindata, len);
+#warning check malloc
+    message->parse_header_done = 1;
+    message->parse_done = 1;
+
+    return message;
+}
+
+
+struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *data, uint16_t len)
+{
+    struct fcgi_message_s *message = calloc(1, sizeof(*message));
+    assert(message);
+    if ( !message )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    message->message.header.version = FCGI_VERSION_1;
+    message->message.header.type = FCGI_STDIN;
+    WRITE_FCGI_NUMBER16(message->message.header.requestId, requestId);
+    WRITE_FCGI_NUMBER16(message->message.header.contentLength, len);
+    message->contentLength = len;
+    if (len>0)
+	message->content = memcpy(malloc(len), data, len);
+#warning check malloc
+    message->parse_header_done = 1;
+    message->parse_done = 1;
+
+    return message;
+}
+
+
 struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus)
 {
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
@@ -1183,6 +1366,7 @@ struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t 
     WRITE_FCGI_NUMBER32(message->message.endrequestbody.appStatus, appStatus);
     message->message.endrequestbody.protocolStatus = protocolStatus;
 
+    message->contentLength = sizeof(message->message.endrequestbody);
     message->parse_header_done = 1;
     message->parse_done = 1;
 

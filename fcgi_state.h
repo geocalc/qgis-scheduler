@@ -99,7 +99,14 @@ int fcgi_message_set_flag(struct fcgi_message_s *message, unsigned char flags);
 int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message_s *message);
 
 /* construct a message */
+struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role, unsigned char flags);
+struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char *parameter, uint16_t len);
+struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *stdindata, uint16_t len);
+struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *data, uint16_t len);
 struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t appStatus, unsigned char protocolStatus);
+
+
+int fcgi_param_list_write(char *buffer, int len, const char *name, const char *value);
 
 
 #endif /* FCGI_STATE_H_ */
