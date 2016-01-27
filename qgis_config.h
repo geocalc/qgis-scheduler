@@ -53,5 +53,7 @@ const char *config_get_project_config_path(const char *project);
 const char *config_get_init_key(const char *project, int num);
 const char *config_get_init_value(const char *project, int num);
 
+void set_program_shutdown(int does_shutdown);
+int get_program_shutdown(void);
 
 #endif /* QGIS_CONFIG_H_ */

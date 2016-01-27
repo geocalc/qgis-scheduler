@@ -85,7 +85,7 @@
 
 static dictionary *config_opts = NULL;
 static pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
-
+static int does_program_shutdown = 0;
 
 /* Copy content of s1 and s2 into a new allocated string.
  * You have to free() the resulting string yourself.
@@ -751,6 +751,19 @@ const char *config_get_init_value(const char *project, int num)
 
     return ret;
 }
+
+
+void set_program_shutdown(int does_shutdown)
+{
+    does_program_shutdown = does_shutdown;
+}
+
+
+int get_program_shutdown(void)
+{
+    return does_program_shutdown;
+}
+
 
 
 

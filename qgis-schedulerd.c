@@ -1549,7 +1549,6 @@ void *thread_handle_connection(void *arg)
 }
 
 
-int do_terminate = 0;	// in process to terminate itself (=1) or not (=0)
 
 /* act on signals */
 /* TODO: sometimes the program hangs during shutdown.
@@ -1582,7 +1581,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	    qgis_process_list_remove_process(proclist, proc);
 	    qgis_process_delete(proc);
 
-	    if ( !do_terminate )
+	    if ( !get_program_shutdown() )
 	    {
 		fprintf(stderr, "restarting process\n");
 
@@ -1600,7 +1599,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
     case SIGQUIT:
 	/* termination signal, kill all child processes */
 	fprintf(stderr, "exit program\n");
-	do_terminate = 1;
+	set_program_shutdown(1);
 	break;
     }
 }
@@ -1916,7 +1915,7 @@ int main(int argc, char **argv)
 	 * If this expectation does not fulfill we have to look for a different
 	 * design in this section.
 	 */
-	if ( do_terminate )
+	if ( get_program_shutdown() )
 	{
 	    /* On the first run send all child processes the TERM signal,
 	     * then wait for the processes to exit normally. During this
