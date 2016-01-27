@@ -67,7 +67,6 @@ struct thread_init_new_child_args
 
 struct thread_start_new_child_args
 {
-//    struct qgis_process_list_s *list; // TODO: remove this!!
     struct qgis_project_s *project;
 };
 
@@ -439,11 +438,9 @@ void *thread_start_new_child(void *arg)
 {
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
-//    struct qgis_process_list_s *proclist = tinfo->list;
     struct qgis_project_s *project = tinfo->project;
     const char *project_name = qgis_project_get_name(project);
     const char *command = config_get_process( project_name );
-//    const char *args = config_get_process_args( NULL );
 
     fprintf(stderr, "start new child process\n");
 
@@ -568,8 +565,7 @@ void *thread_start_new_child(void *arg)
 	 * fork
 	 * exec
 	 */
-	// TODO: change "NULL" to real project name
-	int ret = chdir(config_get_working_directory(NULL));
+	int ret = chdir(config_get_working_directory(project));
 	if (-1 == ret)
 	{
 	    perror("error calling chdir");
@@ -582,8 +578,6 @@ void *thread_start_new_child(void *arg)
 	    perror("error calling dup2");
 	    exit(EXIT_FAILURE);
 	}
-//	const char *command = iniparser_getstring(ini, CGI_PATH_KEY,
-//		CGI_PATH_KEY_DEFAULT);
 
 
 	/* close all file descriptors different from 0. The fd different from
@@ -604,10 +598,7 @@ void *thread_start_new_child(void *arg)
     {
 	/* parent */
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
-//	if (project)
-	    qgis_project_add_process(project, childproc);
-//	else // TODO remove this!!
-//	    qgis_process_list_add_process(proclist, childproc);
+	qgis_project_add_process(project, childproc);
 
 	/* NOTE: aside from the general rule
 	 * "malloc() and free() within the same function"
@@ -624,6 +615,7 @@ void *thread_start_new_child(void *arg)
 	targs->proc = childproc;
 	targs->project_name = project_name;
 
+	// TODO: move start and init threads to functions, call both with one thread, wait for init phase during scheduler startup.
 	pthread_t thread;
 	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
 	if (retval)
@@ -647,112 +639,53 @@ void *thread_start_new_child(void *arg)
 
 void start_new_process_wait(int num, struct qgis_project_s *project)
 {
-    /* NOTE: aside from the general rule
-     * "malloc() and free() within the same function"
-     * we transfer the responsibility for this info memory
-     * to the thread itself.
-     */
-    /* Start the process creation thread in detached state because
-     * we do not want to wait for it. Different from the handling
-     * during the program startup there is no join() waiting for
-     * the end of the thread and collecting its resources.
-     */
     pthread_t threads[num];
     int i;
     int retval;
-//    pthread_attr_t thread_attr;
 
-//    int retval = pthread_attr_init(&thread_attr);
-//    if (retval)
-//    {
-//	errno = retval;
-//	perror("error: pthread_attr_init");
-//	exit(EXIT_FAILURE);
-//    }
-//    retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
-//    if (retval)
-//    {
-//	errno = retval;
-//	perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
-//	exit(EXIT_FAILURE);
-//    }
+    /* start all thread in parallel */
     for (i=0; i<num; i++)
     {
-	    /* NOTE: aside from the general rule
-	     * "malloc() and free() within the same function"
-	     * we transfer the responsibility for this memory
-	     * to the thread itself.
-	     */
-	    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-	    assert(targs);
-	    if ( !targs )
-	    {
-		perror("could not allocate memory");
-		exit(EXIT_FAILURE);
-	    }
-//	    targs->list = proclist;
-	    targs->project = project;
-
-	    retval = pthread_create(&threads[i], NULL, thread_start_new_child, targs);
-	    if (retval)
-	    {
-		errno = retval;
-		perror("error creating thread");
-		exit(EXIT_FAILURE);
-	    }
-	}
-	for (i=0; i<num; i++)
+	/* NOTE: aside from the general rule
+	 * "malloc() and free() within the same function"
+	 * we transfer the responsibility for this memory
+	 * to the thread itself.
+	 */
+	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+	assert(targs);
+	if ( !targs )
 	{
-	    retval = pthread_join(threads[i], NULL);
-	    if (retval)
-	    {
-		errno = retval;
-		perror("error joining thread");
-		exit(EXIT_FAILURE);
-	    }
+	    perror("could not allocate memory");
+	    exit(EXIT_FAILURE);
 	}
-//	/* NOTE: aside from the general rule
-//	 * "malloc() and free() within the same function"
-//	 * we transfer the responsibility for this memory
-//	 * to the thread itself.
-//	 */
-//	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-//	assert(targs);
-//	if ( !targs )
-//	{
-//	    perror("could not allocate memory");
-//	    exit(EXIT_FAILURE);
-//	}
-////	targs->list = proclist;
-//	targs->list = qgis_project_get_process_list(project);
-//	targs->project = project;
-//
-//	int retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);
-//	if (retval)
-//	{
-//	    errno = retval;
-//	    perror("error: pthread_create");
-//	    exit(EXIT_FAILURE);
-//	}
+	targs->project = project;
 
-//    retval = pthread_attr_destroy(&thread_attr);
-//    if (retval)
-//    {
-//	errno = retval;
-//	perror("error: pthread_attr_destroy");
-//	exit(EXIT_FAILURE);
-//    }
+	retval = pthread_create(&threads[i], NULL, thread_start_new_child, targs);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error creating thread");
+	    exit(EXIT_FAILURE);
+	}
+    }
+    /* wait for those threads */
+    for (i=0; i<num; i++)
+    {
+	retval = pthread_join(threads[i], NULL);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error joining thread");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
 }
 
 
 
 void start_new_process_detached(int num, struct qgis_project_s *project)
 {
-    /* NOTE: aside from the general rule
-     * "malloc() and free() within the same function"
-     * we transfer the responsibility for this info memory
-     * to the thread itself.
-     */
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
      * during the program startup there is no join() waiting for
@@ -789,8 +722,6 @@ void start_new_process_detached(int num, struct qgis_project_s *project)
 	    perror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-//	targs->list = proclist;
-//	targs->list = qgis_project_get_process_list(project);
 	targs->project = project;
 
 	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);

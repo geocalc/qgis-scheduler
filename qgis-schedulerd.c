@@ -158,7 +158,6 @@ struct thread_connection_handler_args
 
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 1;
-//static const char DEFAULT_CONFIG_PATH[] = "/etc/qgis-scheduler/qgis-scheduler.conf";
 static const int daemon_no_change_dir = 0;
 static const int daemon_no_close_streams = 1;
 
@@ -218,8 +217,6 @@ void remove_pid_file(const char *path)
 
 
 
-const char *command = NULL;
-//struct qgis_process_list_s *proclist = NULL;
 struct qgis_project_list_s *projectlist = NULL;
 
 void *thread_handle_connection(void *arg)
@@ -1087,13 +1084,6 @@ int main(int argc, char **argv)
 	}
     }
 
-//    if (optind >= argc)
-//    {
-//	printf("error: missing command\n");
-//	usage(argv[0]);
-//	return EXIT_FAILURE;
-//    }
-//    command = argv[optind++];
 
 
     int retval = config_load(config_path);
@@ -1102,8 +1092,6 @@ int main(int argc, char **argv)
 	perror("can not load config file");
 	exit(EXIT_FAILURE);
     }
-
-
 
 
 
@@ -1270,50 +1258,10 @@ int main(int argc, char **argv)
 	    const char *configpath = config_get_project_config_path(projname);
 	    struct qgis_project_s *project = qgis_project_new(projname, configpath);
 
-	    {
-//		int k;
-		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
+	    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
+	    // TODO: start one thread for each project in parallel, starting multiple processes, join all project threads
+	    start_new_process_wait(nr_of_childs_during_startup, project);
 
-		start_new_process_wait(nr_of_childs_during_startup, project);
-
-//		struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-//		pthread_t threads[nr_of_childs_during_startup];
-//		for (k=0; k<nr_of_childs_during_startup; k++)
-//		{
-//		    /* NOTE: aside from the general rule
-//		     * "malloc() and free() within the same function"
-//		     * we transfer the responsibility for this memory
-//		     * to the thread itself.
-//		     */
-//		    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-//		    assert(targs);
-//		    if ( !targs )
-//		    {
-//			perror("could not allocate memory");
-//			exit(EXIT_FAILURE);
-//		    }
-//		    targs->list = proclist;
-//		    targs->project = project;
-//
-//		    retval = pthread_create(&threads[k], NULL, thread_start_new_child, targs);
-//		    if (retval)
-//		    {
-//			errno = retval;
-//			perror("error creating thread");
-//			exit(EXIT_FAILURE);
-//		    }
-//		}
-//		for (k=0; k<nr_of_childs_during_startup; k++)
-//		{
-//		    retval = pthread_join(threads[k], NULL);
-//		    if (retval)
-//		    {
-//			errno = retval;
-//			perror("error joining thread");
-//			exit(EXIT_FAILURE);
-//		    }
-//		}
-	    }
 	    qgis_proj_list_add_project(projectlist, project);
 
 	}
