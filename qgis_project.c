@@ -60,32 +60,32 @@ struct qgis_project_s
  * The required number may be the number of processes from the old list
  * or the configuration parameter for minimal free idle processes.
  */
-static void qgis_project_restart_processes(struct qgis_project_s *proj)
-{
-    assert(proj);
-
-    int retval = pthread_rwlock_wrlock(&proj->rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error acquire read-write lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if ( !proj->shutdownproclist )
-	proj->shutdownproclist = qgis_process_list_new();
-
-    qgis_process_list_transfer_all_process(proj->shutdownproclist, proj->proclist);
-
-    retval = pthread_rwlock_unlock(&proj->rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error unlock read-write lock");
-	exit(EXIT_FAILURE);
-    }
-
-}
+//static void qgis_project_restart_processes(struct qgis_project_s *proj)
+//{
+//    assert(proj);
+//
+//    int retval = pthread_rwlock_wrlock(&proj->rwlock);
+//    if (retval)
+//    {
+//	errno = retval;
+//	perror("error acquire read-write lock");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//    if ( !proj->shutdownproclist )
+//	proj->shutdownproclist = qgis_process_list_new();
+//
+//    qgis_process_list_transfer_all_process(proj->shutdownproclist, proj->proclist);
+//
+//    retval = pthread_rwlock_unlock(&proj->rwlock);
+//    if (retval)
+//    {
+//	errno = retval;
+//	perror("error unlock read-write lock");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//}
 
 
 
@@ -94,11 +94,11 @@ static void qgis_project_restart_processes(struct qgis_project_s *proj)
 /* watches changes in the configuration file.
  * uses inotify.
  */
-static void *thread_watch_config(void *arg)
-{
-
-    return NULL;
-}
+//static void *thread_watch_config(void *arg)
+//{
+//
+//    return NULL;
+//}
 
 
 
