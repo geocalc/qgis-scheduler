@@ -244,7 +244,7 @@ void *thread_init_new_child(void *arg)
     socklen_t sockaddrlen = sizeof(sockaddr);
     int childunixsocketfd = qgis_process_get_socketfd(childproc);
 
-    retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
+    retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
 	perror("error retrieving the name of child process socket");
@@ -260,7 +260,7 @@ void *thread_init_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
     childunixsocketfd = retval;	// refers to the socket this program connects to the child process
-    retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
+    retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
 	perror("error: can not connect to child process");
@@ -528,7 +528,7 @@ void *thread_start_new_child(void *arg)
 	    exit(EXIT_FAILURE);
 	}
 
-	retval = bind(childsocket, &childsockaddr, sizeof(childsockaddr));
+	retval = bind(childsocket, (struct sockaddr *)&childsockaddr, sizeof(childsockaddr));
 	if (-1 == retval)
 	{
 	    if (EADDRINUSE==errno)
