@@ -54,6 +54,7 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 //int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
 //int qgis_project_shutdown_all_process(struct qgis_project_s *proj);
 
+void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid);
 
 
 

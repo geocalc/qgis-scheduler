@@ -39,6 +39,7 @@
 #include <errno.h>
 
 #include "qgis_process_list.h"
+#include "qgis_config.h"
 
 
 struct qgis_project_s
@@ -163,6 +164,64 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
     }
 
     return -1;
+}
+
+/* bad, Bad, BAD workaround.
+ * next time this function moves in here, and we get rid of this declaration
+ */
+void start_new_process_detached(int num, struct qgis_project_s *project);
+
+/* some process died and sent its pid via SIGCHLD.
+ * maybe it was listet in this project?
+ * test and remove the old entry and maybe restart anew.
+ */
+void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
+{
+    assert(proj);
+    assert(pid>0);
+
+    if (proj)
+    {
+	/* Erase the old entry. The process does not exist anymore */
+	struct qgis_process_list_s *proclist = proj->proclist;
+	assert(proclist);
+	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
+	if (proc)
+	{
+	    /* that process belongs to our active list.
+	     * restart the process if not during shutdown.
+	     */
+	    qgis_process_list_remove_process(proclist, proc);
+	    qgis_process_delete(proc);
+
+	    if ( !get_program_shutdown() )
+	    {
+		fprintf(stderr, "restarting process\n");
+
+		/* child process terminated, restart anew */
+		/* TODO: react on child processes exiting immediately.
+		 * maybe store the creation time and calculate the execution time?
+		 */
+		start_new_process_detached(1, proj);
+	    }
+	}
+	else
+	{
+	    proclist = proj->shutdownproclist;
+	    if (proclist)
+	    {
+		proc = qgis_process_list_find_process_by_pid(proclist, pid);
+		if (proc)
+		{
+		    /* that process belongs to our list of deleted processes.
+		     * just remove it from this list.
+		     */
+		    qgis_process_list_remove_process(proclist, proc);
+		    qgis_process_delete(proc);
+		}
+	    }
+	}
+    }
 }
 
 
