@@ -667,6 +667,7 @@ int fcgi_message_write(unsigned char *buffer, int len, const struct fcgi_message
 	else
 	{
 	    memcpy(buffer, &message->message.header, sizeof(message->message.header));
+	    buffer += sizeof(message->message.header);
 	    memcpy(buffer, message->content, written-sizeof(message->message.header));
 	}
 
