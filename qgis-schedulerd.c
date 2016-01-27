@@ -128,6 +128,10 @@
 #include "fcgi_data.h"
 #include "qgis_config.h"
 
+//#include <sys/types.h>	// für open()
+//#include <sys/stat.h>
+//#include <fcntl.h>
+
 
 #define min(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -149,6 +153,7 @@
 struct thread_init_new_child_args
 {
     struct qgis_process_s *proc;
+    const char *project_name;
 };
 
 struct thread_connection_handler_args
@@ -158,7 +163,7 @@ struct thread_connection_handler_args
 
 struct thread_start_new_child_args
 {
-    struct qgis_process_list_s *list;
+    struct qgis_process_list_s *list; // TODO: remove this!!
     struct qgis_project_s *project;
 };
 
@@ -246,7 +251,10 @@ void *thread_init_new_child(void *arg)
     struct thread_init_new_child_args *tinfo = arg;
     struct qgis_process_s *childproc = tinfo->proc;
     assert(childproc);
+    const char *projname = tinfo->project_name;
+    assert(projname);
     const pthread_t thread_id = pthread_self();
+    char *buffer ;
 
     qgis_process_set_state_init(childproc, thread_id);
 
@@ -260,8 +268,199 @@ void *thread_init_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr, "init new spawned child process\n");
+    fprintf(stderr, "init new spawned child process for project '%s'\n", projname);
 
+
+//    char debugfile[256];
+//    sprintf(debugfile, "/tmp/threadinit.%lu.dump", thread_id);
+//    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
+//    if (-1 == debugfd)
+//    {
+//	fprintf(stderr, "error can not open file '%s': ", debugfile);
+//	perror(NULL);
+//	exit(EXIT_FAILURE);
+//    }
+
+
+    /* open the socket to the child process */
+
+    struct sockaddr_un sockaddr;
+    socklen_t sockaddrlen = sizeof(sockaddr);
+    int childunixsocketfd = qgis_process_get_socketfd(childproc);
+
+    retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
+    if (-1 == retval)
+    {
+	perror("error retrieving the name of child process socket");
+	exit(EXIT_FAILURE);
+    }
+    /* leave the original child socket and create a new one on the opposite
+     * side.
+     */
+    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
+    if (-1 == retval)
+    {
+	perror("error: can not create socket to child process");
+	exit(EXIT_FAILURE);
+    }
+    childunixsocketfd = retval;	// refers to the socket this program connects to the child process
+    retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
+    if (-1 == retval)
+    {
+	perror("error: can not connect to child process");
+	exit(EXIT_FAILURE);
+    }
+
+
+
+    /* create the fcgi data and
+     * send the fcgi data to the child process
+     */
+    static const int maxbufferlen = 4096;
+    buffer = malloc(maxbufferlen);
+    assert(buffer);
+    if ( !buffer )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
+    static const int requestid = 1;
+    int len;
+    struct fcgi_message_s *message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
+    len = fcgi_message_write(buffer, maxbufferlen, message);
+    if (-1 == len)	// TODO: be more flexible if buffer too small
+    {
+	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	exit(EXIT_FAILURE);
+    }
+//    retval = write(debugfd, buffer, len);
+    retval = write(childunixsocketfd, buffer, len);
+    if (-1 == retval)
+    {
+	perror("error: can not write to child process");
+	exit(EXIT_FAILURE);
+    }
+    //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
+    fcgi_message_delete(message);
+
+    {
+	char *parambuffer = (char *)buffer;
+	int remain_len = maxbufferlen;
+
+	int i;
+	for (i=0; i<128; i++)
+	{
+	    const char *key = config_get_init_key(projname, i);
+	    if (!key)
+		break;
+	    const char *value = config_get_init_value(projname, i);
+	    if (!value)
+		break;
+	    fprintf(stderr, "Param %s=%s\n", key, value);
+
+	    retval = fcgi_param_list_write(parambuffer, remain_len, key, value);
+	    if (-1 == retval)
+	    {
+		// TODO: be more flexible if buffer too small
+		fprintf(stderr, "fcgi parameter buffer too small (%d)\n", maxbufferlen);
+		exit(EXIT_FAILURE);
+
+	    }
+
+	    parambuffer += retval;
+	    remain_len -= retval;
+
+	}
+	len = maxbufferlen - remain_len;
+
+	if (i>=128)
+	{
+	    fprintf(stderr, "fcgi parameter too many key/value pairs\n");
+	    exit(EXIT_FAILURE);
+
+	}
+    }
+
+    /* send parameter list */
+    message = fcgi_message_new_parameter(requestid, buffer, len);
+    len = fcgi_message_write(buffer, maxbufferlen, message);
+    if (-1 == len)	// TODO: be more flexible if buffer too small
+    {
+	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	exit(EXIT_FAILURE);
+    }
+//    retval = write(debugfd, buffer, len);
+    retval = write(childunixsocketfd, buffer, len);
+    if (-1 == retval)
+    {
+	perror("error: can not write to child process");
+	exit(EXIT_FAILURE);
+    }
+    fcgi_message_delete(message);
+
+    /* send empty parameter list to signal EOP */
+    message = fcgi_message_new_parameter(requestid, "", 0);
+    len = fcgi_message_write(buffer, maxbufferlen, message);
+    if (-1 == len)	// TODO: be more flexible if buffer too small
+    {
+	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	exit(EXIT_FAILURE);
+    }
+//    retval = write(debugfd, buffer, len);
+    retval = write(childunixsocketfd, buffer, len);
+    if (-1 == retval)
+    {
+	perror("error: can not write to child process");
+	exit(EXIT_FAILURE);
+    }
+    fcgi_message_delete(message);
+
+
+    message = fcgi_message_new_stdin(requestid, "", 0);
+    len = fcgi_message_write(buffer, maxbufferlen, message);
+    if (-1 == len)
+    {
+	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	exit(EXIT_FAILURE);
+    }
+//    retval = write(debugfd, buffer, len);
+    retval = write(childunixsocketfd, buffer, len);
+    if (-1 == retval)
+    {
+	perror("error: can not write to child process");
+	exit(EXIT_FAILURE);
+    }
+    // write stdin = "" twice
+//    retval = write(debugfd, buffer, len);
+    retval = write(childunixsocketfd, buffer, len);
+    if (-1 == retval)
+    {
+	perror("error: can not write to child process");
+	exit(EXIT_FAILURE);
+    }
+    fcgi_message_delete(message);
+
+
+    /* now read from socket into void until no more data
+     * we do it to make sure that the child process has completed the request
+     * and filled up its cache.
+     */
+    retval = 1;
+    while (retval>0)
+    {
+	retval = read(childunixsocketfd, buffer, maxbufferlen);
+    }
+
+
+    /* ok, we did read each and every byte from child process.
+     * now close this and set idle
+     */
+    close(childunixsocketfd);
+//    close(debugfd);
+    fprintf(stderr, "init child process for project '%s' done. waiting for input..\n", projname);
+
+    // TODO: do we need this distinction over here?
     if (childproc)
     {
 	qgis_process_set_state_idle(childproc);
@@ -271,6 +470,7 @@ void *thread_init_new_child(void *arg)
 	fprintf(stderr, "no child process found to initialize\n");
 	exit(EXIT_FAILURE);
     }
+    free(buffer);
     free(arg);
 
     return NULL;
@@ -283,7 +483,8 @@ void *thread_start_new_child(void *arg)
     struct thread_start_new_child_args *tinfo = arg;
     struct qgis_process_list_s *proclist = tinfo->list;
     struct qgis_project_s *project = tinfo->project;
-    const char *command = config_get_process( NULL );
+    const char *project_name = qgis_project_get_name(project);
+    const char *command = config_get_process( project_name );
 //    const char *args = config_get_process_args( NULL );
 
     fprintf(stderr, "start new child process\n");
@@ -432,8 +633,8 @@ void *thread_start_new_child(void *arg)
 	 * flag enabled. This way, all fds are closed during exec() call.
 	 * TODO: assign an error log file to fd 1 and 2
 	 */
-	close(1);
-	close(2);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
 
 
 	execl(command, command, NULL);
@@ -447,7 +648,7 @@ void *thread_start_new_child(void *arg)
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
 	if (project)
 	    qgis_project_add_process(project, childproc);
-	else
+	else // TODO remove this!!
 	    qgis_process_list_add_process(proclist, childproc);
 
 	/* NOTE: aside from the general rule
@@ -463,6 +664,8 @@ void *thread_start_new_child(void *arg)
 	    exit(EXIT_FAILURE);
 	}
 	targs->proc = childproc;
+	targs->project_name = project_name;
+
 	pthread_t thread;
 	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
 	if (retval)
@@ -580,6 +783,16 @@ void *thread_handle_connection(void *arg)
     }
 
     fprintf(stderr, "start a new connection thread\n");
+
+//    char debugfile[128];
+//    sprintf(debugfile, "/tmp/threadconnect.%lu.dump", thread_id);
+//    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
+//    if (-1 == debugfd)
+//    {
+//	fprintf(stderr, "error can not open file '%s': ", debugfile);
+//	perror(NULL);
+//	exit(EXIT_FAILURE);
+//    }
 
 
     /* 1) accept fcgi data from the webserver.
@@ -1240,6 +1453,7 @@ void *thread_handle_connection(void *arg)
 
 		    const char *data = fcgi_data_get_data(fcgi_data);
 		    int datalen = fcgi_data_get_datalen(fcgi_data);
+//		    retval = write(debugfd, data, datalen);
 		    int writebytes = write(childunixsocketfd, data, datalen);
 		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
@@ -1323,6 +1537,7 @@ void *thread_handle_connection(void *arg)
 	free(buffer);
 	qgis_process_set_state_idle(proc);
     }
+//    close(debugfd);
 
     /* clean up */
     fprintf(stderr, "[%ld] end connection thread\n", thread_id);
