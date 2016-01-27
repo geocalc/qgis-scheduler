@@ -565,7 +565,7 @@ void *thread_start_new_child(void *arg)
 	 * fork
 	 * exec
 	 */
-	int ret = chdir(config_get_working_directory(project));
+	int ret = chdir(config_get_working_directory(project_name));
 	if (-1 == ret)
 	{
 	    perror("error calling chdir");
