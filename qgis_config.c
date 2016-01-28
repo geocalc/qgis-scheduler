@@ -434,11 +434,10 @@ int config_get_min_idle_processes(const char *project)
 	char *key = astrcat(project, CONFIG_MIN_PROCESS);
 	ret = iniparser_getint(config_opts, key, INT32_MIN);
 	free (key);
-	if (INT32_MIN != ret)
-	    return ret;
     }
 
-    ret = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
+    if (INT32_MIN == ret)
+	ret = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
 
     retval = pthread_rwlock_unlock(&config_rwlock);
     if (retval)
@@ -479,11 +478,10 @@ int config_get_max_idle_processes(const char *project)
 	char *key = astrcat(project, CONFIG_MAX_PROCESS);
 	ret = iniparser_getint(config_opts, key, INT32_MIN);
 	free (key);
-	if (INT32_MIN != ret)
-	    return ret;
     }
 
-    ret = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
+    if (INT32_MIN == ret)
+	ret = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
 
     retval = pthread_rwlock_unlock(&config_rwlock);
     if (retval)
@@ -505,16 +503,16 @@ const char *config_get_scan_parameter_key(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error acquire read-write lock");
-	exit(EXIT_FAILURE);
-    }
-
     if (project)
     {
+	int retval = pthread_rwlock_rdlock(&config_rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
 	/* NOTE: this could be faster if we use a local char array instead of
 	 * dynamic memory. However this buffer maybe too small, to circumvent
 	 * this we need to know the string sizes before. I think it is too much
@@ -523,14 +521,15 @@ const char *config_get_scan_parameter_key(const char *project)
 	char *key = astrcat(project, CONFIG_SCAN_PARAM);
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_PARAM);
 	free (key);
-    }
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error unlock read-write lock");
-	exit(EXIT_FAILURE);
+
+	retval = pthread_rwlock_unlock(&config_rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
     }
 
     return ret;
@@ -545,16 +544,16 @@ const char *config_get_scan_parameter_regex(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error acquire read-write lock");
-	exit(EXIT_FAILURE);
-    }
-
     if (project)
     {
+	int retval = pthread_rwlock_rdlock(&config_rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
 	/* NOTE: this could be faster if we use a local char array instead of
 	 * dynamic memory. However this buffer maybe too small, to circumvent
 	 * this we need to know the string sizes before. I think it is too much
@@ -563,14 +562,15 @@ const char *config_get_scan_parameter_regex(const char *project)
 	char *key = astrcat(project, CONFIG_SCAN_REGEX);
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_SCAN_REGEX);
 	free (key);
-    }
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
-    if (retval)
-    {
-	errno = retval;
-	perror("error unlock read-write lock");
-	exit(EXIT_FAILURE);
+
+	retval = pthread_rwlock_unlock(&config_rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
     }
 
     return ret;
@@ -604,11 +604,10 @@ const char *config_get_working_directory(const char *project)
 	char *key = astrcat(project, CONFIG_CWD);
 	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
 	free (key);
-	if (INVALID_STRING != ret)
-	    return ret;
     }
 
-    ret = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
+    if (INVALID_STRING == ret)
+	ret = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
 
     retval = pthread_rwlock_unlock(&config_rwlock);
     if (retval)
