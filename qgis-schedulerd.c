@@ -1515,43 +1515,7 @@ int main(int argc, char **argv)
 		while ( projiterator )
 		{
 		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-		    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-		    int i;
-		    pid_t *pidlist = NULL;
-		    int pidlen = 0;
-		    retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
-		    for(i=0; i<pidlen; i++)
-		    {
-			pid_t pid = pidlist[i];
-			retval = kill(pid, SIGTERM);
-			if (0 > retval)
-			{
-			    switch(errno)
-			    {
-			    case ESRCH:
-				/* child process is not existent anymore.
-				 * erase it from the list of available processes
-				 */
-			    {
-				struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
-				if (myproc)
-				{
-				    qgis_process_list_remove_process(proclist, myproc);
-				    qgis_process_delete(myproc);
-				}
-			    }
-			    break;
-			    default:
-				perror("error: could not send TERM signal");
-			    }
-			}
-			else
-			{
-			    children++;
-			}
-
-		    }
-		    free(pidlist);
+		    children += qgis_project_shutdown_all_processes(project, SIGTERM);
 		}
 		qgis_proj_list_return_iterator(projectlist);
 
@@ -1569,6 +1533,7 @@ int main(int argc, char **argv)
 		     * exit immediately.
 		     */
 		    fprintf(stderr, "termination signal received, no more processes to signal, shut down\n");
+		    has_finished = 1;
 		    break;
 		}
 
@@ -1637,6 +1602,8 @@ int main(int argc, char **argv)
 	}
 
     }
+
+    /* at this point no more child processes should be running anymore */
 
     fprintf(stderr, "closing network socket\n");
     fflush(stderr);
