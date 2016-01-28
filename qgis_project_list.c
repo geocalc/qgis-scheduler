@@ -318,5 +318,26 @@ void qgis_proj_list_return_iterator(struct qgis_project_list_s *list)
 }
 
 
+/* signals a dying process. The signal has been received by the signal trap.
+ * now every project has to look, if the process is in its own process list.
+ */
+void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
+{
+    //assert(list); already done in qgis_proj_list_find_project_by_pid()
+
+    /* get array id of terminated child process */
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(list, pid);
+
+    if ( !project )
+    {
+	/* pid does not belong to our child processes ? */
+	fprintf(stderr, "pid %d does not belong to us?\n", pid);
+    }
+    else
+    {
+	fprintf(stderr, "process %d ended\n", pid);
+	qgis_project_process_died(project, pid);
+    }
+}
 
 
