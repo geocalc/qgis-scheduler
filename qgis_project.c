@@ -201,7 +201,7 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 }
 
 
-void *thread_init_new_child(void *arg)
+void thread_function_init_new_child(void *arg)
 {
     assert(arg);
     struct thread_init_new_child_args *tinfo = arg;
@@ -427,14 +427,14 @@ void *thread_init_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
     free(buffer);
-    free(arg);
+//    free(arg);
 
-    return NULL;
+//    return NULL;
 }
 
 
 
-void *thread_start_new_child(void *arg)
+struct qgis_process_s *thread_function_start_new_child(void *arg)
 {
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
@@ -600,31 +600,32 @@ void *thread_start_new_child(void *arg)
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
 	qgis_project_add_process(project, childproc);
 
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
-	 */
-	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
-	{
-	    perror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-	targs->proc = childproc;
-	targs->project_name = project_name;
+//	/* NOTE: aside from the general rule
+//	 * "malloc() and free() within the same function"
+//	 * we transfer the responsibility for this memory
+//	 * to the thread itself.
+//	 */
+//	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
+//	assert(targs);
+//	if ( !targs )
+//	{
+//	    perror("could not allocate memory");
+//	    exit(EXIT_FAILURE);
+//	}
+//	targs->proc = childproc;
+//	targs->project_name = project_name;
+//
+//	// TODO: move start and init threads to functions, call both with one thread, wait for init phase during scheduler startup.
+//	pthread_t thread;
+//	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
+//	if (retval)
+//	{
+//	    errno = retval;
+//	    perror("error creating thread");
+//	    exit(EXIT_FAILURE);
+//	}
 
-	// TODO: move start and init threads to functions, call both with one thread, wait for init phase during scheduler startup.
-	pthread_t thread;
-	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error creating thread");
-	    exit(EXIT_FAILURE);
-	}
-
+	return childproc;
     }
     else
     {
@@ -633,7 +634,24 @@ void *thread_start_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    free(arg);
+//    free(arg);
+    return NULL;
+}
+
+void *thread_start_new_child(void *arg)
+{
+    assert(arg);
+    struct thread_start_new_child_args *tinfo = arg;
+    struct thread_init_new_child_args initargs;
+
+    initargs.proc = thread_function_start_new_child(arg);
+
+    if (initargs.proc)
+    {
+	initargs.project_name = qgis_project_get_name(tinfo->project);
+	thread_function_init_new_child(&initargs);
+    }
+
     return NULL;
 }
 
