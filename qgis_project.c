@@ -652,6 +652,7 @@ void *thread_start_new_child(void *arg)
 	thread_function_init_new_child(&initargs);
     }
 
+    free(arg);
     return NULL;
 }
 
