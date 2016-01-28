@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <signal.h>
 #include <fastcgi.h>
 
 #include "qgis_process_list.h"
@@ -678,10 +679,12 @@ void start_new_process_wait(int num, struct qgis_project_s *project)
 	    perror("error creating thread");
 	    exit(EXIT_FAILURE);
 	}
+	fprintf(stderr, "[%lu] started process %lu\n", pthread_self(), threads[i]);
     }
     /* wait for those threads */
     for (i=0; i<num; i++)
     {
+	fprintf(stderr, "[%lu] join process %lu\n", pthread_self(), threads[i]);
 	retval = pthread_join(threads[i], NULL);
 	if (retval)
 	{
@@ -815,10 +818,54 @@ int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_proce
 }
 
 
-int qgis_project_shutdown_all_process(struct qgis_project_s *proj)
+/* Get a list of al processes belonging to this project and send them the kill
+ * signal "signum".
+ * return: number of processes send "signum" */
+int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum)
 {
+    assert(proj);
 
-    return -1;
+    int children = 0;
+    struct qgis_process_list_s *proclist = qgis_project_get_process_list(proj);
+    int retval;
+    int i;
+    pid_t *pidlist = NULL;
+    int pidlen = 0;
+    retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
+    for(i=0; i<pidlen; i++)
+    {
+	pid_t pid = pidlist[i];
+	retval = kill(pid, signum);
+	if (0 > retval)
+	{
+	    switch(errno)
+	    {
+	    case ESRCH:
+		/* child process is not existent anymore.
+		 * erase it from the list of available processes
+		 */
+	    {
+		struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
+		if (myproc)
+		{
+		    qgis_process_list_remove_process(proclist, myproc);
+		    qgis_process_delete(myproc);
+		}
+	    }
+	    break;
+	    default:
+		perror("error: could not send TERM signal");
+	    }
+	}
+	else
+	{
+	    children++;
+	}
+
+    }
+    free(pidlist);
+
+    return children;
 }
 
 
