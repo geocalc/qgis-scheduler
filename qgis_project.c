@@ -210,19 +210,11 @@ void thread_function_init_new_child(void *arg)
     const char *projname = tinfo->project_name;
     assert(projname);
     const pthread_t thread_id = pthread_self();
-    char *buffer ;
+    char *buffer;
+    int retval;
 
     qgis_process_set_state_init(childproc, thread_id);
 
-    /* detach myself from the main thread. Doing this to collect resources after
-     * this thread ends. Because there is no join() waiting for this thread.
-     */
-    int retval = pthread_detach(thread_id);
-    if (-1 == retval)
-    {
-	perror("error detaching thread");
-	exit(EXIT_FAILURE);
-    }
 
     fprintf(stderr, "init new spawned child process for project '%s'\n", projname);
 
