@@ -31,3 +31,5 @@
 
 + add include= key to config file, to include a whole subdirectory of files. Better administration when adding projects to the configuration
 
++ create a separate inotify watch module
+
