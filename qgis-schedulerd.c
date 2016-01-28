@@ -1029,20 +1029,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
     {
 	/* get pid of terminated child process */
 	pid_t pid = info->si_pid;
-	/* get array id of terminated child process */
-	struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-	//struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
-	//if ( !proc )
-	if ( !project )
-	{
-	    /* pid does not belong to our child processes ? */
-	    fprintf(stderr, "pid %d does not belong to us?\n", pid);
-	}
-	else
-	{
-	    fprintf(stderr, "process %d ended\n", pid);
-	    qgis_project_process_died(project, pid);
-	}
+	qgis_proj_list_process_died(projectlist, pid);
 	break;
     }
     case SIGTERM:	// fall through
