@@ -1056,6 +1056,38 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 }
 
 
+struct thread_start_project_processes_args
+{
+    struct qgis_project_s *project;
+    int num;
+};
+
+void *thread_start_project_processes(void *arg)
+{
+    assert(arg);
+    struct thread_start_project_processes_args *targ = arg;
+    struct qgis_project_s *project = targ->project;
+    int num = targ->num;
+
+    assert(project);
+    assert(num >= 0);
+    assert(projectlist);
+
+    /* start "num" processes for this project and wait for them to finish
+     * its initialization.
+     * Then add this project to the global list
+     */
+    start_new_process_wait(num, project);
+    qgis_proj_list_add_project(projectlist, project);
+
+
+    free(arg);
+    return NULL;
+}
+
+
+
+
 int main(int argc, char **argv)
 {
     int exitvalue = EXIT_SUCCESS;
@@ -1207,68 +1239,102 @@ int main(int argc, char **argv)
      * or we can kill the children if this management process got signal
      * to terminate.
      */
-    struct sigaction action;
-    action.sa_sigaction = signalaction;
-    action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
-    sigemptyset(&action.sa_mask);
-    sigaddset(&action.sa_mask, SIGCHLD);
-    sigaddset(&action.sa_mask, SIGTERM);
-    sigaddset(&action.sa_mask, SIGINT);
-    sigaddset(&action.sa_mask, SIGQUIT);
-    retval = sigaction(SIGTERM, &action, NULL);
-    if (retval)
     {
-	perror("error: can not install signal handler");
-	exit(EXIT_FAILURE);
-    }
-    retval = sigaction(SIGQUIT, &action, NULL);
-    if (retval)
-    {
-	perror("error: can not install signal handler");
-	exit(EXIT_FAILURE);
-    }
-    retval = sigaction(SIGCHLD, &action, NULL);
-    if (retval)
-    {
-	perror("error: can not install signal handler");
-	exit(EXIT_FAILURE);
-    }
-    retval = sigaction(SIGINT, &action, NULL);
-    if (retval)
-    {
-	perror("error: can not install signal handler");
-	exit(EXIT_FAILURE);
+	struct sigaction action;
+	action.sa_sigaction = signalaction;
+	action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
+	sigemptyset(&action.sa_mask);
+	sigaddset(&action.sa_mask, SIGCHLD);
+	sigaddset(&action.sa_mask, SIGTERM);
+	sigaddset(&action.sa_mask, SIGINT);
+	sigaddset(&action.sa_mask, SIGQUIT);
+	retval = sigaction(SIGTERM, &action, NULL);
+	if (retval)
+	{
+	    perror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGQUIT, &action, NULL);
+	if (retval)
+	{
+	    perror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGCHLD, &action, NULL);
+	if (retval)
+	{
+	    perror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGINT, &action, NULL);
+	if (retval)
+	{
+	    perror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
     }
 
 
     projectlist = qgis_proj_list_new();
 
-    /* start the children */
+    /* start the child processes */
     {
-	int i;
-	/* get the sections of the configuration file and start child processes
-	 * for every section in there.
+	/* do for every project:
+	 * (TODO) check every project for correct configured settings.
+	 * Start a thread for every project, which in turn starts multiple
+	 *  child processes in parallel.
+	 * Wait for the project threads to finish.
+	 * After that we accept network connections.
 	 */
+
 	int num_proj = config_get_num_projects();
-	for (i=0; i<num_proj; i++)
 	{
-	    const char *projname = config_get_name_project(i);
-	    fprintf(stderr, "found project '%s'. Startup child processes\n", projname);
+	    pthread_t threads[num_proj];
+	    int i;
+	    for (i=0; i<num_proj; i++)
+	    {
+		const char *projname = config_get_name_project(i);
+		fprintf(stderr, "found project '%s'. Startup child processes\n", projname);
 
-	    const char *configpath = config_get_project_config_path(projname);
-	    struct qgis_project_s *project = qgis_project_new(projname, configpath);
+		const char *configpath = config_get_project_config_path(projname);
+		struct qgis_project_s *project = qgis_project_new(projname, configpath);
 
-	    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
-	    // TODO: start one thread for each project in parallel, starting multiple processes, join all project threads
-	    start_new_process_wait(nr_of_childs_during_startup, project);
+		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
 
-	    qgis_proj_list_add_project(projectlist, project);
 
+		struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
+		assert(targs);
+		if ( !targs )
+		{
+		    perror("could not allocate memory");
+		    exit(EXIT_FAILURE);
+		}
+		targs->project = project;
+		targs->num = nr_of_childs_during_startup;
+
+		retval = pthread_create(&threads[i], NULL, thread_start_project_processes, targs);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error creating thread");
+		    exit(EXIT_FAILURE);
+		}
+	    }
+
+	    for (i=0; i<num_proj; i++)
+	    {
+		retval = pthread_join(threads[i], NULL);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error joining thread");
+		    exit(EXIT_FAILURE);
+		}
+	    }
 	}
-
-
-
     }
+
+
 
     /* wait for signals of child processes exiting (SIGCHLD) or to terminate
      * this program (SIGTERM, SIGINT) or clients connecting via network to
