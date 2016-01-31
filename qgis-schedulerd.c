@@ -1384,24 +1384,6 @@ int main(int argc, char **argv)
 
 	    if (has_finished_second_run)
 	    {
-		struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-		while ( projiterator )
-		{
-		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-		    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-		    struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-
-		    if ( !proc )
-		    {
-			/* all child processes did exit, we can end this */
-			exitvalue = EXIT_SUCCESS;
-			//break; // TODO: this breaks the inner loop not the outer one
-		    }
-		    else
-			break;
-		}
-		qgis_proj_list_return_iterator(projectlist);
-
 		/* if none of the child processes did terminate on timeout
 		 * we exit with failure
 		 */
@@ -1410,8 +1392,44 @@ int main(int argc, char **argv)
 		    exitvalue = EXIT_FAILURE;
 		    break;
 		}
-		// else restart the sleep() with remaining timeout
+		else
+		{
+		    fprintf(stderr, "got interrupt after sending SIGKILL. Have a look of processes running?\n");
+		    int children = 0;
+		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		    while ( projiterator )
+		    {
+			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+			struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
 
+			if ( !proc )
+			{
+			    /* all child processes did exit, we can end this */
+			    exitvalue = EXIT_SUCCESS;
+			    //break; // TODO: this breaks the inner loop not the outer one
+			}
+			else
+			{
+			    children++;
+			    break;
+			}
+		    }
+		    qgis_proj_list_return_iterator(projectlist);
+
+		    if (children)
+		    {
+			fprintf(stderr, "still found processes after sending SIGKILL\n");
+		    }
+		    else
+		    {
+			/* all child processes did exit, we can end this */
+			exitvalue = EXIT_SUCCESS;
+			has_finished = 1;
+			fprintf(stderr, "no more processes found after sending SIGKILL\n");
+		    }
+
+		}
 	    }
 	    else if (has_finished_first_run)
 	    {
@@ -1423,9 +1441,9 @@ int main(int argc, char **argv)
 		{
 		    fprintf(stderr, "timeout, sending SIGKILL to remaining processes\n");
 
-			int children = 0;
+		    int children = 0;
 
-			struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
 		    while ( projiterator )
 		    {
 			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
@@ -1475,58 +1493,58 @@ int main(int argc, char **argv)
 		    }
 		    qgis_proj_list_return_iterator(projectlist);
 
-			if (0 < children)
-			{
-			    fprintf(stderr, "termination signal timeout, sending SIGKILL to %d child processes..\n", children);
-			    timeout.tv_sec = 10;
-			    has_finished_second_run = 1;
-			}
-			else
-			{
-			    /* no more child processes found to send signal.
-			     * exit immediately.
-			     */
-			    fprintf(stderr, "termination signal timeout, shut down\n");
-			    has_finished = 1;
-			    break;
-			}
+		    if (0 < children)
+		    {
+			fprintf(stderr, "termination signal timeout, sending SIGKILL to %d child processes..\n", children);
+			timeout.tv_sec = 10;
+			has_finished_second_run = 1;
+		    }
+		    else
+		    {
+			/* no more child processes found to send signal.
+			 * exit immediately.
+			 */
+			fprintf(stderr, "termination signal timeout, shut down\n");
+			has_finished = 1;
+			break;
+		    }
 		}
 		else
 		{
+		    fprintf(stderr, "got interrupt after sending SIGTERM. Have a look of processes running?\n");
 		    int children = 0;
-			struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-			while ( projiterator )
-			{
-			    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-			    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
+		    while ( projiterator )
+		    {
+			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
+			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
 
-			    struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-			    if ( !proc )
-			    {
-			    }
-			    else
-			    {
-				children++;
-				break; // this breaks the inner loop not the outer one
-			    }
-			}
-			qgis_proj_list_return_iterator(projectlist);
-
-			if (children)
+			struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
+			if ( !proc )
 			{
-				fprintf(stderr, "still found processes after sending SIGTERM\n");
 			}
 			else
 			{
-				/* all child processes did exit, we can end this */
-				exitvalue = EXIT_SUCCESS;
-				has_finished = 1;
-				fprintf(stderr, "no more processes found after sending SIGTERM\n");
+			    children++;
+			    break; // this breaks the inner loop not the outer one
 			}
+		    }
+		    qgis_proj_list_return_iterator(projectlist);
+
+		    if (children)
+		    {
+			fprintf(stderr, "still found processes after sending SIGTERM\n");
+		    }
+		    else
+		    {
+			/* all child processes did exit, we can end this */
+			exitvalue = EXIT_SUCCESS;
+			has_finished = 1;
+			fprintf(stderr, "no more processes found after sending SIGTERM\n");
+		    }
 
 		}
 
-		// else restart the sleep() with remaining timeout
 
 	    }
 	    else
@@ -1582,7 +1600,7 @@ int main(int argc, char **argv)
 		{
 		    char hbuf[80], sbuf[10];
 		    int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
-	                       sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+			    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 		    if (ret < 0)
 		    {
 			fprintf(stderr, "error: can not convert host address: %s\n", gai_strerror(ret));
