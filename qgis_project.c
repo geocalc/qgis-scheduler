@@ -161,17 +161,6 @@ static void *thread_watch_config(void *arg)
     const char *projname = project->name;
     fprintf(stderr, "[%lu] started watcher thread for project '%s'\n", thread_id, projname);
 
-    /* detach myself from the main thread. Doing this to collect resources after
-     * this thread ends. Because there is no join() waiting for this thread.
-     */
-    int retval = pthread_detach(thread_id);
-    if (retval)
-    {
-	errno = retval;
-	perror("error detaching thread");
-	exit(EXIT_FAILURE);
-    }
-
 
     static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;
     struct inotify_event *inotifyevent = malloc(sizeof_inotifyevent);
@@ -187,11 +176,24 @@ static void *thread_watch_config(void *arg)
 	int retval = read(project->inotifyfd, inotifyevent, sizeof_inotifyevent);
 	if (-1 == retval)
 	{
-	    perror("read() inotify_event");
-	    exit(EXIT_FAILURE);
+	    switch (errno)
+	    {
+	    case EINTR:
+		/* We received an interrupt, possibly a termination signal.
+		 */
+		fprintf(stderr, "[%lu] read() inotify_event received interrupt\n", thread_id);
+		break;
+
+	    default:
+		perror("read() inotify_event");
+		exit(EXIT_FAILURE);
+		// no break needed
+	    }
 	}
+	else
+	{
 	int size_read = retval;
-	fprintf(stderr, "inotify read %d bytes, sizeof event %d, len %d\n", size_read, sizeof(*inotifyevent), inotifyevent->len);
+	fprintf(stderr, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
 
 	while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
 	{
@@ -214,16 +216,35 @@ static void *thread_watch_config(void *arg)
 		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 		break;
 
+	    case IN_IGNORED:
+		// Watch was removed. We can exit this thread
+		fprintf(stderr, "got event IN_IGNORED for project %s\n", projname );
+//		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+		if (get_program_shutdown())
+		{
+		    goto thread_watch_config_end_for_loop;
+		}
+		break;
+
 	    default:
 		fprintf(stderr, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
 		break;
 	    }
 	}
+	else
+	{
+	    fprintf(stderr, "error: got event %d for project %s, watch %d\n", inotifyevent->mask, projname, inotifyevent->wd );
+	}
 
 	size_read -= sizeof(*inotifyevent) + inotifyevent->len;
 	}
+
+	}
     }
 
+thread_watch_config_end_for_loop:
+
+    fprintf(stderr, "[%lu] shutdown watcher thread for project '%s'\n", thread_id, projname);
     free(inotifyevent);
     free(arg);
     return NULL;
@@ -298,8 +319,9 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		 * The process should be restarted if a new configuration is
 		 * available.
 		 * This may happen by editing the file in place (1), moving another
-		 * file to the same place (2), or creating the file in the
-		 * directory (3).
+		 * file to the same place (2), copying another file to the same
+		 * place (3) or creating the file in the directory (4).
+		 * Looking at the man page we get:
 		 * In case of (1) we receive the event IN_CLOSE_WRITE for the file
 		 * and the directory as well.
 		 * In case of (2) we receive the events IN_ATTRIB, IN_DELETE_SELF
@@ -307,6 +329,15 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		 * IN_MOVED_TO for the directory.
 		 * In case of (3) we receive the event IN_CLOSE_WRITE for the
 		 * directory.
+		 * In case of (4) we receive the event IN_CLOSE_WRITE for the
+		 * directory.
+		 * If the file is deleted the project may reject starting further
+		 * processes and keep the current ones to feed the network clients.
+		 *
+		 * With some tests we get:
+		 * Looking at the directory and the target file name alone we get
+		 * the event IN_CLOSE_WRITE for the case (1), (3) and (4) and the
+		 * event IN_MOVED_TO for the case (2).
 		 *
 		 * So in summary we watch the directory for changes and react on
 		 * the file name of the configuration file.
@@ -332,7 +363,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 
 		directoryname = dirname(directoryname);
 
-		retval = inotify_add_watch(proj->inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO);
+		retval = inotify_add_watch(proj->inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO|IN_IGNORED);
 		if (-1 == retval)
 		{
 		    perror("inotify_add_watch");
@@ -340,7 +371,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		}
 		proj->inotifywatchfd = retval;
 
-		proj->configbasename = basename(configpath);
+		proj->configbasename = basename((char *)configpath);
 		proj->configpath = configpath;
 
 		/* start a new thread to watch the configuration file
@@ -359,8 +390,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		}
 		targs->project = proj;
 
-		pthread_t thread;
-		retval = pthread_create(&thread, NULL, thread_watch_config, targs);
+		retval = pthread_create(&proj->config_watch_threadid, NULL, thread_watch_config, targs);
 		if (retval)
 		{
 		    errno = retval;
@@ -385,19 +415,34 @@ void qgis_project_delete(struct qgis_project_s *proj)
 {
     if (proj)
     {
+	fprintf(stderr, "deleting project '%s'\n", proj->name);
 	if (proj->inotifyfd)
 	{
+	    fprintf(stderr, "found inotify fd for project '%s'\n", proj->name);
 	    int retval;
 	    if (proj->inotifywatchfd)
 	    {
+		fprintf(stderr, "removing inotify watch for project '%s'\n", proj->name);
 		retval = inotify_rm_watch(proj->inotifyfd, proj->inotifywatchfd);
 		if (-1 == retval)
 		{
 		    perror("inotify_rm_watch");
 		    // no exit on purpose
 		}
+
+		// if we have a valid inotify watch fd, then there must be a watcher thread?
+		assert(proj->config_watch_threadid);
+		fprintf(stderr, "[%lu] join process %lu\n", pthread_self(), proj->config_watch_threadid);
+		int retval = pthread_join(proj->config_watch_threadid, NULL);
+		if (retval)
+		{
+		    errno = retval;
+		    perror("error joining thread");
+		    exit(EXIT_FAILURE);
+		}
 	    }
 
+	    fprintf(stderr, "close inotify fd for project '%s'\n", proj->name);
 	    close(proj->inotifyfd);
 	}
 
