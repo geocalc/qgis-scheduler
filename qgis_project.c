@@ -53,6 +53,10 @@
 #include "fcgi_state.h"
 
 
+//#define DISABLED_INIT
+
+
+
 struct qgis_project_s
 {
     struct qgis_process_list_s *proclist;	// list of processes which handle fcgi requests
@@ -870,12 +874,15 @@ void *thread_start_new_child(void *arg)
     struct thread_init_new_child_args initargs;
 
     initargs.proc = thread_function_start_new_child(arg);
-
+#ifdef DISABLED_INIT
+#warning disabled init phase
+#else
     if (initargs.proc)
     {
 	initargs.project_name = qgis_project_get_name(tinfo->project);
 	thread_function_init_new_child(&initargs);
     }
+#endif
 
     free(arg);
     return NULL;
