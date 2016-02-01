@@ -35,3 +35,5 @@
 
 + disable initialization if no init data is configured
 
++ establish a separate logger thread, which listens on pipe for log data, and writes it to log file or stderr. thread should be detached and killed at the very end of the program. stdout and stderr should be dup()ed to a new handler, then pipe write fd should be dup()ed to stdout and stderr
+
