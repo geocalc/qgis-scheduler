@@ -1033,15 +1033,15 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
     int retval;
     struct signal_data_s sigdata;
     sigdata.signal = signal;
+    sigdata.pid = info->si_pid;
     fprintf(stderr, "got signal %d from pid %d\n", signal, info->si_pid);
     switch (signal)
     {
-    case SIGCHLD:
-    {
-	/* get pid of terminated child process */
-	pid_t pid = info->si_pid;
-	qgis_proj_list_process_died(projectlist, pid);
-	sigdata.pid = pid;
+    case SIGCHLD:	// fall through
+    case SIGTERM:	// fall through
+    case SIGINT:	// fall through
+    case SIGQUIT:
+	/* write signal to main thread */
 	assert(signalpipe_wr >= 0);
 	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
 	if (-1 == retval)
@@ -1051,22 +1051,9 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	}
 	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
 	break;
-    }
-    case SIGTERM:	// fall through
-    case SIGINT:
-    case SIGQUIT:
-	/* termination signal, kill all child processes */
-	fprintf(stderr, "exit program\n");
-	set_program_shutdown(1);
-	sigdata.pid = 0;
-	assert(signalpipe_wr >= 0);
-	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
-	if (-1 == retval)
-	{
-	    perror("write signal data");
-	    exit(EXIT_FAILURE);
-	}
-	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
+
+    default:
+	fprintf(stderr, "Huh? Got unexpected signal %d. Ignored\n", signal);
 	break;
     }
 }
@@ -1438,7 +1425,6 @@ int main(int argc, char **argv)
 	    if (is_readable_signalpipe)
 	    {
 		/* signal has been send to this thread */
-#warning feed me!
 		struct signal_data_s sigdata;
 		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
 		if (-1 == retval)
@@ -1449,6 +1435,25 @@ int main(int argc, char **argv)
 		else
 		{
 		    fprintf(stderr, "-- read %d bytes, got signal %d, child %d\n", retval, sigdata.signal, sigdata.pid);
+
+		    /* react on signals */
+		    switch (sigdata.signal)
+		    {
+		    case SIGCHLD:
+		    {
+			/* child process died, rearrange the project list */
+			qgis_proj_list_process_died(projectlist, sigdata.pid);
+			break;
+		    }
+		    case SIGTERM:	// fall through
+		    case SIGINT:
+		    case SIGQUIT:
+			/* termination signal, kill all child processes */
+			fprintf(stderr, "exit program\n");
+			set_program_shutdown(1);
+			break;
+		    }
+
 		}
 
 		is_readable_signalpipe = 0;
