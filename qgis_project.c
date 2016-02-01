@@ -982,8 +982,12 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
     }
 
     if (do_exchange_processes)
-	qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
-    qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
+    {
+	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
+	fprintf(stderr, "project '%s' moved %d processes from active list to shutdown list\n", project->name, retval);
+    }
+    retval = qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
+    fprintf(stderr, "project '%s' moved %d processes from init list to active list\n", project->name, retval);
 
     retval = pthread_rwlock_unlock(&project->rwlock);
     if (retval)
