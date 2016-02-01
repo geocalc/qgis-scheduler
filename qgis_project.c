@@ -293,7 +293,9 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	perror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
+    proj->initproclist = qgis_process_list_new();
     proj->activeproclist = qgis_process_list_new();
+    proj->shutdownproclist = qgis_process_list_new();
     proj->name = name;
 
     int retval = pthread_rwlock_init(&proj->rwlock, NULL);
@@ -472,7 +474,9 @@ void qgis_project_delete(struct qgis_project_s *proj)
 	    close(proj->inotifyfd);
 	}
 
+	qgis_process_list_delete(proj->initproclist);
 	qgis_process_list_delete(proj->activeproclist);
+	qgis_process_list_delete(proj->shutdownproclist);
 	free(proj);
     }
 }
@@ -482,10 +486,10 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 {
     assert(proj);
     assert(proc);
-    assert(proj->activeproclist);
-    if (proj && proj->activeproclist && proc)
+    assert(proj->initproclist);
+    if (proj && proj->initproclist && proc)
     {
-	qgis_process_list_add_process(proj->activeproclist, proc);
+	qgis_process_list_add_process(proj->initproclist, proc);
 
 	return 0;
     }
@@ -914,7 +918,13 @@ void *thread_start_new_child(void *arg)
     return NULL;
 }
 
-void start_new_process_wait(int num, struct qgis_project_s *project)
+/* starts "num" new child processes synchronously.
+ * param num: number of processes to start (num>=0)
+ * param project: project to manage them
+ * param do_exchange_processes: if true removes all active processes and replaces them with the new created ones.
+ *                              else integrate them in the list of active processes.
+ */
+void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     pthread_t threads[num];
     int i;
@@ -959,71 +969,105 @@ void start_new_process_wait(int num, struct qgis_project_s *project)
 	}
     }
 
+
+    /* move the processes from the initialization list to the active process
+     * list
+     */
+    retval = pthread_rwlock_wrlock(&project->rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (do_exchange_processes)
+	qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
+    qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
+
+    retval = pthread_rwlock_unlock(&project->rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+
 }
 
 
+struct thread_start_process_detached_args
+{
+    int num;
+    struct qgis_project_s *project;
+    int do_exchange_processes;
+};
 
-void start_new_process_detached(int num, struct qgis_project_s *project)
+
+void *qgis_project_thread_start_process_detached(void *arg)
+{
+    assert(arg);
+    struct thread_start_process_detached_args *tinfo = arg;
+    pthread_t thread_id = pthread_self();
+
+    /* detach myself from the main thread. Doing this to collect resources after
+     * this thread ends. Because there is no join() waiting for this thread.
+     */
+    int retval = pthread_detach(thread_id);
+    if (retval)
+    {
+	errno = retval;
+	perror("error detaching thread");
+	exit(EXIT_FAILURE);
+    }
+
+    start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
+
+    return NULL;
+}
+
+
+/* starts a new thread in detached state, which in turn calls start_new_process_wait() */
+void start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
      * during the program startup there is no join() waiting for
      * the end of the thread and collecting its resources.
      */
+
+    /* NOTE: aside from the general rule
+     * "malloc() and free() within the same function"
+     * we transfer the responsibility for this memory
+     * to the thread itself.
+     */
+    struct thread_start_process_detached_args *targs = malloc(sizeof(*targs));
+    assert(targs);
+    if ( !targs )
+    {
+	perror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+    targs->num = num;
+    targs->project = project;
+    targs->do_exchange_processes = do_exchange_processes;
+
     pthread_t thread;
-    pthread_attr_t thread_attr;
+    int retval = pthread_create(&thread, NULL, qgis_project_thread_start_process_detached, targs);
+    if (retval)
+    {
+	errno = retval;
+	perror("error: pthread_create");
+	exit(EXIT_FAILURE);
+    }
 
-    int retval = pthread_attr_init(&thread_attr);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_init");
-	exit(EXIT_FAILURE);
-    }
-    retval = pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_setdetachstate PTHREAD_CREATE_DETACHED");
-	exit(EXIT_FAILURE);
-    }
-    while (num-- > 0)
-    {
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
-	 */
-	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
-	{
-	    perror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-	targs->project = project;
-
-	retval = pthread_create(&thread, &thread_attr, thread_start_new_child, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    perror("error: pthread_create");
-	    exit(EXIT_FAILURE);
-	}
-    }
-    retval = pthread_attr_destroy(&thread_attr);
-    if (retval)
-    {
-	errno = retval;
-	perror("error: pthread_attr_destroy");
-	exit(EXIT_FAILURE);
-    }
 }
 
 
 
 /* some process died and sent its pid via SIGCHLD.
- * maybe it was listet in this project?
+ * maybe it was listed in this project?
  * test and remove the old entry and maybe restart anew.
  */
 void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
@@ -1053,7 +1097,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		start_new_process_detached(1, proj);
+		start_new_process_detached(1, proj, 0);
 	    }
 	}
 	else
@@ -1076,11 +1120,11 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 }
 
 
-int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc)
-{
-
-    return -1;
-}
+//int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc)
+//{
+//
+//    return -1;
+//}
 
 
 /* Get a list of al processes belonging to this project and send them the kill
