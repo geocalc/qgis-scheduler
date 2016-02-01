@@ -1049,6 +1049,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	    perror("write signal data");
 	    exit(EXIT_FAILURE);
 	}
+	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
 	break;
     }
     case SIGTERM:	// fall through
@@ -1065,6 +1066,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	    perror("write signal data");
 	    exit(EXIT_FAILURE);
 	}
+	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
 	break;
     }
 }
@@ -1269,6 +1271,10 @@ int main(int argc, char **argv)
 
 	struct sigaction action;
 	action.sa_sigaction = signalaction;
+	/* note: according to man page sigaction (2) in environments
+	 * different from linux the SIGCHLD signal may not be delivered
+	 * if SA_NOCLDWAIT is set and the child process ends.
+	 */
 	action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
 	sigemptyset(&action.sa_mask);
 	sigaddset(&action.sa_mask, SIGCHLD);
@@ -1415,10 +1421,98 @@ int main(int argc, char **argv)
 	    }
 	}
 
-	if (FD_ISSET(serversocketfd, &rfds))
-	    is_readable_serversocket = 1;
-	if (FD_ISSET(signalpipe_rd, &rfds))
-	    is_readable_signalpipe = 1;
+
+	if (retval > 0)
+	{
+	    if (FD_ISSET(serversocketfd, &rfds))
+	    {
+		is_readable_serversocket = 1;
+		fprintf(stderr, "can read from network socket\n");
+	    }
+	    if (FD_ISSET(signalpipe_rd, &rfds))
+	    {
+		is_readable_signalpipe = 1;
+		fprintf(stderr, "can read from pipe\n");
+	    }
+
+	    if (is_readable_signalpipe)
+	    {
+		/* signal has been send to this thread */
+#warning feed me!
+		struct signal_data_s sigdata;
+		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
+		if (-1 == retval)
+		{
+		    perror("error: reading signal data");
+		    exit(EXIT_FAILURE);
+		}
+		else
+		{
+		    fprintf(stderr, "-- read %d bytes, got signal %d, child %d\n", retval, sigdata.signal, sigdata.pid);
+		}
+
+		is_readable_signalpipe = 0;
+	    }
+
+	    if (is_readable_serversocket)
+	    {
+		if (!get_program_shutdown())
+		{
+		    /* connection available */
+		    struct sockaddr addr;
+		    socklen_t addrlen = sizeof(addr);
+		    retval = accept(serversocketfd, &addr, &addrlen);
+		    if (-1 == retval)
+		    {
+			perror("error: calling accept");
+			exit(EXIT_FAILURE);
+		    }
+		    else
+		    {
+			char hbuf[80], sbuf[10];
+			int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
+				sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+			if (ret < 0)
+			{
+			    fprintf(stderr, "error: can not convert host address: %s\n", gai_strerror(ret));
+			}
+			else
+			{
+			    fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
+			}
+
+			int networkfd = retval;
+
+
+			/* NOTE: aside from the general rule
+			 * "malloc() and free() within the same function"
+			 * we transfer the responsibility for this memory
+			 * to the thread itself.
+			 */
+			struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
+			assert(targs);
+			if ( !targs )
+			{
+			    perror("could not allocate memory");
+			    exit(EXIT_FAILURE);
+			}
+			targs->new_accepted_inet_fd = networkfd;
+
+			pthread_t thread;
+			retval = pthread_create(&thread, NULL, thread_handle_connection, targs);
+			if (retval)
+			{
+			    errno = retval;
+			    perror("error creating thread");
+			    exit(EXIT_FAILURE);
+			}
+
+		    }
+
+		    is_readable_serversocket = 0;
+		}
+	    }
+	}
 
 	/* over here I expect the main thread to continue AFTER the signal
 	 * handler has ended its thread.
@@ -1635,89 +1729,6 @@ int main(int argc, char **argv)
 
 	    }
 
-	}
-	else if (retval > 0)
-	{
-	    if (is_readable_signalpipe)
-	    {
-		/* signal has been send to this thread */
-#warning feed me!
-		struct signal_data_s sigdata;
-		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
-		if (-1 == retval)
-		{
-		    perror("error: reading signal data");
-		    exit(EXIT_FAILURE);
-		}
-		else
-		{
-		    fprintf(stderr, "got signal %d\n", sigdata.signal);
-		}
-
-		is_readable_signalpipe = 0;
-	    }
-	    if (is_readable_serversocket)
-	    {
-		if (!get_program_shutdown())
-		{
-		/* connection available */
-		struct sockaddr addr;
-		socklen_t addrlen = sizeof(addr);
-		retval = accept(serversocketfd, &addr, &addrlen);
-		if (-1 == retval)
-		{
-		    perror("error: calling accept");
-		    exit(EXIT_FAILURE);
-		}
-		else
-		{
-		    char hbuf[80], sbuf[10];
-		    int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
-			    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
-		    if (ret < 0)
-		    {
-			fprintf(stderr, "error: can not convert host address: %s\n", gai_strerror(ret));
-		    }
-		    else
-		    {
-			fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
-		    }
-
-		    int networkfd = retval;
-
-
-		    /* NOTE: aside from the general rule
-		     * "malloc() and free() within the same function"
-		     * we transfer the responsibility for this memory
-		     * to the thread itself.
-		     */
-		    struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
-		    assert(targs);
-		    if ( !targs )
-		    {
-			perror("could not allocate memory");
-			exit(EXIT_FAILURE);
-		    }
-		    targs->new_accepted_inet_fd = networkfd;
-
-		    pthread_t thread;
-		    retval = pthread_create(&thread, NULL, thread_handle_connection, targs);
-		    if (retval)
-		    {
-			errno = retval;
-			perror("error creating thread");
-			exit(EXIT_FAILURE);
-		    }
-
-		}
-
-		is_readable_serversocket = 0;
-		}
-	    }
-	}
-	else
-	{
-	    /* no further data available */
 	}
 
     }
