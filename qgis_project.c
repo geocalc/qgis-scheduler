@@ -921,6 +921,7 @@ void *thread_start_new_child(void *arg)
     initargs.proc = thread_function_start_new_child(arg);
 #ifdef DISABLED_INIT
 #warning disabled init phase
+    qgis_process_set_state_idle(initargs.proc);
 #else
     if (initargs.proc)
     {
