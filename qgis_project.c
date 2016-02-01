@@ -61,10 +61,9 @@ struct qgis_project_s
 {
     struct qgis_process_list_s *proclist;	// list of processes which handle fcgi requests
     const char *name;
-    const char *configpath;		// path to qgis config file watched for updates. note: no watch if configpath is NULL
-    const char *configbasename;
+    const char *configpath;		// full path to qgis config file watched for updates. note: no watch if configpath is NULL
+    const char *configbasename;		// only config file name without path
     pthread_t config_watch_threadid;
-    //int does_shutdown;
     struct qgis_process_list_s *shutdownproclist; // list of processes which are shut down, no need to restart them
     pthread_rwlock_t rwlock;
     int inotifyfd;
@@ -142,7 +141,26 @@ static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 //
 //}
 
+//void qgis_project_start_process_restart_thread(struct qgis_project_s *project);
 
+void qgis_project_config_change(struct qgis_project_s *project, const char *filename)
+{
+    /* this file has been changed.
+     * check if the file belongs to our projects
+     */
+    assert(project);
+    assert(filename);
+    // TODO use locks
+
+    int retval = strcmp(filename, project->configbasename);
+    if (0 == retval)
+    {
+	/* match, start new processes and then move them to idle list */
+	fprintf(stderr, "found config change in project '%s', update processes\n", project->name);
+	//qgis_project_start_process_restart_thread(project);
+    }
+
+}
 
 
 
@@ -202,18 +220,29 @@ static void *thread_watch_config(void *arg)
 		    switch(inotifyevent->mask)
 		    {
 		    case IN_CLOSE_WRITE:
+			/* The file has been written or copied to this path
+			 * Restart the processes
+			 */
 			fprintf(stderr, "got event IN_CLOSE_WRITE for project %s\n", projname );
 			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			qgis_project_config_change(project, inotifyevent->name);
 			break;
 
 		    case IN_DELETE:
+			/* The file has been erased from this path.
+			 * Don't care, just mark the service as not restartable. (or better close this project and kill child progs?)
+			 */
 			fprintf(stderr, "got event IN_DELETE for project %s\n", projname );
 			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 			break;
 
 		    case IN_MOVED_TO:
+			/* The file has been overwritten by a move to this path
+			 * Restart the processes
+			 */
 			fprintf(stderr, "got event IN_MOVED_TO for project %s\n", projname );
 			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			qgis_project_config_change(project, inotifyevent->name);
 			break;
 
 		    case IN_IGNORED:
@@ -233,7 +262,7 @@ static void *thread_watch_config(void *arg)
 		}
 		else
 		{
-		    fprintf(stderr, "error: got event %d for project %s, watch %d\n", inotifyevent->mask, projname, inotifyevent->wd );
+		    fprintf(stderr, "error: project %s, got event %d for unknown watch %d. Ignored\n", projname, inotifyevent->mask, inotifyevent->wd );
 		}
 
 		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
@@ -249,10 +278,6 @@ thread_watch_config_end_for_loop:
     free(arg);
     return NULL;
 }
-
-
-
-
 
 
 struct qgis_project_s *qgis_project_new(const char *name, const char *configpath)
@@ -452,21 +477,6 @@ void qgis_project_delete(struct qgis_project_s *proj)
 }
 
 
-//int qgis_project_add_process_list(struct qgis_project_s *proj, struct qgis_process_list_s *proclist)
-//{
-//    assert(proj);
-//    assert(proclist);
-//    if (proj && proclist)
-//    {
-//	proj->proclist = proclist;
-//
-//	return 0;
-//    }
-//
-//    return -1;
-//}
-
-
 int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s *proc)
 {
     assert(proj);
@@ -483,10 +493,9 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 }
 
 
-void thread_function_init_new_child(void *arg)
+void thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
 {
-    assert(arg);
-    struct thread_init_new_child_args *tinfo = arg;
+    assert(tinfo);
     struct qgis_process_s *childproc = tinfo->proc;
     assert(childproc);
     const char *projname = tinfo->project_name;
@@ -701,17 +710,13 @@ void thread_function_init_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
     free(buffer);
-//    free(arg);
-
-//    return NULL;
 }
 
 
 
-struct qgis_process_s *thread_function_start_new_child(void *arg)
+struct qgis_process_s *thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
 {
-    assert(arg);
-    struct thread_start_new_child_args *tinfo = arg;
+    assert(tinfo);
     struct qgis_project_s *project = tinfo->project;
     const char *project_name = qgis_project_get_name(project);
     const char *command = config_get_process( project_name );
@@ -874,31 +879,6 @@ struct qgis_process_s *thread_function_start_new_child(void *arg)
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
 	qgis_project_add_process(project, childproc);
 
-//	/* NOTE: aside from the general rule
-//	 * "malloc() and free() within the same function"
-//	 * we transfer the responsibility for this memory
-//	 * to the thread itself.
-//	 */
-//	struct thread_init_new_child_args *targs = malloc(sizeof(*targs));
-//	assert(targs);
-//	if ( !targs )
-//	{
-//	    perror("could not allocate memory");
-//	    exit(EXIT_FAILURE);
-//	}
-//	targs->proc = childproc;
-//	targs->project_name = project_name;
-//
-//	// TODO: move start and init threads to functions, call both with one thread, wait for init phase during scheduler startup.
-//	pthread_t thread;
-//	retval = pthread_create(&thread, NULL, thread_init_new_child, targs);
-//	if (retval)
-//	{
-//	    errno = retval;
-//	    perror("error creating thread");
-//	    exit(EXIT_FAILURE);
-//	}
-
 	return childproc;
     }
     else
@@ -908,7 +888,6 @@ struct qgis_process_s *thread_function_start_new_child(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-//    free(arg);
     return NULL;
 }
 
