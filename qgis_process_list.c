@@ -219,14 +219,16 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = fromlist->head.lh_first; np != NULL; np = np->entries.le_next)
+	    for (np = fromlist->head.lh_first; np != NULL; )
 	    {
+		struct qgis_process_iterator *next = np->entries.le_next;
 		if (qgis_process_get_state(np->proc) == state)
 		{
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
 		    ret++;
 		}
+		np = next;
 	    }
 
 	    retval = pthread_rwlock_unlock(&tolist->rwlock);
@@ -275,7 +277,7 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = fromlist->head.lh_first; np != NULL; np = np->entries.le_next)
+	    for (np = fromlist->head.lh_first; np != NULL; np = fromlist->head.lh_first)
 	    {
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
