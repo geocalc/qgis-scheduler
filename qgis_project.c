@@ -159,7 +159,7 @@ static void *thread_watch_config(void *arg)
 
 
     const char *projname = project->name;
-    fprintf(stderr, "[%lu] started watcher thread for project '%s', watching changes for '%s'\n", thread_id, projname, project->configpath);
+    fprintf(stderr, "[%lu] started watcher thread for project '%s', looking for changes in '%s'\n", thread_id, projname, project->configpath);
 
 
     static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;
@@ -192,52 +192,52 @@ static void *thread_watch_config(void *arg)
 	}
 	else
 	{
-	int size_read = retval;
-	fprintf(stderr, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
+	    int size_read = retval;
+	    fprintf(stderr, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
 
-	while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
-	{
-	if (inotifyevent->wd == project->inotifywatchfd)
-	{
-	    switch(inotifyevent->mask)
+	    while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
 	    {
-	    case IN_CLOSE_WRITE:
-		fprintf(stderr, "got event IN_CLOSE_WRITE for project %s\n", projname );
-		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		break;
-
-	    case IN_DELETE:
-		fprintf(stderr, "got event IN_DELETE for project %s\n", projname );
-		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		break;
-
-	    case IN_MOVED_TO:
-		fprintf(stderr, "got event IN_MOVED_TO for project %s\n", projname );
-		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		break;
-
-	    case IN_IGNORED:
-		// Watch was removed. We can exit this thread
-		fprintf(stderr, "got event IN_IGNORED for project %s\n", projname );
-//		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		if (get_program_shutdown())
+		if (inotifyevent->wd == project->inotifywatchfd)
 		{
-		    goto thread_watch_config_end_for_loop;
+		    switch(inotifyevent->mask)
+		    {
+		    case IN_CLOSE_WRITE:
+			fprintf(stderr, "got event IN_CLOSE_WRITE for project %s\n", projname );
+			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			break;
+
+		    case IN_DELETE:
+			fprintf(stderr, "got event IN_DELETE for project %s\n", projname );
+			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			break;
+
+		    case IN_MOVED_TO:
+			fprintf(stderr, "got event IN_MOVED_TO for project %s\n", projname );
+			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			break;
+
+		    case IN_IGNORED:
+			// Watch was removed. We can exit this thread
+			fprintf(stderr, "got event IN_IGNORED for project %s\n", projname );
+			//		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			if (get_program_shutdown())
+			{
+			    goto thread_watch_config_end_for_loop;
+			}
+			break;
+
+		    default:
+			fprintf(stderr, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
+			break;
+		    }
 		}
-		break;
+		else
+		{
+		    fprintf(stderr, "error: got event %d for project %s, watch %d\n", inotifyevent->mask, projname, inotifyevent->wd );
+		}
 
-	    default:
-		fprintf(stderr, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
-		break;
+		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
 	    }
-	}
-	else
-	{
-	    fprintf(stderr, "error: got event %d for project %s, watch %d\n", inotifyevent->mask, projname, inotifyevent->wd );
-	}
-
-	size_read -= sizeof(*inotifyevent) + inotifyevent->len;
-	}
 
 	}
     }
