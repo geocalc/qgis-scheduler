@@ -323,21 +323,40 @@ void qgis_proj_list_return_iterator(struct qgis_project_list_s *list)
  */
 void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
 {
-    //assert(list); already done in qgis_proj_list_find_project_by_pid()
-
-    /* get array id of terminated child process */
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(list, pid);
-
-    if ( !project )
+    assert(pid>0);
+    assert(list);
+    if (list)
     {
-	/* pid does not belong to our child processes ? */
-	fprintf(stderr, "pid %d does not belong to us?\n", pid);
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+
+	    /* every project has to look in its process lists if the pid
+	     * matches an entry.
+	     * remove the entry and in case restart the process
+	     */
+	    qgis_project_process_died(myproj, pid);
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
     }
-    else
-    {
-	fprintf(stderr, "process %d ended\n", pid);
-	qgis_project_process_died(project, pid);
-    }
+
 }
 
 

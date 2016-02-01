@@ -107,42 +107,26 @@ static unsigned int socket_id = 0;
 static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
+void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes);
 
 
-/* does restart all processes belonging to this project.
- * We move the list of processes from proclist to shutdownproclist.
- * Then we start the required number of processes and initialize them.
- * The required number may be the number of processes from the old list
- * or the configuration parameter for minimal free idle processes.
+/* restarts all processes.
+ * I.e. evaluate current number of processes for this project,
+ * start num processes, init them,
+ * atomically move the old processes to shutdown list
+ * and new processes to active list,
+ * and kill all old processes from shutdown list.
  */
-//static void qgis_project_restart_processes(struct qgis_project_s *proj)
-//{
-//    assert(proj);
-//
-//    int retval = pthread_rwlock_wrlock(&proj->rwlock);
-//    if (retval)
-//    {
-//	errno = retval;
-//	perror("error acquire read-write lock");
-//	exit(EXIT_FAILURE);
-//    }
-//
-//    if ( !proj->shutdownproclist )
-//	proj->shutdownproclist = qgis_process_list_new();
-//
-//    qgis_process_list_transfer_all_process(proj->shutdownproclist, proj->proclist);
-//
-//    retval = pthread_rwlock_unlock(&proj->rwlock);
-//    if (retval)
-//    {
-//	errno = retval;
-//	perror("error unlock read-write lock");
-//	exit(EXIT_FAILURE);
-//    }
-//
-//}
+void qgis_project_restart_processes(struct qgis_project_s *project)
+{
+    assert(project);
+    if (project)
+    {
+	int numproc = qgis_process_list_get_num_process(project->activeproclist);
+	start_new_process_wait(numproc, project, 1);
+    }
+}
 
-//void qgis_project_start_process_restart_thread(struct qgis_project_s *project);
 
 void qgis_project_config_change(struct qgis_project_s *project, const char *filename)
 {
@@ -151,14 +135,13 @@ void qgis_project_config_change(struct qgis_project_s *project, const char *file
      */
     assert(project);
     assert(filename);
-    // TODO use locks
 
     int retval = strcmp(filename, project->configbasename);
     if (0 == retval)
     {
 	/* match, start new processes and then move them to idle list */
 	fprintf(stderr, "found config change in project '%s', update processes\n", project->name);
-	//qgis_project_start_process_restart_thread(project);
+	qgis_project_restart_processes(project);
     }
 
 }
@@ -268,6 +251,7 @@ static void *thread_watch_config(void *arg)
 
 		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
 	    }
+	    assert(0 == size_read);
 
 	}
     }
@@ -985,6 +969,8 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
     {
 	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
 	fprintf(stderr, "project '%s' moved %d processes from active list to shutdown list\n", project->name, retval);
+	retval = qgis_process_list_send_signal(project->shutdownproclist, SIGTERM);
+	fprintf(stderr, "project '%s' send %d processes the TERM signal\n", project->name, retval);
     }
     retval = qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
     fprintf(stderr, "project '%s' moved %d processes from init list to active list\n", project->name, retval);
@@ -1073,6 +1059,7 @@ void start_new_process_detached(int num, struct qgis_project_s *project, int do_
 /* some process died and sent its pid via SIGCHLD.
  * maybe it was listed in this project?
  * test and remove the old entry and maybe restart anew.
+ * test all three lists initproclist, activeproclist and shutdownproclist.
  */
 void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 {
@@ -1095,7 +1082,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 
 	    if ( !get_program_shutdown() )
 	    {
-		fprintf(stderr, "restarting process\n");
+		fprintf(stderr, "project '%s' restarting process\n", proj->name);
 
 		/* child process terminated, restart anew */
 		/* TODO: react on child processes exiting immediately.
@@ -1106,17 +1093,43 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	}
 	else
 	{
-	    proclist = proj->shutdownproclist;
-	    if (proclist)
+	    proclist = proj->initproclist;
+	    assert(proclist);
+	    proc = qgis_process_list_find_process_by_pid(proclist, pid);
+	    if (proc)
 	    {
-		proc = qgis_process_list_find_process_by_pid(proclist, pid);
-		if (proc)
+		/* that process belongs to our active list.
+		 * restart the process if not during shutdown.
+		 */
+		qgis_process_list_remove_process(proclist, proc);
+		qgis_process_delete(proc);
+
+		if ( !get_program_shutdown() )
 		{
-		    /* that process belongs to our list of deleted processes.
-		     * just remove it from this list.
+		    fprintf(stderr, "project '%s' restarting process\n", proj->name);
+
+		    /* child process terminated, restart anew */
+		    /* TODO: react on child processes exiting immediately.
+		     * maybe store the creation time and calculate the execution time?
 		     */
-		    qgis_process_list_remove_process(proclist, proc);
-		    qgis_process_delete(proc);
+		    start_new_process_detached(1, proj, 0);
+		}
+	    }
+	    else
+
+	    {
+		proclist = proj->shutdownproclist;
+		if (proclist)
+		{
+		    proc = qgis_process_list_find_process_by_pid(proclist, pid);
+		    if (proc)
+		    {
+			/* that process belongs to our list of deleted processes.
+			 * just remove it from this list.
+			 */
+			qgis_process_list_remove_process(proclist, proc);
+			qgis_process_delete(proc);
+		    }
 		}
 	    }
 	}
