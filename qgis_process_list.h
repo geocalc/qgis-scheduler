@@ -56,6 +56,7 @@ struct qgis_process_iterator *qgis_process_list_get_iterator(struct qgis_process
 struct qgis_process_s *qgis_process_list_get_next_process(struct qgis_process_iterator **iterator);
 void qgis_process_list_return_iterator(struct qgis_process_list_s *list);
 int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid, int *len);
+int qgis_process_list_get_num_process(struct qgis_process_list_s *list);
 int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state);
 
 

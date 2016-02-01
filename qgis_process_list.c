@@ -610,6 +610,39 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
     return -1;
 }
 
+int qgis_process_list_get_num_process(struct qgis_process_list_s *list)
+{
+    int count = 0;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    count++;
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return count;
+}
+
 
 int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state)
 {
