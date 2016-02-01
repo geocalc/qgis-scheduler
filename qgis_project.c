@@ -159,7 +159,7 @@ static void *thread_watch_config(void *arg)
 
 
     const char *projname = project->name;
-    fprintf(stderr, "[%lu] started watcher thread for project '%s'\n", thread_id, projname);
+    fprintf(stderr, "[%lu] started watcher thread for project '%s', watching changes for '%s'\n", thread_id, projname, project->configpath);
 
 
     static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;

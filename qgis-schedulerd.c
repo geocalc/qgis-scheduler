@@ -1015,13 +1015,24 @@ void *thread_handle_connection(void *arg)
 }
 
 
+struct signal_data_s
+{
+    int signal;
+    union {
+	pid_t pid;
+    };
+};
 
 /* act on signals */
 /* TODO: sometimes the program hangs during shutdown.
  *       we receive a signal (SIGCHLD) but dont react on it?
  */
+int signalpipe_wr = -1;
 void signalaction(int signal, siginfo_t *info, void *ucontext)
 {
+    int retval;
+    struct signal_data_s sigdata;
+    sigdata.signal = signal;
     fprintf(stderr, "got signal %d from pid %d\n", signal, info->si_pid);
     switch (signal)
     {
@@ -1030,6 +1041,14 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	/* get pid of terminated child process */
 	pid_t pid = info->si_pid;
 	qgis_proj_list_process_died(projectlist, pid);
+	sigdata.pid = pid;
+	assert(signalpipe_wr >= 0);
+	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
+	if (-1 == retval)
+	{
+	    perror("write signal data");
+	    exit(EXIT_FAILURE);
+	}
 	break;
     }
     case SIGTERM:	// fall through
@@ -1038,6 +1057,14 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	/* termination signal, kill all child processes */
 	fprintf(stderr, "exit program\n");
 	set_program_shutdown(1);
+	sigdata.pid = 0;
+	assert(signalpipe_wr >= 0);
+	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
+	if (-1 == retval)
+	{
+	    perror("write signal data");
+	    exit(EXIT_FAILURE);
+	}
 	break;
     }
 }
@@ -1226,7 +1253,20 @@ int main(int argc, char **argv)
      * or we can kill the children if this management process got signal
      * to terminate.
      */
+    int signalpipe_rd;
     {
+	/* create a pipe to send signal status changes to main thread
+	 */
+	int pipes[2];
+	retval = pipe(pipes);
+	if (retval)
+	{
+	    perror("error: can not install signal pipe");
+	    exit(EXIT_FAILURE);
+	}
+	signalpipe_rd = pipes[0];
+	signalpipe_wr = pipes[1];
+
 	struct sigaction action;
 	action.sa_sigaction = signalaction;
 	action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
@@ -1329,7 +1369,7 @@ int main(int argc, char **argv)
      */
 
     fd_set rfds;
-    int maxfd = serversocketfd;
+    int maxfd = max(serversocketfd,signalpipe_rd);
     maxfd++;
 
     /* set timeout to infinite */
@@ -1341,6 +1381,8 @@ int main(int argc, char **argv)
     int has_finished_second_run = 0;
     int has_finished = 0;
     int is_readable_serversocket = 0;
+    int is_readable_signalpipe = 0;
+    fprintf(stderr, "waiting for network connection requests\n");
     while ( !has_finished )
     {
 	/* wait for connections, signals or timeout */
@@ -1351,6 +1393,8 @@ int main(int argc, char **argv)
 	FD_ZERO(&rfds);
 	if (!is_readable_serversocket)
 	    FD_SET(serversocketfd, &rfds);
+	if (!is_readable_signalpipe)
+	    FD_SET(signalpipe_rd, &rfds);
 	retval = select(maxfd, &rfds,NULL,NULL,timeout_ptr);
 	if (-1 == retval)
 	{
@@ -1373,6 +1417,8 @@ int main(int argc, char **argv)
 
 	if (FD_ISSET(serversocketfd, &rfds))
 	    is_readable_serversocket = 1;
+	if (FD_ISSET(signalpipe_rd, &rfds))
+	    is_readable_signalpipe = 1;
 
 	/* over here I expect the main thread to continue AFTER the signal
 	 * handler has ended its thread.
@@ -1592,6 +1638,24 @@ int main(int argc, char **argv)
 	}
 	else if (retval > 0)
 	{
+	    if (is_readable_signalpipe)
+	    {
+		/* signal has been send to this thread */
+#warning feed me!
+		struct signal_data_s sigdata;
+		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
+		if (-1 == retval)
+		{
+		    perror("error: reading signal data");
+		    exit(EXIT_FAILURE);
+		}
+		else
+		{
+		    fprintf(stderr, "got signal %d\n", sigdata.signal);
+		}
+
+		is_readable_signalpipe = 0;
+	    }
 	    if (is_readable_serversocket)
 	    {
 		if (!get_program_shutdown())
@@ -1674,6 +1738,8 @@ int main(int argc, char **argv)
 	}
     }
     config_shutdown();
+    close(signalpipe_rd);
+    close(signalpipe_wr);
 
     return exitvalue;
 }
