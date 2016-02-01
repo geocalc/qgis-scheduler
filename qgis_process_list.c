@@ -194,8 +194,10 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 
 
 /* moves all processes with a specific state from one list to another */
-void qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, enum qgis_process_state_e state)
+int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, enum qgis_process_state_e state)
 {
+    int ret = 0;
+
     assert(tolist);
     assert(fromlist);
     if (fromlist && tolist)
@@ -223,6 +225,7 @@ void qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_
 		{
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
+		    ret++;
 		}
 	    }
 
@@ -243,11 +246,14 @@ void qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_
 
     }
 
+    return ret;
 }
 
 
-void qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist)
+int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist)
 {
+    int ret = 0;
+
     assert(tolist);
     assert(fromlist);
     if (fromlist && tolist)
@@ -273,6 +279,7 @@ void qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, 
 	    {
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
+		    ret++;
 	    }
 
 	    retval = pthread_rwlock_unlock(&tolist->rwlock);
@@ -291,6 +298,8 @@ void qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, 
 	    }
 
     }
+
+    return ret;
 }
 
 
