@@ -1329,6 +1329,8 @@ int main(int argc, char **argv)
      */
 
     fd_set rfds;
+    int maxfd = serversocketfd;
+    maxfd++;
 
     /* set timeout to infinite */
     struct timeval timeout, *timeout_ptr = NULL;
@@ -1338,6 +1340,7 @@ int main(int argc, char **argv)
     int has_finished_first_run = 0;
     int has_finished_second_run = 0;
     int has_finished = 0;
+    int is_readable_serversocket = 0;
     while ( !has_finished )
     {
 	/* wait for connections, signals or timeout */
@@ -1346,8 +1349,9 @@ int main(int argc, char **argv)
 	 * is modified to contain the remaining time.
 	 */
 	FD_ZERO(&rfds);
-	FD_SET(serversocketfd, &rfds);
-	retval = select(serversocketfd+1, &rfds,NULL,NULL,timeout_ptr);
+	if (!is_readable_serversocket)
+	    FD_SET(serversocketfd, &rfds);
+	retval = select(maxfd, &rfds,NULL,NULL,timeout_ptr);
 	if (-1 == retval)
 	{
 	    switch (errno)
@@ -1366,6 +1370,9 @@ int main(int argc, char **argv)
 		// no break needed
 	    }
 	}
+
+	if (FD_ISSET(serversocketfd, &rfds))
+	    is_readable_serversocket = 1;
 
 	/* over here I expect the main thread to continue AFTER the signal
 	 * handler has ended its thread.
@@ -1585,9 +1592,11 @@ int main(int argc, char **argv)
 	}
 	else if (retval > 0)
 	{
-	    /* connection available */
-	    if (FD_ISSET(serversocketfd, &rfds))
+	    if (is_readable_serversocket)
 	    {
+		if (!get_program_shutdown())
+		{
+		/* connection available */
 		struct sockaddr addr;
 		socklen_t addrlen = sizeof(addr);
 		retval = accept(serversocketfd, &addr, &addrlen);
@@ -1637,6 +1646,9 @@ int main(int argc, char **argv)
 		    }
 
 		}
+
+		is_readable_serversocket = 0;
+		}
 	    }
 	}
 	else
@@ -1662,7 +1674,6 @@ int main(int argc, char **argv)
 	}
     }
     config_shutdown();
-
 
     return exitvalue;
 }
