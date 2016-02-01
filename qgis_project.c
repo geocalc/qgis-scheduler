@@ -494,7 +494,7 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 }
 
 
-void thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
+static void qgis_project_thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
 {
     assert(tinfo);
     struct qgis_process_s *childproc = tinfo->proc;
@@ -715,7 +715,7 @@ void thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
 
 
 
-struct qgis_process_s *thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
+static struct qgis_process_s *qgis_project_thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
 {
     assert(tinfo);
     struct qgis_project_s *project = tinfo->project;
@@ -898,7 +898,7 @@ void *thread_start_new_child(void *arg)
     struct thread_start_new_child_args *tinfo = arg;
     struct thread_init_new_child_args initargs;
 
-    initargs.proc = thread_function_start_new_child(arg);
+    initargs.proc = qgis_project_thread_function_start_new_child(arg);
 #ifdef DISABLED_INIT
 #warning disabled init phase
     qgis_process_set_state_idle(initargs.proc);
@@ -906,7 +906,7 @@ void *thread_start_new_child(void *arg)
     if (initargs.proc)
     {
 	initargs.project_name = qgis_project_get_name(tinfo->project);
-	thread_function_init_new_child(&initargs);
+	qgis_project_thread_function_init_new_child(&initargs);
     }
 #endif
 
