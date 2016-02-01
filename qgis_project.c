@@ -59,12 +59,13 @@
 
 struct qgis_project_s
 {
-    struct qgis_process_list_s *proclist;	// list of processes which handle fcgi requests
+    struct qgis_process_list_s *initproclist;	// list of processes which are initialized and can not be used for requests
+    struct qgis_process_list_s *activeproclist;	// list of processes which handle fcgi requests
+    struct qgis_process_list_s *shutdownproclist; // list of processes which are shut down
     const char *name;
     const char *configpath;		// full path to qgis config file watched for updates. note: no watch if configpath is NULL
     const char *configbasename;		// only config file name without path
     pthread_t config_watch_threadid;
-    struct qgis_process_list_s *shutdownproclist; // list of processes which are shut down, no need to restart them
     pthread_rwlock_t rwlock;
     int inotifyfd;
     int inotifywatchfd;
@@ -292,7 +293,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	perror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
-    proj->proclist = qgis_process_list_new();
+    proj->activeproclist = qgis_process_list_new();
     proj->name = name;
 
     int retval = pthread_rwlock_init(&proj->rwlock, NULL);
@@ -471,7 +472,7 @@ void qgis_project_delete(struct qgis_project_s *proj)
 	    close(proj->inotifyfd);
 	}
 
-	qgis_process_list_delete(proj->proclist);
+	qgis_process_list_delete(proj->activeproclist);
 	free(proj);
     }
 }
@@ -481,10 +482,10 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 {
     assert(proj);
     assert(proc);
-    assert(proj->proclist);
-    if (proj && proj->proclist && proc)
+    assert(proj->activeproclist);
+    if (proj && proj->activeproclist && proc)
     {
-	qgis_process_list_add_process(proj->proclist, proc);
+	qgis_process_list_add_process(proj->activeproclist, proc);
 
 	return 0;
     }
@@ -1033,7 +1034,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
     if (proj)
     {
 	/* Erase the old entry. The process does not exist anymore */
-	struct qgis_process_list_s *proclist = proj->proclist;
+	struct qgis_process_list_s *proclist = proj->activeproclist;
 	assert(proclist);
 	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
 	if (proc)
@@ -1140,7 +1141,7 @@ struct qgis_process_list_s *qgis_project_get_process_list(struct qgis_project_s 
     assert(proj);
     if (proj)
     {
-	list = proj->proclist;
+	list = proj->activeproclist;
     }
 
     return list;
