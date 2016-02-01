@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <sys/queue.h>
 #include <errno.h>
+#include <signal.h>
 
 
 struct qgis_process_list_s
@@ -681,6 +682,73 @@ int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list
     return count;
 }
 
+
+/* send a signal to all programs in the list
+ * side effect: removes a process from the list, if its pid is not available (process not running).
+ * return: number of processes send the signal */
+int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
+{
+    int num = 0;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_wrlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; )
+	{
+	    /* get the next entry in advance. because maybe the list order
+	     * is changed in the loop
+	     */
+	    struct qgis_process_iterator *next = np->entries.le_next;
+
+	    struct qgis_process_s *myproc = np->proc;
+	    pid_t pid = qgis_process_get_pid(myproc);
+
+	    retval = kill(pid, signal);
+	    if (0 > retval)
+	    {
+		switch(errno)
+		{
+		case ESRCH:
+		    /* child process is not existent anymore.
+		     * erase it from the list of available processes
+		     */
+		{
+		    LIST_REMOVE(np, entries);
+		    qgis_process_delete(myproc);
+		}
+		break;
+		default:
+		    perror("error: could not send TERM signal");
+		}
+	    }
+	    else
+	    {
+		num++;
+	    }
+
+	    np = next;
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    perror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return num;
+}
 
 
 
