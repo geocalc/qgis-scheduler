@@ -40,6 +40,7 @@ const char *config_get_network_listen(void);
 const char *config_get_network_port(void);
 const char *config_get_user(void);
 const char *config_get_pid_path(void);
+const char *config_get_logfile(void);
 
 
 const char *config_get_process(const char *project);

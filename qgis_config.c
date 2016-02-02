@@ -68,7 +68,8 @@
 #define DEFAULT_CONFIG_PROJ_INITVAR	NULL
 #define CONFIG_PROJ_INITDATA		":initdata"
 #define DEFAULT_CONFIG_PROJ_INITDATA	NULL
-
+#define CONFIG_LOGFILE			":logfile"
+#define DEFAULT_CONFIG_LOGFILE		NULL
 
 
 #if __WORDSIZE == 64
@@ -316,6 +317,33 @@ const char *config_get_pid_path(void)
     }
 
     return ret;
+}
+
+
+const char *config_get_logfile(void)
+{
+    assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_LOGFILE, DEFAULT_CONFIG_LOGFILE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+
 }
 
 
