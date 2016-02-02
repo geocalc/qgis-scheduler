@@ -538,7 +538,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 	perror("error: can not connect to child process");
 	exit(EXIT_FAILURE);
     }
-
+//    fprintf(stderr, "init project '%s', connected to child via socket '\\0%s'\n", projname, sockaddr.sun_path+1);
 
 
     /* create the fcgi data and
@@ -678,6 +678,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     while (retval>0)
     {
 	retval = read(childunixsocketfd, buffer, maxbufferlen);
+//	fprintf(stderr, "init project '%s' received:\n%.*s\n", projname, retval, buffer);
     }
 
 
@@ -710,7 +711,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     const char *project_name = qgis_project_get_name(project);
     const char *command = config_get_process( project_name );
 
-    fprintf(stderr, "start new child process\n");
+    fprintf(stderr, "project '%s' start new child process '%s'\n", project_name, command);
 
     if (NULL == command || 0 == strlen(command))
     {
@@ -809,6 +810,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 		exit(EXIT_FAILURE);
 	    }
 	}
+	fprintf(stderr, "start project '%s', bound socket to '\\0%s'\n", project_name, childsockaddr.sun_path+1);
 	break;
     }
 
