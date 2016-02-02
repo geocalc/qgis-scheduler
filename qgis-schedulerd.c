@@ -119,6 +119,7 @@
 #include <sys/queue.h>
 #include <fastcgi.h>
 #include <regex.h>
+#include <fcntl.h>
 
 #include "qgis_project_list.h"
 //#include "qgis_project.h"
@@ -1247,7 +1248,7 @@ int main(int argc, char **argv)
 	/* create a pipe to send signal status changes to main thread
 	 */
 	int pipes[2];
-	retval = pipe(pipes);
+	retval = pipe2(pipes, O_CLOEXEC|O_NONBLOCK);
 	if (retval)
 	{
 	    perror("error: can not install signal pipe");
