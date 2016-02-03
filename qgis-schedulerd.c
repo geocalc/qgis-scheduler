@@ -157,6 +157,7 @@ struct thread_connection_handler_args
 };
 
 
+static const char version[] = "0.5";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 1;
 static const int daemon_no_change_dir = 0;
@@ -181,11 +182,18 @@ const char *basename(const char *path)
 
 void usage(const char *argv0)
 {
-    //fprintf(stdout, "usage: %s [-h] [-d] [-c <CONFIGFILE>]\n", basename(argv0));
-    fprintf(stdout, "usage: %s [-h] [-d]\n", basename(argv0));
+    fprintf(stdout, "usage: %s [-h] [-V] [-d] [-c <CONFIGFILE>]\n", basename(argv0));
+    //fprintf(stdout, "usage: %s [-h]  [-V] [-d]\n", basename(argv0));
     fprintf(stdout, "\t-h: print this help\n");
+    fprintf(stdout, "\t-V: print version\n");
     fprintf(stdout, "\t-d: do NOT become daemon\n");
     fprintf(stdout, "\t-c: use CONFIGFILE (default '%s')\n", DEFAULT_CONFIG_PATH);
+}
+
+
+void print_version()
+{
+    fprintf(stdout, "%s\n", version);
 }
 
 
@@ -1101,7 +1109,7 @@ int main(int argc, char **argv)
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "hdc:")) != -1)
+    while ((opt = getopt(argc, argv, "hdc:V")) != -1)
     {
 	switch (opt)
 	{
@@ -1114,6 +1122,9 @@ int main(int argc, char **argv)
 	case 'c':
 	    config_path = optarg;
 	    break;
+	case 'V':
+	    print_version();
+	    return EXIT_SUCCESS;
 	default: /* '?' */
 	    usage(argv[0]);
 	    return EXIT_FAILURE;
