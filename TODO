@@ -39,4 +39,6 @@
 
 + during shutdown make a poll frequency of 1 second (instead of 10) to check for child procs already gone
 
++ be able to select file logging or syslog logging in config file
+
   
