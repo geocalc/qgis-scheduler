@@ -35,8 +35,8 @@
 
 int logger_init(int in_daemon_mode);
 void logger_stop(void);
-int printlog(const char *template, ...);
-int debug(int level, const char *template, ...);
+int printlog(const char *format, ...);
+int debug(int level, const char *format, ...);
 
 
 #endif /* LOGGER_H_ */

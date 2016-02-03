@@ -36,6 +36,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -275,6 +277,80 @@ void logger_stop(void)
 }
 
 
-int printlog(const char *template, ...);
-int debug(int level, const char *template, ...);
+int printlog(const char *format, ...)
+{
+    assert(format);
+
+    int retval = 0;
+    va_list args;
+
+    // prepend some time data before the format string
+    static const int timebuffersize = 32;
+    struct tm tm;
+    char timebuffer[timebuffersize];
+    time_t times;
+
+    time(&times);
+    localtime_r(&times, &tm);
+    strftime(timebuffer, timebuffersize, "[%F %T] ", &tm);
+    int strsize = strlen(timebuffer) + strlen(format);
+
+    {
+	// print string
+	char strbuffer[strsize+1];
+	strcpy(strbuffer, timebuffer);
+	strcat(strbuffer, format);
+
+	va_start(args, format);
+	if (-1 != new_stderr)
+	    retval = vdprintf(new_stderr, strbuffer, args);
+	else
+	    retval = vdprintf(STDERR_FILENO, strbuffer, args);
+	va_end(args);
+    }
+
+    return retval;
+}
+
+
+//int debug(int level, const char *format, ...)
+//{
+//    assert(format);
+//    assert(level>0);
+//
+//    int retval = 0;
+//    if (level <= loglevel)
+//    {
+//	va_list args;
+//
+//	// prepend some time data before the format string
+//	static const int timebuffersize = 32;
+//	struct tm tm;
+//	char timebuffer[timebuffersize];
+//	time_t times;
+//
+//	time(&times);
+//	localtime_r(&times, &tm);
+//	strftime(timebuffer, timebuffersize, "[%F %T]D ", &tm);
+//	int strsize = strlen(timebuffer) + strlen(format);
+//
+//	{
+//	    // print string
+//	    char strbuffer[strsize+1];
+//	    strcpy(strbuffer, timebuffer);
+//	    strcat(strbuffer, format);
+//
+//	    va_start(args, format);
+//	    if (-1 != new_stderr)
+//		retval = vdprintf(new_stderr, strbuffer, args);
+//	    else
+//		retval = vdprintf(STDERR_FILENO, strbuffer, args);
+//	    va_end(args);
+//	}
+//    }
+//
+//    return retval;
+//}
+
+
 
