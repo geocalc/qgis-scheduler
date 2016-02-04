@@ -28,10 +28,10 @@
 */
 
 
+#define _GNU_SOURCE
 
 #include "qgis_config.h"
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
@@ -91,6 +91,7 @@
 static dictionary *config_opts = NULL;
 static pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 static int does_program_shutdown = 0;
+static clockid_t system_clk_id = 0;
 
 /* Copy content of s1 and s2 into a new allocated string.
  * You have to free() the resulting string yourself.
@@ -820,6 +821,55 @@ int get_program_shutdown(void)
 {
     return does_program_shutdown;
 }
+
+
+/* checks which clock id can be used for a call to clock_gettime()
+ * Do this in order of CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE,
+ * CLOCK_MONOTONIC, CLOCK_REALTIME_COARSE, CLOCK_REALTIME.
+ */
+void test_set_valid_clock_id(void)
+{
+    static const clockid_t clockidarr[] = {
+	    CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC,
+	    CLOCK_REALTIME_COARSE, CLOCK_REALTIME};
+    static const int numarr = sizeof(clockidarr)/sizeof(*clockidarr);
+    int i;
+
+    for (i=0; i<numarr; i++)
+    {
+	int retval = clock_getres(clockidarr[i], NULL);
+	if (-1 == retval)
+	{
+	    if (EINVAL != errno)
+	    {
+		logerror("error: clock_getres(%d, NULL)", clockidarr[i]);
+	    }
+	}
+	else
+	{
+	    // success
+	    system_clk_id = clockidarr[i];
+	    return;
+	}
+    }
+
+    if (errno)
+	logerror("error: can not get valid clockid");
+
+}
+
+
+void set_valid_clock_id(clockid_t clk_id)
+{
+    system_clk_id = clk_id;
+}
+
+
+clockid_t get_valid_clock_id(void)
+{
+    return system_clk_id;
+}
+
 
 
 

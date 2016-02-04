@@ -31,6 +31,7 @@
 #ifndef QGIS_CONFIG_H_
 #define QGIS_CONFIG_H_
 
+#include <time.h>
 
 int config_load(const char *path);
 void config_shutdown(void);
@@ -57,5 +58,10 @@ const char *config_get_init_value(const char *project, int num);
 
 void set_program_shutdown(int does_shutdown);
 int get_program_shutdown(void);
+
+void test_set_valid_clock_id(void);
+void set_valid_clock_id(clockid_t clk_id);
+clockid_t get_valid_clock_id(void);
+
 
 #endif /* QGIS_CONFIG_H_ */
