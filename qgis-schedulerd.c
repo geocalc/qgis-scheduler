@@ -155,6 +155,7 @@
 struct thread_connection_handler_args
 {
     int new_accepted_inet_fd;
+    char *hostname;
 };
 
 
@@ -563,7 +564,7 @@ void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	debug(1, "found no free process for network request. answer overload and close connection\n");
+	printlog("Found no free process for network request from %s. Answer overload and close connection\n", tinfo->hostname);
 	/* NOTE: intentionally no mutex unlock here. We checked all processes,
 	 * locked and unlocked all entries. Now there is no locked mutex left.
 	 */
@@ -697,6 +698,11 @@ void *thread_handle_connection(void *arg)
 	}
 	mutex = NULL;
 
+	{
+	    pid_t pid = qgis_process_get_pid(proc);
+	    const char *projname = qgis_project_get_name(project);
+	    printlog("use process %d to handle request for %s, project %s", pid, tinfo->hostname, projname );
+	}
 
 	/* change the connection flag of the fastcgi connection to not
 	 * FCGI_KEEP_CONN. This way the child process closes the unix socket
@@ -981,7 +987,7 @@ void *thread_handle_connection(void *arg)
 		debug(1, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
-		    logerror("\nerror: reading from child process socket");
+		    logerror("error: reading from child process socket");
 		    exit(EXIT_FAILURE);
 		}
 		else if (0 == readbytes)
@@ -1017,6 +1023,7 @@ void *thread_handle_connection(void *arg)
     debug(1, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
     fcgi_data_list_delete(datalist);
+    free(tinfo->hostname);
     free(arg);
 
     return NULL;
@@ -1395,7 +1402,7 @@ int main(int argc, char **argv)
     int has_finished = 0;
     int is_readable_serversocket = 0;
     int is_readable_signalpipe = 0;
-    debug(1, "waiting for network connection requests\n");
+    printlog("Initialization done. Waiting for network connection requests..");
     while ( !has_finished )
     {
 	/* wait for connections, signals or timeout */
@@ -1494,20 +1501,7 @@ int main(int argc, char **argv)
 		    }
 		    else
 		    {
-			char hbuf[80], sbuf[10];
-			int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
-				sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
-			if (ret < 0)
-			{
-			    debug(1, "error: can not convert host address: %s\n", gai_strerror(ret));
-			}
-			else
-			{
-			    debug(1, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
-			}
-
 			int networkfd = retval;
-
 
 			/* NOTE: aside from the general rule
 			 * "malloc() and free() within the same function"
@@ -1522,6 +1516,22 @@ int main(int argc, char **argv)
 			    exit(EXIT_FAILURE);
 			}
 			targs->new_accepted_inet_fd = networkfd;
+
+
+			char hbuf[80], sbuf[10];
+			int ret = getnameinfo(&addr, addrlen, hbuf, sizeof(hbuf), sbuf,
+				sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+			if (ret < 0)
+			{
+			    printlog("error: can not convert host address: %s", gai_strerror(ret));
+			    targs->hostname = NULL;
+			}
+			else
+			{
+			    printlog("Accepted connection from host %s, port %s", hbuf, sbuf);
+			    targs->hostname = strdup(hbuf);
+			}
+
 
 			pthread_t thread;
 			retval = pthread_create(&thread, NULL, thread_handle_connection, targs);
