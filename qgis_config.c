@@ -70,6 +70,8 @@
 #define DEFAULT_CONFIG_PROJ_INITDATA	NULL
 #define CONFIG_LOGFILE			":logfile"
 #define DEFAULT_CONFIG_LOGFILE		NULL
+#define CONFIG_DEBUGLEVEL		":debuglevel"
+#define DEFAULT_CONFIG_DEBUGLEVEL	0
 
 
 #if __WORDSIZE == 64
@@ -343,8 +345,34 @@ const char *config_get_logfile(void)
     }
 
     return ret;
-
 }
+
+
+int config_get_debuglevel(void)
+{
+    assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int ret = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	perror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
 
 
 const char *config_get_process(const char *project)
