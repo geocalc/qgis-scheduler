@@ -1037,6 +1037,12 @@ struct signal_data_s
 /* TODO: sometimes the program hangs during shutdown.
  *       we receive a signal (SIGCHLD) but dont react on it?
  */
+/* TODO: according to this website
+ *       http://www.securecoding.cert.org/confluence/display/c/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers
+ *       we should not call fprintf (or vdprintf in log message) from a signal
+ *       handler.
+ *       Use write in here?
+ */
 int signalpipe_wr = -1;
 void signalaction(int signal, siginfo_t *info, void *ucontext)
 {
