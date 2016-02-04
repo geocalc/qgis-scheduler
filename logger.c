@@ -316,9 +316,10 @@ int printlog(const char *format, ...)
 
     {
 	// print string
-	char strbuffer[strsize+1];
+	char strbuffer[strsize+2];
 	strcpy(strbuffer, timebuffer);
 	strcat(strbuffer, format);
+	strcat(strbuffer, "\n");
 
 	va_start(args, format);
 	if (-1 != new_stderr)
