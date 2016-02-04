@@ -1148,6 +1148,9 @@ int main(int argc, char **argv)
     }
 
 
+    logger_init();
+    printlog("starting %s with pid %d", basename(argv[0]), getpid());
+
 
     /* prepare inet socket connection for application server process (this)
      */
@@ -1235,7 +1238,6 @@ int main(int argc, char **argv)
 	exit(EXIT_FAILURE);
     }
 
-    logger_init();
 
     if ( !no_daemon )
     {
