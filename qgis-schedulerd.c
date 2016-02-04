@@ -1100,6 +1100,21 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	debug(1, "wrote %d bytes to sig pipe\n", retval);
 	break;
 
+    case SIGSEGV:
+	printlog("Got SIGSEGV! exiting..");
+	syncfs(STDERR_FILENO);
+	syncfs(STDOUT_FILENO);
+	/* reinstall default handler and fire signal again */
+	{
+//	    struct sigaction action;
+//	    memset(&action, 0, sizeof(action));
+//	    action.sa_handler = SIG_DFL;
+//	    sigaction(SIGSEGV, &action, NULL);
+	    signal(SIGSEGV, SIG_DFL);
+	    raise(SIGSEGV);
+	}
+	break;
+
     default:
 	debug(1, "Huh? Got unexpected signal %d. Ignored\n", signal);
 	break;
@@ -1342,6 +1357,12 @@ int main(int argc, char **argv)
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGINT, &action, NULL);
+	if (retval)
+	{
+	    logerror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGSEGV, &action, NULL);
 	if (retval)
 	{
 	    logerror("error: can not install signal handler");
