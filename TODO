@@ -1,5 +1,3 @@
-+ create a list of projects containing a list of processes, a compiled regular expression, etc.
-
 + delete all environment variables before starting a new child process
 
 + hand over those URLs which can not be recognized by the scan settings to a set of programs handling global requests
@@ -7,15 +5,9 @@
 + parse the configuration file at program start and warn about incorrect settings (e.g. empty scan_param= or empty scan_regex= or errors compiling regular expression).
   remove the project from the project list on any error.
 
-+ create a log file and reassign the stdout and stderr channel to the log file.
-
-+ setup a log message module. This adds informations about the pid and more to the log string
-
 + use autotools for the build process
 
 + assign path of the config file by autotools parameter
-
-+ initialize the qgis program with a query string
 
 + test for execution times. warn in log file if execution time exceeds a limit
 
@@ -31,11 +23,7 @@
 
 + add include= key to config file, to include a whole subdirectory of files. Better administration when adding projects to the configuration
 
-+ create a separate inotify watch module
-
 + disable initialization if no init data is configured
-
-+ establish a separate logger thread, which listens on pipe for log data, and writes it to log file or stderr. thread should be detached and killed at the very end of the program. stdout and stderr should be dup()ed to a new handler, then pipe write fd should be dup()ed to stdout and stderr
 
 + during shutdown make a poll frequency of 1 second (instead of 10) to check for child procs already gone
 
