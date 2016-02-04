@@ -106,15 +106,32 @@ int printlog(const char *format, ...)
     struct tm tm;
     char timebuffer[timebuffersize];
     time_t times;
+    int strsize = 0;
 
     time(&times);
-    localtime_r(&times, &tm);
-    strftime(timebuffer, timebuffersize, "[%F %T] ", &tm);
-    int strsize = strlen(timebuffer) + strlen(format);
+    if ((time_t)(-1) == times)
+    {
+	/* error occured
+	 * try to print the text without a time value
+	 */
+    }
+    else
+    {
+	if (NULL != localtime_r(&times, &tm))
+	    strsize = strftime(timebuffer, timebuffersize, "[%F %T] ", &tm);
+    }
+    /* create a \0 terminated string just in case strftime could not
+     * fill the "timebuffer".
+     */
+    if (0 == strsize)
+	timebuffer[0] = '\0';
 
     {
+	strsize += strlen(format);	// add size of 'format'
+	strsize +=1;			// add size of "\n"
+
 	// print string
-	char strbuffer[strsize+2];
+	char strbuffer[strsize+1];
 	strcpy(strbuffer, timebuffer);
 	strcat(strbuffer, format);
 	strcat(strbuffer, "\n");
@@ -144,15 +161,32 @@ int debug(int level, const char *format, ...)
 	struct tm tm;
 	char timebuffer[timebuffersize];
 	time_t times;
+	int strsize = 0;
 
 	time(&times);
-	localtime_r(&times, &tm);
-	strftime(timebuffer, timebuffersize, "[%F %T]D ", &tm);
-	int strsize = strlen(timebuffer) + strlen(format);
+	if ((time_t)(-1) == times)
+	{
+	    /* error occured
+	     * try to print the text without a time value
+	     */
+	}
+	else
+	{
+	    if (NULL != localtime_r(&times, &tm))
+		strsize = strftime(timebuffer, timebuffersize, "[%F %T]D ", &tm);
+	}
+	/* create a \0 terminated string just in case strftime could not
+	 * fill the "timebuffer".
+	 */
+	if (0 == strsize)
+	    timebuffer[0] = '\0';
 
 	{
+	    strsize += strlen(format);	// add size of 'format'
+	    strsize += 1;		// add size of "\n"
+
 	    // print string
-	    char strbuffer[strsize+2];
+	    char strbuffer[strsize+1];
 	    strcpy(strbuffer, timebuffer);
 	    strcat(strbuffer, format);
 	    strcat(strbuffer, "\n");
