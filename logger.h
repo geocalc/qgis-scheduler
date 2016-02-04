@@ -34,7 +34,6 @@
 #define LOGGER_H_
 
 int logger_init(void);
-void logger_stop(void);
 int printlog(const char *format, ...);
 int debug(int level, const char *format, ...);
 

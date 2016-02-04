@@ -1771,7 +1771,6 @@ int main(int argc, char **argv)
     close(signalpipe_rd);
     close(signalpipe_wr);
     printlog("shut down %s", basename(argv[0]));
-    logger_stop();
 
     return exitvalue;
 }

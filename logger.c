@@ -94,11 +94,6 @@ int logger_init(void)
 }
 
 
-void logger_stop(void)
-{
-}
-
-
 int printlog(const char *format, ...)
 {
     assert(format);
