@@ -39,6 +39,8 @@
 #include <assert.h>
 #include <errno.h>
 
+#include "logger.h"
+
 
 struct qgis_process_s
 {
@@ -78,7 +80,7 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     assert(proc);
     if ( !proc )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -88,7 +90,7 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     if (retval)
     {
 	errno = retval;
-	perror("error: pthread_mutex_init");
+	logerror("error: pthread_mutex_init");
 	exit(EXIT_FAILURE);
     }
 
@@ -106,7 +108,7 @@ void qgis_process_delete(struct qgis_process_s *proc)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error delete mutex");
+	    logerror("error delete mutex");
 	    exit(EXIT_FAILURE);
 	}
     }

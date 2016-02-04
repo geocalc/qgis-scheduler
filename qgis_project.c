@@ -51,6 +51,7 @@
 #include "qgis_process_list.h"
 #include "qgis_config.h"
 #include "fcgi_state.h"
+#include "logger.h"
 
 
 //#define DISABLED_INIT
@@ -169,7 +170,7 @@ static void *thread_watch_config(void *arg)
     assert(inotifyevent);
     if ( !inotifyevent )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -187,7 +188,7 @@ static void *thread_watch_config(void *arg)
 		break;
 
 	    default:
-		perror("read() inotify_event");
+		logerror("read() inotify_event");
 		exit(EXIT_FAILURE);
 		// no break needed
 	    }
@@ -274,7 +275,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     assert(proj);
     if ( !proj )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     proj->initproclist = qgis_process_list_new();
@@ -286,7 +287,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     if (retval)
     {
 	errno = retval;
-	perror("error init read-write lock");
+	logerror("error init read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -311,13 +312,13 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	    case ENOTDIR:
 	    case EOVERFLOW:
 		fprintf(stderr, "error accessing file '%s': ", configpath);
-		perror(NULL);
+		logerror(NULL);
 		fprintf(stderr, "file is not watched for changes\n");
 		break;
 
 	    default:
 		fprintf(stderr, "error accessing file '%s': ", configpath);
-		perror(NULL);
+		logerror(NULL);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -360,7 +361,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		retval = inotify_init1(IN_CLOEXEC);
 		if (-1 == retval)
 		{
-		    perror("inotify_init1");
+		    logerror("inotify_init1");
 		    exit(EXIT_FAILURE);
 		}
 		proj->inotifyfd = retval;
@@ -369,7 +370,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		assert(directoryname);
 		if ( !directoryname )
 		{
-		    perror("could not allocate memory");
+		    logerror("could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -378,7 +379,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		retval = inotify_add_watch(proj->inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO|IN_IGNORED);
 		if (-1 == retval)
 		{
-		    perror("inotify_add_watch");
+		    logerror("inotify_add_watch");
 		    exit(EXIT_FAILURE);
 		}
 		proj->inotifywatchfd = retval;
@@ -397,7 +398,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		assert(targs);
 		if ( !targs )
 		{
-		    perror("could not allocate memory");
+		    logerror("could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 		targs->project = proj;
@@ -406,7 +407,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 		if (retval)
 		{
 		    errno = retval;
-		    perror("error creating thread");
+		    logerror("error creating thread");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -438,7 +439,7 @@ void qgis_project_delete(struct qgis_project_s *proj)
 		retval = inotify_rm_watch(proj->inotifyfd, proj->inotifywatchfd);
 		if (-1 == retval)
 		{
-		    perror("inotify_rm_watch");
+		    logerror("inotify_rm_watch");
 		    // no exit on purpose
 		}
 
@@ -449,7 +450,7 @@ void qgis_project_delete(struct qgis_project_s *proj)
 		if (retval)
 		{
 		    errno = retval;
-		    perror("error joining thread");
+		    logerror("error joining thread");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -505,7 +506,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 //    if (-1 == debugfd)
 //    {
 //	fprintf(stderr, "error can not open file '%s': ", debugfile);
-//	perror(NULL);
+//	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
 
@@ -519,7 +520,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
-	perror("error retrieving the name of child process socket");
+	logerror("error retrieving the name of child process socket");
 	exit(EXIT_FAILURE);
     }
     /* leave the original child socket and create a new one on the opposite
@@ -528,14 +529,14 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	perror("error: can not create socket to child process");
+	logerror("error: can not create socket to child process");
 	exit(EXIT_FAILURE);
     }
     childunixsocketfd = retval;	// refers to the socket this program connects to the child process
     retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
-	perror("error: can not connect to child process");
+	logerror("error: can not connect to child process");
 	exit(EXIT_FAILURE);
     }
 //    fprintf(stderr, "init project '%s', connected to child via socket '\\0%s'\n", projname, sockaddr.sun_path+1);
@@ -549,7 +550,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     assert(buffer);
     if ( !buffer )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -566,7 +567,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	perror("error: can not write to child process");
+	logerror("error: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
@@ -622,7 +623,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	perror("error: can not write to child process");
+	logerror("error: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -639,7 +640,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	perror("error: can not write to child process");
+	logerror("error: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -656,7 +657,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	perror("error: can not write to child process");
+	logerror("error: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     // write stdin = "" twice
@@ -664,7 +665,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	perror("error: can not write to child process");
+	logerror("error: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -726,7 +727,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     int retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	perror("can not create socket for fcgi program");
+	logerror("can not create socket for fcgi program");
 	exit(EXIT_FAILURE);
     }
     const int childsocket = retval;
@@ -748,7 +749,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     if (retval)
     {
 	errno = retval;
-	perror("error acquire mutex");
+	logerror("error acquire mutex");
 	exit(EXIT_FAILURE);
     }
     unsigned int socket_suffix_start = socket_id-1;
@@ -756,7 +757,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     if (retval)
     {
 	errno = retval;
-	perror("error unlock mutex");
+	logerror("error unlock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -766,7 +767,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire mutex");
+	    logerror("error acquire mutex");
 	    exit(EXIT_FAILURE);
 	}
 	unsigned int socket_suffix = socket_id++;
@@ -774,7 +775,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock mutex");
+	    logerror("error unlock mutex");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -793,7 +794,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	retval = snprintf( childsockaddr.sun_path, sizeof(childsockaddr.sun_path), "%c%s%u", '\0', base_socket_desc, socket_suffix );
 	if (-1 == retval)
 	{
-	    perror("error calling string format function snprintf");
+	    logerror("error calling string format function snprintf");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -806,7 +807,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	    }
 	    else
 	    {
-		perror("error calling bind");
+		logerror("error calling bind");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -818,7 +819,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     retval = listen(childsocket, 1);
     if (-1 == retval)
     {
-	perror("can not listen to socket connecting fast cgi application");
+	logerror("can not listen to socket connecting fast cgi application");
 	exit(EXIT_FAILURE);
     }
 
@@ -838,14 +839,14 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	int ret = chdir(config_get_working_directory(project_name));
 	if (-1 == ret)
 	{
-	    perror("error calling chdir");
+	    logerror("error calling chdir");
 	}
 
 
 	ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == ret)
 	{
-	    perror("error calling dup2");
+	    logerror("error calling dup2");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -861,7 +862,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 
 	execl(command, command, NULL);
 	fprintf(stderr, "could not execute '%s': ", command);
-	perror(NULL);
+	logerror(NULL);
 	exit(EXIT_FAILURE);
     }
     else if (0 < pid)
@@ -875,7 +876,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     else
     {
 	/* error */
-	perror("can not fork");
+	logerror("can not fork");
 	exit(EXIT_FAILURE);
     }
 
@@ -928,7 +929,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	assert(targs);
 	if ( !targs )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	targs->project = project;
@@ -937,7 +938,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error creating thread");
+	    logerror("error creating thread");
 	    exit(EXIT_FAILURE);
 	}
 	fprintf(stderr, "[%lu] started process %lu\n", pthread_self(), threads[i]);
@@ -950,7 +951,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error joining thread");
+	    logerror("error joining thread");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -963,7 +964,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -981,7 +982,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1010,7 +1011,7 @@ void *qgis_project_thread_start_process_detached(void *arg)
     if (retval)
     {
 	errno = retval;
-	perror("error detaching thread");
+	logerror("error detaching thread");
 	exit(EXIT_FAILURE);
     }
 
@@ -1038,7 +1039,7 @@ void start_new_process_detached(int num, struct qgis_project_s *project, int do_
     assert(targs);
     if ( !targs )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     targs->num = num;
@@ -1050,7 +1051,7 @@ void start_new_process_detached(int num, struct qgis_project_s *project, int do_
     if (retval)
     {
 	errno = retval;
-	perror("error: pthread_create");
+	logerror("error: pthread_create");
 	exit(EXIT_FAILURE);
     }
 
@@ -1182,7 +1183,7 @@ int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum)
 	    }
 	    break;
 	    default:
-		perror("error: could not send TERM signal");
+		logerror("error: could not send TERM signal");
 	    }
 	}
 	else

@@ -41,6 +41,9 @@
 #include <sys/queue.h>
 #include <fastcgi.h>
 
+#include "logger.h"
+
+
 #define min(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -222,7 +225,7 @@ struct fcgi_param_list_s *fcgi_param_list_new(void)
     assert(list);
     if ( !list )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -257,7 +260,7 @@ void fcgi_param_list_add_param(struct fcgi_param_list_s *paramlist, struct fcgi_
 	assert(entry);
 	if ( !entry )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -322,7 +325,7 @@ int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
 	    int retval = fprintf(stderr, "%s=%s\n", it->param.name, it->param.value);
 	    if (-1 == retval)
 	    {
-		perror("error fprintf");
+		logerror("error fprintf");
 		exit(EXIT_FAILURE);
 	    }
 	    bytes_printed += retval;
@@ -443,7 +446,7 @@ struct fcgi_message_s *fcgi_message_new(void)
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -516,7 +519,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 		assert(message->content);
 		if ( !message->content )
 		{
-		    perror("could not allocate memory");
+		    logerror("could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -864,7 +867,7 @@ struct fcgi_message_list_s *fcgi_message_list_new(void)
     assert(messlist);
     if ( !messlist )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -902,7 +905,7 @@ void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct 
 	assert(entry);
 	if ( !entry )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1022,7 +1025,7 @@ struct fcgi_session_s *fcgi_session_new(int keep_messages)
     assert(session);
     if ( !session )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1251,7 +1254,7 @@ struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role,
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1280,7 +1283,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1294,7 +1297,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1313,7 +1316,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1327,7 +1330,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1346,7 +1349,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1360,7 +1363,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1379,7 +1382,7 @@ struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t 
     assert(message);
     if ( !message )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 

@@ -66,7 +66,7 @@ struct fcgi_data_list_s *fcgi_data_list_new(void)
     assert(list);
     if ( !list )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -101,7 +101,7 @@ void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len)
 	assert(entry);
 	if ( !entry )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 

@@ -204,7 +204,7 @@ void write_pid_file(const char *path)
     if (NULL == f)
     {
 	fprintf(stderr, "can not open pidfile '%s': ", path);
-	perror(NULL);
+	logerror(NULL);
 	exit(EXIT_FAILURE);
     }
 
@@ -220,7 +220,7 @@ void remove_pid_file(const char *path)
     if (-1 == retval)
     {
 	fprintf(stderr, "can not remove pidfile '%s': ", path);
-	perror(NULL);
+	logerror(NULL);
 	// intentionally no exit() call
     }
 }
@@ -254,7 +254,7 @@ void *thread_handle_connection(void *arg)
     if (retval)
     {
 	errno = retval;
-	perror("error detaching thread");
+	logerror("error detaching thread");
 	exit(EXIT_FAILURE);
     }
 
@@ -266,7 +266,7 @@ void *thread_handle_connection(void *arg)
 //    if (-1 == debugfd)
 //    {
 //	fprintf(stderr, "error can not open file '%s': ", debugfile);
-//	perror(NULL);
+//	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
 
@@ -305,7 +305,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -317,7 +317,7 @@ void *thread_handle_connection(void *arg)
 	assert(buffer);
 	if ( !buffer )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
@@ -363,7 +363,7 @@ void *thread_handle_connection(void *arg)
 		    break;
 
 		default:
-		    perror("error: thread_handle_connection() calling select");
+		    logerror("error: thread_handle_connection() calling select");
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
@@ -384,7 +384,7 @@ void *thread_handle_connection(void *arg)
 		fprintf(stderr, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
-		    perror("\nerror: reading from network socket");
+		    logerror("\nerror: reading from network socket");
 		    exit(EXIT_FAILURE);
 		}
 		else if (0 == readbytes)
@@ -406,7 +406,7 @@ void *thread_handle_connection(void *arg)
 		    assert(data);
 		    if ( !data )
 		    {
-			perror("could not allocate memory");
+			logerror("could not allocate memory");
 			exit(EXIT_FAILURE);
 		    }
 
@@ -584,7 +584,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -634,7 +634,7 @@ void *thread_handle_connection(void *arg)
 		    break;
 
 		default:
-		    perror("error: thread_handle_connection() calling select");
+		    logerror("error: thread_handle_connection() calling select");
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
@@ -665,7 +665,7 @@ void *thread_handle_connection(void *arg)
 		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
-			perror("error: writing to network socket");
+			logerror("error: writing to network socket");
 			exit(EXIT_FAILURE);
 		    }
 
@@ -694,7 +694,7 @@ void *thread_handle_connection(void *arg)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock mutex");
+	    logerror("error unlock mutex");
 	    exit(EXIT_FAILURE);
 	}
 	mutex = NULL;
@@ -756,7 +756,7 @@ void *thread_handle_connection(void *arg)
 	retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
-	    perror("error retrieving the name of child process socket");
+	    logerror("error retrieving the name of child process socket");
 	    exit(EXIT_FAILURE);
 	}
 	/* leave the original child socket and create a new one on the opposite
@@ -765,14 +765,14 @@ void *thread_handle_connection(void *arg)
 	retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
 	if (-1 == retval)
 	{
-	    perror("error: can not create socket to child process");
+	    logerror("error: can not create socket to child process");
 	    exit(EXIT_FAILURE);
 	}
 	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
 	retval = connect(childunixsocketfd, &sockaddr, sizeof(sockaddr));
 	if (-1 == retval)
 	{
-	    perror("error: can not connect to child process");
+	    logerror("error: can not connect to child process");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -785,7 +785,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -794,7 +794,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -803,7 +803,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -812,7 +812,7 @@ void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		perror("error: getsockopt");
+		logerror("error: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -824,7 +824,7 @@ void *thread_handle_connection(void *arg)
 	assert(buffer);
 	if ( !buffer )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -889,7 +889,7 @@ void *thread_handle_connection(void *arg)
 		    break;
 
 		default:
-		    perror("error: thread_handle_connection() calling select");
+		    logerror("error: thread_handle_connection() calling select");
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
@@ -934,7 +934,7 @@ void *thread_handle_connection(void *arg)
 		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
-			perror("error: writing to child process socket");
+			logerror("error: writing to child process socket");
 			exit(EXIT_FAILURE);
 		    }
 		    can_write_unixsock = 0;
@@ -950,7 +950,7 @@ void *thread_handle_connection(void *arg)
 		    fprintf(stderr, "read %d, ", readbytes);
 		    if (-1 == readbytes)
 		    {
-			perror("\nerror: reading from network socket");
+			logerror("\nerror: reading from network socket");
 			exit(EXIT_FAILURE);
 		    }
 		    else if (0 == readbytes)
@@ -968,7 +968,7 @@ void *thread_handle_connection(void *arg)
 		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
-			perror("error: writing to child process socket");
+			logerror("error: writing to child process socket");
 			exit(EXIT_FAILURE);
 		    }
 		    can_read_networksock = 0;
@@ -983,7 +983,7 @@ void *thread_handle_connection(void *arg)
 		fprintf(stderr, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
-		    perror("\nerror: reading from child process socket");
+		    logerror("\nerror: reading from child process socket");
 		    exit(EXIT_FAILURE);
 		}
 		else if (0 == readbytes)
@@ -1000,7 +1000,7 @@ void *thread_handle_connection(void *arg)
 		fprintf(stderr, "wrote %d\n", writebytes);
 		if (-1 == writebytes)
 		{
-		    perror("error: writing to network socket");
+		    logerror("error: writing to network socket");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -1062,7 +1062,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
 	if (-1 == retval)
 	{
-	    perror("write signal data");
+	    logerror("write signal data");
 	    exit(EXIT_FAILURE);
 	}
 	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
@@ -1143,7 +1143,7 @@ int main(int argc, char **argv)
     int retval = config_load(config_path);
     if (retval)
     {
-	perror("can not load config file");
+	logerror("can not load config file");
 	exit(EXIT_FAILURE);
     }
 
@@ -1188,7 +1188,7 @@ int main(int argc, char **argv)
 	    if (serversocketfd == -1)
 	    {
 		//printf(" could not create socket\n");
-		perror(" could not create socket for network data");
+		logerror(" could not create socket for network data");
 		continue;
 	    }
 
@@ -1196,21 +1196,21 @@ int main(int argc, char **argv)
 	    int retval = setsockopt(serversocketfd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 	    if (-1 == retval)
 	    {
-		perror(" could not set socket to SOL_SOCKET");
+		logerror(" could not set socket to SOL_SOCKET");
 	    }
 
 	    if (bind(serversocketfd, rp->ai_addr, rp->ai_addrlen) == 0)
 		break; /* Success */
 
 	    //printf(" could not bind to socket\n");
-	    perror(" could not bind to network socket");
+	    logerror(" could not bind to network socket");
 	    close(serversocketfd);
 	}
 
 	if (rp == NULL)
 	{ /* No address succeeded */
 	    //fprintf(stderr, "Could not bind\n"); // TODO better message
-	    perror("could not create network socket");
+	    logerror("could not create network socket");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1222,7 +1222,7 @@ int main(int argc, char **argv)
     retval = listen(serversocketfd, SOMAXCONN);
     if (retval)
     {
-	perror("error: can not listen to socket");
+	logerror("error: can not listen to socket");
 	exit(EXIT_FAILURE);
     }
 
@@ -1234,7 +1234,7 @@ int main(int argc, char **argv)
     retval = chdir("/");
     if (retval)
     {
-	perror("error: can not change working directory to '/'");
+	logerror("error: can not change working directory to '/'");
 	exit(EXIT_FAILURE);
     }
 
@@ -1244,7 +1244,7 @@ int main(int argc, char **argv)
 	retval = daemon(daemon_no_change_dir,daemon_no_close_streams);
 	if (retval)
 	{
-	    perror("error: can not become daemon");
+	    logerror("error: can not become daemon");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1272,7 +1272,7 @@ int main(int argc, char **argv)
 	retval = pipe2(pipes, O_CLOEXEC|O_NONBLOCK);
 	if (retval)
 	{
-	    perror("error: can not install signal pipe");
+	    logerror("error: can not install signal pipe");
 	    exit(EXIT_FAILURE);
 	}
 	signalpipe_rd = pipes[0];
@@ -1293,25 +1293,25 @@ int main(int argc, char **argv)
 	retval = sigaction(SIGTERM, &action, NULL);
 	if (retval)
 	{
-	    perror("error: can not install signal handler");
+	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGQUIT, &action, NULL);
 	if (retval)
 	{
-	    perror("error: can not install signal handler");
+	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGCHLD, &action, NULL);
 	if (retval)
 	{
-	    perror("error: can not install signal handler");
+	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGINT, &action, NULL);
 	if (retval)
 	{
-	    perror("error: can not install signal handler");
+	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1348,7 +1348,7 @@ int main(int argc, char **argv)
 		assert(targs);
 		if ( !targs )
 		{
-		    perror("could not allocate memory");
+		    logerror("could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 		targs->project = project;
@@ -1358,7 +1358,7 @@ int main(int argc, char **argv)
 		if (retval)
 		{
 		    errno = retval;
-		    perror("error creating thread");
+		    logerror("error creating thread");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -1369,7 +1369,7 @@ int main(int argc, char **argv)
 		if (retval)
 		{
 		    errno = retval;
-		    perror("error joining thread");
+		    logerror("error joining thread");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -1424,7 +1424,7 @@ int main(int argc, char **argv)
 		break;
 
 	    default:
-		perror("error: main() calling select");
+		logerror("error: main() calling select");
 		exit(EXIT_FAILURE);
 		// no break needed
 	    }
@@ -1451,7 +1451,7 @@ int main(int argc, char **argv)
 		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
 		if (-1 == retval)
 		{
-		    perror("error: reading signal data");
+		    logerror("error: reading signal data");
 		    exit(EXIT_FAILURE);
 		}
 		else
@@ -1491,7 +1491,7 @@ int main(int argc, char **argv)
 		    retval = accept(serversocketfd, &addr, &addrlen);
 		    if (-1 == retval)
 		    {
-			perror("error: calling accept");
+			logerror("error: calling accept");
 			exit(EXIT_FAILURE);
 		    }
 		    else
@@ -1520,7 +1520,7 @@ int main(int argc, char **argv)
 			assert(targs);
 			if ( !targs )
 			{
-			    perror("could not allocate memory");
+			    logerror("could not allocate memory");
 			    exit(EXIT_FAILURE);
 			}
 			targs->new_accepted_inet_fd = networkfd;
@@ -1530,7 +1530,7 @@ int main(int argc, char **argv)
 			if (retval)
 			{
 			    errno = retval;
-			    perror("error creating thread");
+			    logerror("error creating thread");
 			    exit(EXIT_FAILURE);
 			}
 
@@ -1654,7 +1654,7 @@ int main(int argc, char **argv)
 				}
 				break;
 				default:
-				    perror("error: could not send KILL signal");
+				    logerror("error: could not send KILL signal");
 				}
 			    }
 			    else

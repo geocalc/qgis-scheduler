@@ -66,7 +66,7 @@ int logger_init(void)
 	if (-1 == retval)
 	{
 	    fprintf(stderr, "can not open log file '%s': ", logfilename);
-	    perror(NULL);
+	    logerror(NULL);
 	    exit(EXIT_FAILURE);
 	}
 	int logfd = retval;
@@ -76,14 +76,14 @@ int logger_init(void)
 	retval = dup3(logfd, STDOUT_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    perror("can not dup to stdout");
+	    logerror("can not dup to stdout");
 	    exit(EXIT_FAILURE);
 	}
 
 	retval = dup3(logfd, STDERR_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    perror("can not dup to stderr");
+	    logerror("can not dup to stderr");
 	    exit(EXIT_FAILURE);
 	}
 

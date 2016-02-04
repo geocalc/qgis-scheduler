@@ -38,6 +38,8 @@
 #include <errno.h>
 #include <signal.h>
 
+#include "logger.h"
+
 
 struct qgis_process_list_s
 {
@@ -58,7 +60,7 @@ struct qgis_process_list_s *qgis_process_list_new(void)
     assert(list);
     if ( !list )
     {
-	perror("could not allocate memory");
+	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     LIST_INIT(&list->head);	// same as calloc(), should we remove this?
@@ -66,7 +68,7 @@ struct qgis_process_list_s *qgis_process_list_new(void)
     if (retval)
     {
 	errno = retval;
-	perror("error init read-write lock");
+	logerror("error init read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -81,7 +83,7 @@ void qgis_process_list_delete(struct qgis_process_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -97,14 +99,14 @@ void qgis_process_list_delete(struct qgis_process_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 	retval = pthread_rwlock_destroy(&list->rwlock);
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error delete read-write lock");
+	    logerror("error delete read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 	free(list);
@@ -124,7 +126,7 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	    assert(entry);
 	    if ( !entry )
 	    {
-		perror("could not allocate memory");
+		logerror("could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -134,7 +136,7 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -144,7 +146,7 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -165,7 +167,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -183,7 +185,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -209,14 +211,14 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = pthread_rwlock_wrlock(&tolist->rwlock);
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -236,14 +238,14 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = pthread_rwlock_unlock(&fromlist->rwlock);
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -267,14 +269,14 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = pthread_rwlock_wrlock(&tolist->rwlock);
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire read-write lock");
+		logerror("error acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -289,14 +291,14 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = pthread_rwlock_unlock(&fromlist->rwlock);
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock read-write lock");
+		logerror("error unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -331,7 +333,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_status(struct qgis_proc
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -349,7 +351,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_status(struct qgis_proc
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -370,7 +372,7 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -381,7 +383,7 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error acquire mutex");
+		logerror("error acquire mutex");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -414,7 +416,7 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	    if (retval)
 	    {
 		errno = retval;
-		perror("error unlock mutex");
+		logerror("error unlock mutex");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -423,7 +425,7 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -444,7 +446,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_pid(struct qgis_process
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -462,7 +464,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_pid(struct qgis_process
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -482,7 +484,7 @@ struct qgis_process_s *qgis_process_list_get_first_process(struct qgis_process_l
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -495,7 +497,7 @@ struct qgis_process_s *qgis_process_list_get_first_process(struct qgis_process_l
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -513,7 +515,7 @@ struct qgis_process_iterator *qgis_process_list_get_iterator(struct qgis_process
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -548,7 +550,7 @@ void qgis_process_list_return_iterator(struct qgis_process_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -569,7 +571,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -582,7 +584,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	assert(pidp);
 	if ( !pidp )
 	{
-	    perror("could not allocate memory");
+	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -596,7 +598,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -623,7 +625,7 @@ int qgis_process_list_get_num_process(struct qgis_process_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -636,7 +638,7 @@ int qgis_process_list_get_num_process(struct qgis_process_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -657,7 +659,7 @@ int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -674,7 +676,7 @@ int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -698,7 +700,7 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -727,7 +729,7 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
 		}
 		break;
 		default:
-		    perror("error: could not send TERM signal");
+		    logerror("error: could not send TERM signal");
 		}
 	    }
 	    else
@@ -742,7 +744,7 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }

@@ -39,6 +39,8 @@
 #include <errno.h>
 #include <pthread.h>
 
+#include "logger.h"
+
 
 #define CONFIG_LISTEN_KEY		":listen"
 #define DEFAULT_CONFIG_LISTEN_VALUE	"*"
@@ -119,7 +121,7 @@ int config_load(const char *path)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -129,7 +131,7 @@ int config_load(const char *path)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
     if (!config_opts)
@@ -147,7 +149,7 @@ void config_shutdown(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -157,7 +159,7 @@ void config_shutdown(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -173,7 +175,7 @@ int config_get_num_projects(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -183,7 +185,7 @@ int config_get_num_projects(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -200,7 +202,7 @@ const char *config_get_name_project(int num)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -210,7 +212,7 @@ const char *config_get_name_project(int num)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -226,7 +228,7 @@ const char *config_get_network_listen(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -236,7 +238,7 @@ const char *config_get_network_listen(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -252,7 +254,7 @@ const char *config_get_network_port(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -262,7 +264,7 @@ const char *config_get_network_port(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -278,7 +280,7 @@ const char *config_get_user(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -288,7 +290,7 @@ const char *config_get_user(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -304,7 +306,7 @@ const char *config_get_pid_path(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -314,7 +316,7 @@ const char *config_get_pid_path(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -330,7 +332,7 @@ const char *config_get_logfile(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -340,7 +342,7 @@ const char *config_get_logfile(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -356,7 +358,7 @@ int config_get_debuglevel(void)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -366,7 +368,7 @@ int config_get_debuglevel(void)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -388,7 +390,7 @@ const char *config_get_process(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -411,7 +413,7 @@ const char *config_get_process(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -432,7 +434,7 @@ const char *config_get_process_args(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -455,7 +457,7 @@ const char *config_get_process_args(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -476,7 +478,7 @@ int config_get_min_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -499,7 +501,7 @@ int config_get_min_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -520,7 +522,7 @@ int config_get_max_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -543,7 +545,7 @@ int config_get_max_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -565,7 +567,7 @@ const char *config_get_scan_parameter_key(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -583,7 +585,7 @@ const char *config_get_scan_parameter_key(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -606,7 +608,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error acquire read-write lock");
+	    logerror("error acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -624,7 +626,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    perror("error unlock read-write lock");
+	    logerror("error unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -646,7 +648,7 @@ const char *config_get_working_directory(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -669,7 +671,7 @@ const char *config_get_working_directory(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -690,7 +692,7 @@ const char *config_get_project_config_path(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -710,7 +712,7 @@ const char *config_get_project_config_path(const char *project)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -729,7 +731,7 @@ const char *config_get_init_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -744,7 +746,7 @@ const char *config_get_init_key(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITVAR, num);
 	if (-1 == retval)
 	{
-	    perror("asprintf");
+	    logerror("asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITVAR);
@@ -755,7 +757,7 @@ const char *config_get_init_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -774,7 +776,7 @@ const char *config_get_init_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	perror("error acquire read-write lock");
+	logerror("error acquire read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -789,7 +791,7 @@ const char *config_get_init_value(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITDATA, num);
 	if (-1 == retval)
 	{
-	    perror("asprintf");
+	    logerror("asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITDATA);
@@ -800,7 +802,7 @@ const char *config_get_init_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	perror("error unlock read-write lock");
+	logerror("error unlock read-write lock");
 	exit(EXIT_FAILURE);
     }
 
