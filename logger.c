@@ -333,44 +333,46 @@ int printlog(const char *format, ...)
 }
 
 
-//int debug(int level, const char *format, ...)
-//{
-//    assert(format);
-//    assert(level>0);
-//
-//    int retval = 0;
-//    if (level <= loglevel)
-//    {
-//	va_list args;
-//
-//	// prepend some time data before the format string
-//	static const int timebuffersize = 32;
-//	struct tm tm;
-//	char timebuffer[timebuffersize];
-//	time_t times;
-//
-//	time(&times);
-//	localtime_r(&times, &tm);
-//	strftime(timebuffer, timebuffersize, "[%F %T]D ", &tm);
-//	int strsize = strlen(timebuffer) + strlen(format);
-//
-//	{
-//	    // print string
-//	    char strbuffer[strsize+1];
-//	    strcpy(strbuffer, timebuffer);
-//	    strcat(strbuffer, format);
-//
-//	    va_start(args, format);
-//	    if (-1 != new_stderr)
-//		retval = vdprintf(new_stderr, strbuffer, args);
-//	    else
-//		retval = vdprintf(STDERR_FILENO, strbuffer, args);
-//	    va_end(args);
-//	}
-//    }
-//
-//    return retval;
-//}
+int debug(int level, const char *format, ...)
+{
+    assert(format);
+    assert(level>0);
+
+    int retval = 0;
+    int loglevel = config_get_debuglevel();
+    if (level <= loglevel)
+    {
+	va_list args;
+
+	// prepend some time data before the format string
+	static const int timebuffersize = 32;
+	struct tm tm;
+	char timebuffer[timebuffersize];
+	time_t times;
+
+	time(&times);
+	localtime_r(&times, &tm);
+	strftime(timebuffer, timebuffersize, "[%F %T]D ", &tm);
+	int strsize = strlen(timebuffer) + strlen(format);
+
+	{
+	    // print string
+	    char strbuffer[strsize+2];
+	    strcpy(strbuffer, timebuffer);
+	    strcat(strbuffer, format);
+	    strcat(strbuffer, "\n");
+
+	    va_start(args, format);
+	    if (-1 != new_stderr)
+		retval = vdprintf(new_stderr, strbuffer, args);
+	    else
+		retval = vdprintf(STDERR_FILENO, strbuffer, args);
+	    va_end(args);
+	}
+    }
+
+    return retval;
+}
 
 
 
