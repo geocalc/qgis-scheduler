@@ -256,14 +256,14 @@ void *thread_handle_connection(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr, "start a new connection thread\n");
+    debug(1, "start a new connection thread\n");
 
 //    char debugfile[128];
 //    sprintf(debugfile, "/tmp/threadconnect.%lu.dump", thread_id);
 //    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 //    if (-1 == debugfd)
 //    {
-//	fprintf(stderr, "error can not open file '%s': ", debugfile);
+//	debug(1, "error can not open file '%s': ", debugfile);
 //	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
@@ -308,7 +308,7 @@ void *thread_handle_connection(void *arg)
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
-	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
 	}
 
 	char *buffer = malloc(maxbufsize);
@@ -343,7 +343,7 @@ void *thread_handle_connection(void *arg)
 	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
 	    //	timeout.tv_usec = 0;
 
-	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    debug(1, "[%ld] selecting on network connections\n", thread_id);
 	    FD_ZERO(&rfds);
 	    if ( !can_read_networksock )
 		FD_SET(inetsocketfd, &rfds);
@@ -357,7 +357,7 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    debug(1, "thread_handle_connection() received interrupt\n");
 		    break;
 
 		default:
@@ -370,16 +370,16 @@ void *thread_handle_connection(void *arg)
 
 	    if (FD_ISSET(inetsocketfd, &rfds))
 	    {
-		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+		debug(1, "[%ld]  can read from network socket\n", thread_id);
 		can_read_networksock = 1;
 	    }
 
 	    if (can_read_networksock)
 	    {
-		fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+		debug(1, "[%ld]  read data from network socket: ", thread_id);
 
 		int readbytes = read(inetsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", readbytes);
+		debug(1, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
 		    logerror("\nerror: reading from network socket");
@@ -391,9 +391,9 @@ void *thread_handle_connection(void *arg)
 		    break;
 		}
 #ifdef PRINT_NETWORK_DATA
-		fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		debug(1, "\n[%ld] network data:\n", thread_id);
 		fwrite(buffer, 1, readbytes, stderr);
-		fprintf(stderr, "\n");
+		debug(1, "\n");
 #endif
 
 		{
@@ -434,7 +434,7 @@ void *thread_handle_connection(void *arg)
 				{
 				    const char *param = fcgi_session_get_param(fcgi_session, key);
 				    const char *scanregex = config_get_scan_parameter_regex(proj_name);
-				    fprintf(stderr, "use regex %s\n", scanregex);
+				    debug(1, "use regex %s\n", scanregex);
 				    regex_t regex;
 				    /* Compile regular expression */
 				    retval = regcomp(&regex, scanregex, REG_EXTENDED);
@@ -444,7 +444,7 @@ void *thread_handle_connection(void *arg)
 					char *buffer = malloc(len);
 					(void) regerror (retval, &regex, buffer, len);
 
-					fprintf(stderr, "Could not compile regular expression: %s\n", buffer);
+					debug(1, "Could not compile regular expression: %s\n", buffer);
 					free(buffer);
 					exit(EXIT_FAILURE);
 				    }
@@ -465,7 +465,7 @@ void *thread_handle_connection(void *arg)
 					char *buffer = malloc(len);
 					(void) regerror (retval, &regex, buffer, len);
 
-					fprintf(stderr, "Could not match regular expression: %s\n", buffer);
+					debug(1, "Could not match regular expression: %s\n", buffer);
 					free(buffer);
 					exit(EXIT_FAILURE);
 				    }
@@ -475,16 +475,16 @@ void *thread_handle_connection(void *arg)
 				else
 				{
 				    // TODO: do not overflow the log with this message, do parse the config file at program start
-				    fprintf(stderr, "error: no regular expression found for project '%s'\n", proj_name);
+				    debug(1, "error: no regular expression found for project '%s'\n", proj_name);
 				}
 
 			    }
 			    else
 			    {
-				fprintf(stderr, "error: no name for project number %d in configuration found\n", i);
+				debug(1, "error: no name for project number %d in configuration found\n", i);
 			    }
 			}
-			fprintf(stderr, "found project '%s' in query string\n", request_project_name);
+			debug(1, "found project '%s' in query string\n", request_project_name);
 			has_finished = 1;
 			break;
 		    }
@@ -563,7 +563,7 @@ void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	fprintf(stderr, "found no free process for network request. answer overload and close connection\n");
+	debug(1, "found no free process for network request. answer overload and close connection\n");
 	/* NOTE: intentionally no mutex unlock here. We checked all processes,
 	 * locked and unlocked all entries. Now there is no locked mutex left.
 	 */
@@ -588,7 +588,7 @@ void *thread_handle_connection(void *arg)
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
 
-	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
 	}
 
 
@@ -614,7 +614,7 @@ void *thread_handle_connection(void *arg)
 	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
 	    //	timeout.tv_usec = 0;
 
-	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    debug(1, "[%ld] selecting on network connections\n", thread_id);
 	    FD_ZERO(&wfds);
 	    if ( !can_write_networksock )
 		FD_SET(inetsocketfd, &wfds);
@@ -628,7 +628,7 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    debug(1, "thread_handle_connection() received interrupt\n");
 		    break;
 
 		default:
@@ -641,7 +641,7 @@ void *thread_handle_connection(void *arg)
 
 	    if (FD_ISSET(inetsocketfd, &wfds))
 	    {
-		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
+		debug(1, "[%ld]  can write to network socket\n", thread_id);
 		can_write_networksock = 1;
 	    }
 
@@ -660,7 +660,7 @@ void *thread_handle_connection(void *arg)
 		    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
 
 		    int writebytes = write(inetsocketfd, sendbuffer, retval);
-		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to network socket");
@@ -815,7 +815,7 @@ void *thread_handle_connection(void *arg)
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
-	    fprintf(stderr, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
 
 	}
 	char *buffer = malloc(maxbufsize);
@@ -862,7 +862,7 @@ void *thread_handle_connection(void *arg)
 	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
 	    //	timeout.tv_usec = 0;
 
-	    fprintf(stderr, "[%ld] selecting on network connections\n", thread_id);
+	    debug(1, "[%ld] selecting on network connections\n", thread_id);
 	    FD_ZERO(&rfds);
 	    FD_ZERO(&wfds);
 	    if ( !can_read_networksock && !fcgi_data_iterator_has_data(fcgi_data_iterator) )
@@ -883,7 +883,7 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    fprintf(stderr, "thread_handle_connection() received interrupt\n");
+		    debug(1, "thread_handle_connection() received interrupt\n");
 		    break;
 
 		default:
@@ -896,22 +896,22 @@ void *thread_handle_connection(void *arg)
 
 	    if (FD_ISSET(inetsocketfd, &wfds))
 	    {
-		fprintf(stderr, "[%ld]  can write to network socket\n", thread_id);
+		debug(1, "[%ld]  can write to network socket\n", thread_id);
 		can_write_networksock = 1;
 	    }
 	    if (FD_ISSET(childunixsocketfd, &wfds))
 	    {
-		fprintf(stderr, "[%ld]  can write to unix socket\n", thread_id);
+		debug(1, "[%ld]  can write to unix socket\n", thread_id);
 		can_write_unixsock = 1;
 	    }
 	    if (FD_ISSET(inetsocketfd, &rfds))
 	    {
-		fprintf(stderr, "[%ld]  can read from network socket\n", thread_id);
+		debug(1, "[%ld]  can read from network socket\n", thread_id);
 		can_read_networksock = 1;
 	    }
 	    if (FD_ISSET(childunixsocketfd, &rfds))
 	    {
-		fprintf(stderr, "[%ld]  can read from unix socket\n", thread_id);
+		debug(1, "[%ld]  can read from unix socket\n", thread_id);
 		can_read_unixsock = 1;
 	    }
 
@@ -929,7 +929,7 @@ void *thread_handle_connection(void *arg)
 		    int datalen = fcgi_data_get_datalen(fcgi_data);
 //		    retval = write(debugfd, data, datalen);
 		    int writebytes = write(childunixsocketfd, data, datalen);
-		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to child process socket");
@@ -943,9 +943,9 @@ void *thread_handle_connection(void *arg)
 		 */
 		else if ( can_read_networksock )
 		{
-		    fprintf(stderr, "[%ld]  read data from network socket: ", thread_id);
+		    debug(1, "[%ld]  read data from network socket: ", thread_id);
 		    int readbytes = read(inetsocketfd, buffer, maxbufsize);
-		    fprintf(stderr, "read %d, ", readbytes);
+		    debug(1, "read %d, ", readbytes);
 		    if (-1 == readbytes)
 		    {
 			logerror("\nerror: reading from network socket");
@@ -957,13 +957,13 @@ void *thread_handle_connection(void *arg)
 			break;
 		    }
 #ifdef PRINT_NETWORK_DATA
-		    fprintf(stderr, "\n[%ld] network data:\n", thread_id);
+		    debug(1, "\n[%ld] network data:\n", thread_id);
 		    fwrite(buffer, 1, readbytes, stderr);
-		    fprintf(stderr, "\n");
+		    debug(1, "\n");
 #endif
 
 		    int writebytes = write(childunixsocketfd, buffer, readbytes);
-		    fprintf(stderr, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to child process socket");
@@ -976,9 +976,9 @@ void *thread_handle_connection(void *arg)
 
 	    if (can_read_unixsock && can_write_networksock)
 	    {
-		fprintf(stderr, "[%ld]  read data from unix socket: ", thread_id);
+		debug(1, "[%ld]  read data from unix socket: ", thread_id);
 		int readbytes = read(childunixsocketfd, buffer, maxbufsize);
-		fprintf(stderr, "read %d, ", readbytes);
+		debug(1, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
 		    logerror("\nerror: reading from child process socket");
@@ -990,12 +990,12 @@ void *thread_handle_connection(void *arg)
 		    break;
 		}
 #ifdef PRINT_SOCKET_DATA
-		fprintf(stderr, "fcgi data:\n");
+		debug(1, "fcgi data:\n");
 		fwrite(buffer, 1, readbytes, stderr);
-		fprintf(stderr, "\n");
+		debug(1, "\n");
 #endif
 		int writebytes = write(inetsocketfd, buffer, readbytes);
-		fprintf(stderr, "wrote %d\n", writebytes);
+		debug(1, "wrote %d\n", writebytes);
 		if (-1 == writebytes)
 		{
 		    logerror("error: writing to network socket");
@@ -1014,7 +1014,7 @@ void *thread_handle_connection(void *arg)
 //    close(debugfd);
 
     /* clean up */
-    fprintf(stderr, "[%ld] end connection thread\n", thread_id);
+    debug(1, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
     fcgi_data_list_delete(datalist);
     free(arg);
@@ -1048,7 +1048,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
     struct signal_data_s sigdata;
     sigdata.signal = signal;
     sigdata.pid = info->si_pid;
-    fprintf(stderr, "got signal %d from pid %d\n", signal, info->si_pid);
+    debug(1, "got signal %d from pid %d\n", signal, info->si_pid);
     switch (signal)
     {
     case SIGCHLD:	// fall through
@@ -1063,11 +1063,11 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	    logerror("write signal data");
 	    exit(EXIT_FAILURE);
 	}
-	fprintf(stderr, "wrote %d bytes to sig pipe\n", retval);
+	debug(1, "wrote %d bytes to sig pipe\n", retval);
 	break;
 
     default:
-	fprintf(stderr, "Huh? Got unexpected signal %d. Ignored\n", signal);
+	debug(1, "Huh? Got unexpected signal %d. Ignored\n", signal);
 	break;
     }
 }
@@ -1171,7 +1171,7 @@ int main(int argc, char **argv)
 	int s = getaddrinfo(net_listen, net_port, &hints, &result);
 	if (s != 0)
 	{
-	    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+	    debug(1, "getaddrinfo: %s\n", gai_strerror(s));
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1207,7 +1207,7 @@ int main(int argc, char **argv)
 
 	if (rp == NULL)
 	{ /* No address succeeded */
-	    //fprintf(stderr, "Could not bind\n"); // TODO better message
+	    //debug(1, "Could not bind\n"); // TODO better message
 	    logerror("could not create network socket");
 	    exit(EXIT_FAILURE);
 	}
@@ -1334,7 +1334,7 @@ int main(int argc, char **argv)
 	    for (i=0; i<num_proj; i++)
 	    {
 		const char *projname = config_get_name_project(i);
-		fprintf(stderr, "found project '%s'. Startup child processes\n", projname);
+		debug(1, "found project '%s'. Startup child processes\n", projname);
 
 		const char *configpath = config_get_project_config_path(projname);
 		struct qgis_project_s *project = qgis_project_new(projname, configpath);
@@ -1395,7 +1395,7 @@ int main(int argc, char **argv)
     int has_finished = 0;
     int is_readable_serversocket = 0;
     int is_readable_signalpipe = 0;
-    fprintf(stderr, "waiting for network connection requests\n");
+    debug(1, "waiting for network connection requests\n");
     while ( !has_finished )
     {
 	/* wait for connections, signals or timeout */
@@ -1418,7 +1418,7 @@ int main(int argc, char **argv)
 		 * Let the main thread clean up: Wait for all child processes
 		 * to end, close all remaining file descriptors and exit.
 		 */
-		fprintf(stderr, "main() received interrupt\n");
+		debug(1, "main() received interrupt\n");
 		break;
 
 	    default:
@@ -1434,12 +1434,12 @@ int main(int argc, char **argv)
 	    if (FD_ISSET(serversocketfd, &rfds))
 	    {
 		is_readable_serversocket = 1;
-		fprintf(stderr, "can read from network socket\n");
+		debug(1, "can read from network socket\n");
 	    }
 	    if (FD_ISSET(signalpipe_rd, &rfds))
 	    {
 		is_readable_signalpipe = 1;
-		fprintf(stderr, "can read from pipe\n");
+		debug(1, "can read from pipe\n");
 	    }
 
 	    if (is_readable_signalpipe)
@@ -1454,7 +1454,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-		    fprintf(stderr, "-- read %d bytes, got signal %d, child %d\n", retval, sigdata.signal, sigdata.pid);
+		    debug(1, "-- read %d bytes, got signal %d, child %d\n", retval, sigdata.signal, sigdata.pid);
 
 		    /* react on signals */
 		    switch (sigdata.signal)
@@ -1469,7 +1469,7 @@ int main(int argc, char **argv)
 		    case SIGINT:
 		    case SIGQUIT:
 			/* termination signal, kill all child processes */
-			fprintf(stderr, "exit program\n");
+			debug(1, "exit program\n");
 			set_program_shutdown(1);
 			break;
 		    }
@@ -1499,11 +1499,11 @@ int main(int argc, char **argv)
 				sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 			if (ret < 0)
 			{
-			    fprintf(stderr, "error: can not convert host address: %s\n", gai_strerror(ret));
+			    debug(1, "error: can not convert host address: %s\n", gai_strerror(ret));
 			}
 			else
 			{
-			    fprintf(stderr, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
+			    debug(1, "accepted connection from host %s, port %s, fd %d\n", hbuf, sbuf, retval);
 			}
 
 			int networkfd = retval;
@@ -1566,7 +1566,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-		    fprintf(stderr, "got interrupt after sending SIGKILL. Have a look of processes running?\n");
+		    debug(1, "got interrupt after sending SIGKILL. Have a look of processes running?\n");
 		    int children = 0;
 		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
 		    while ( projiterator )
@@ -1591,14 +1591,14 @@ int main(int argc, char **argv)
 
 		    if (children)
 		    {
-			fprintf(stderr, "still found processes after sending SIGKILL\n");
+			debug(1, "still found processes after sending SIGKILL\n");
 		    }
 		    else
 		    {
 			/* all child processes did exit, we can end this */
 			exitvalue = EXIT_SUCCESS;
 			has_finished = 1;
-			fprintf(stderr, "no more processes found after sending SIGKILL\n");
+			debug(1, "no more processes found after sending SIGKILL\n");
 		    }
 
 		}
@@ -1611,7 +1611,7 @@ int main(int argc, char **argv)
 		 */
 		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
 		{
-		    fprintf(stderr, "timeout, sending SIGKILL to remaining processes\n");
+		    debug(1, "timeout, sending SIGKILL to remaining processes\n");
 
 		    int children = 0;
 
@@ -1637,7 +1637,7 @@ int main(int argc, char **argv)
 				     * erase it from the list of available processes
 				     */
 				{
-				    fprintf(stderr, "process %d is gone, removing from list\n", pid);
+				    debug(1, "process %d is gone, removing from list\n", pid);
 
 				    struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
 				    if (myproc)
@@ -1647,7 +1647,7 @@ int main(int argc, char **argv)
 				    }
 				    else
 				    {
-					fprintf(stderr, "process %d not found in list\n", pid);
+					debug(1, "process %d not found in list\n", pid);
 				    }
 				}
 				break;
@@ -1667,7 +1667,7 @@ int main(int argc, char **argv)
 
 		    if (0 < children)
 		    {
-			fprintf(stderr, "termination signal timeout, sending SIGKILL to %d child processes..\n", children);
+			debug(1, "termination signal timeout, sending SIGKILL to %d child processes..\n", children);
 			timeout.tv_sec = 10;
 			has_finished_second_run = 1;
 		    }
@@ -1676,14 +1676,14 @@ int main(int argc, char **argv)
 			/* no more child processes found to send signal.
 			 * exit immediately.
 			 */
-			fprintf(stderr, "termination signal timeout, shut down\n");
+			debug(1, "termination signal timeout, shut down\n");
 			has_finished = 1;
 			break;
 		    }
 		}
 		else
 		{
-		    fprintf(stderr, "got interrupt after sending SIGTERM. Have a look of processes running?\n");
+		    debug(1, "got interrupt after sending SIGTERM. Have a look of processes running?\n");
 		    int children = 0;
 		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
 		    while ( projiterator )
@@ -1705,14 +1705,14 @@ int main(int argc, char **argv)
 
 		    if (children)
 		    {
-			fprintf(stderr, "still found processes after sending SIGTERM\n");
+			debug(1, "still found processes after sending SIGTERM\n");
 		    }
 		    else
 		    {
 			/* all child processes did exit, we can end this */
 			exitvalue = EXIT_SUCCESS;
 			has_finished = 1;
-			fprintf(stderr, "no more processes found after sending SIGTERM\n");
+			debug(1, "no more processes found after sending SIGTERM\n");
 		    }
 
 		}
@@ -1736,7 +1736,7 @@ int main(int argc, char **argv)
 
 		if (0 < children)
 		{
-		    fprintf(stderr, "termination signal received, sending SIGTERM to %d child processes..\n", children);
+		    debug(1, "termination signal received, sending SIGTERM to %d child processes..\n", children);
 		    /* set timeout to "some seconds" */
 		    timeout_ptr = &timeout;
 		    timeout.tv_sec = 10;
@@ -1747,7 +1747,7 @@ int main(int argc, char **argv)
 		    /* no more child processes found to send signal.
 		     * exit immediately.
 		     */
-		    fprintf(stderr, "termination signal received, no more processes to signal, shut down\n");
+		    debug(1, "termination signal received, no more processes to signal, shut down\n");
 		    has_finished = 1;
 		    break;
 		}
@@ -1760,7 +1760,7 @@ int main(int argc, char **argv)
 
     /* at this point no more child processes should be running anymore */
 
-    fprintf(stderr, "closing network socket\n");
+    debug(1, "closing network socket\n");
     fflush(stderr);
     close(serversocketfd);
 //    qgis_process_list_delete(proclist);

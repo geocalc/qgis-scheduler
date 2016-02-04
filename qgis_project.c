@@ -141,7 +141,7 @@ void qgis_project_config_change(struct qgis_project_s *project, const char *file
     if (0 == retval)
     {
 	/* match, start new processes and then move them to idle list */
-	fprintf(stderr, "found config change in project '%s', update processes\n", project->name);
+	debug(1, "found config change in project '%s', update processes\n", project->name);
 	qgis_project_restart_processes(project);
     }
 
@@ -162,7 +162,7 @@ static void *thread_watch_config(void *arg)
 
 
     const char *projname = project->name;
-    fprintf(stderr, "[%lu] started watcher thread for project '%s', looking for changes in '%s'\n", thread_id, projname, project->configpath);
+    debug(1, "[%lu] started watcher thread for project '%s', looking for changes in '%s'\n", thread_id, projname, project->configpath);
 
 
     static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;
@@ -184,7 +184,7 @@ static void *thread_watch_config(void *arg)
 	    case EINTR:
 		/* We received an interrupt, possibly a termination signal.
 		 */
-		fprintf(stderr, "[%lu] read() inotify_event received interrupt\n", thread_id);
+		debug(1, "[%lu] read() inotify_event received interrupt\n", thread_id);
 		break;
 
 	    default:
@@ -196,7 +196,7 @@ static void *thread_watch_config(void *arg)
 	else
 	{
 	    int size_read = retval;
-	    fprintf(stderr, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
+	    debug(1, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
 
 	    while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
 	    {
@@ -208,8 +208,8 @@ static void *thread_watch_config(void *arg)
 			/* The file has been written or copied to this path
 			 * Restart the processes
 			 */
-			fprintf(stderr, "got event IN_CLOSE_WRITE for project %s\n", projname );
-			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			debug(1, "got event IN_CLOSE_WRITE for project %s\n", projname );
+			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 			qgis_project_config_change(project, inotifyevent->name);
 			break;
 
@@ -217,23 +217,23 @@ static void *thread_watch_config(void *arg)
 			/* The file has been erased from this path.
 			 * Don't care, just mark the service as not restartable. (or better close this project and kill child progs?)
 			 */
-			fprintf(stderr, "got event IN_DELETE for project %s\n", projname );
-			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			debug(1, "got event IN_DELETE for project %s\n", projname );
+			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 			break;
 
 		    case IN_MOVED_TO:
 			/* The file has been overwritten by a move to this path
 			 * Restart the processes
 			 */
-			fprintf(stderr, "got event IN_MOVED_TO for project %s\n", projname );
-			fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			debug(1, "got event IN_MOVED_TO for project %s\n", projname );
+			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 			qgis_project_config_change(project, inotifyevent->name);
 			break;
 
 		    case IN_IGNORED:
 			// Watch was removed. We can exit this thread
-			fprintf(stderr, "got event IN_IGNORED for project %s\n", projname );
-			//		fprintf(stderr, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+			debug(1, "got event IN_IGNORED for project %s\n", projname );
+			//		debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
 			if (get_program_shutdown())
 			{
 			    goto thread_watch_config_end_for_loop;
@@ -241,13 +241,13 @@ static void *thread_watch_config(void *arg)
 			break;
 
 		    default:
-			fprintf(stderr, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
+			debug(1, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
 			break;
 		    }
 		}
 		else
 		{
-		    fprintf(stderr, "error: project %s, got event %d for unknown watch %d. Ignored\n", projname, inotifyevent->mask, inotifyevent->wd );
+		    debug(1, "error: project %s, got event %d for unknown watch %d. Ignored\n", projname, inotifyevent->mask, inotifyevent->wd );
 		}
 
 		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
@@ -259,7 +259,7 @@ static void *thread_watch_config(void *arg)
 
 thread_watch_config_end_for_loop:
 
-    fprintf(stderr, "[%lu] shutdown watcher thread for project '%s'\n", thread_id, projname);
+    debug(1, "[%lu] shutdown watcher thread for project '%s'\n", thread_id, projname);
     free(inotifyevent);
     free(arg);
     return NULL;
@@ -312,7 +312,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	    case ENOTDIR:
 	    case EOVERFLOW:
 		logerror("error accessing file '%s': ", configpath);
-		fprintf(stderr, "file is not watched for changes\n");
+		debug(1, "file is not watched for changes\n");
 		break;
 
 	    default:
@@ -413,7 +413,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	    }
 	    else
 	    {
-		fprintf(stderr, "error '%s' is no regular file\n", configpath);
+		debug(1, "error '%s' is no regular file\n", configpath);
 	    }
 	}
     }
@@ -426,14 +426,14 @@ void qgis_project_delete(struct qgis_project_s *proj)
 {
     if (proj)
     {
-	fprintf(stderr, "deleting project '%s'\n", proj->name);
+	debug(1, "deleting project '%s'\n", proj->name);
 	if (proj->inotifyfd)
 	{
-	    fprintf(stderr, "found inotify fd for project '%s'\n", proj->name);
+	    debug(1, "found inotify fd for project '%s'\n", proj->name);
 	    int retval;
 	    if (proj->inotifywatchfd)
 	    {
-		fprintf(stderr, "removing inotify watch for project '%s'\n", proj->name);
+		debug(1, "removing inotify watch for project '%s'\n", proj->name);
 		retval = inotify_rm_watch(proj->inotifyfd, proj->inotifywatchfd);
 		if (-1 == retval)
 		{
@@ -443,7 +443,7 @@ void qgis_project_delete(struct qgis_project_s *proj)
 
 		// if we have a valid inotify watch fd, then there must be a watcher thread?
 		assert(proj->config_watch_threadid);
-		fprintf(stderr, "[%lu] join process %lu\n", pthread_self(), proj->config_watch_threadid);
+		debug(1, "[%lu] join process %lu\n", pthread_self(), proj->config_watch_threadid);
 		int retval = pthread_join(proj->config_watch_threadid, NULL);
 		if (retval)
 		{
@@ -453,7 +453,7 @@ void qgis_project_delete(struct qgis_project_s *proj)
 		}
 	    }
 
-	    fprintf(stderr, "close inotify fd for project '%s'\n", proj->name);
+	    debug(1, "close inotify fd for project '%s'\n", proj->name);
 	    close(proj->inotifyfd);
 	}
 
@@ -495,7 +495,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     qgis_process_set_state_init(childproc, thread_id);
 
 
-    fprintf(stderr, "init new spawned child process for project '%s'\n", projname);
+    debug(1, "init new spawned child process for project '%s'\n", projname);
 
 
 //    char debugfile[256];
@@ -503,7 +503,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 //    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 //    if (-1 == debugfd)
 //    {
-//	fprintf(stderr, "error can not open file '%s': ", debugfile);
+//	debug(1, "error can not open file '%s': ", debugfile);
 //	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
@@ -537,7 +537,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 	logerror("error: can not connect to child process");
 	exit(EXIT_FAILURE);
     }
-//    fprintf(stderr, "init project '%s', connected to child via socket '\\0%s'\n", projname, sockaddr.sun_path+1);
+//    debug(1, "init project '%s', connected to child via socket '\\0%s'\n", projname, sockaddr.sun_path+1);
 
 
     /* create the fcgi data and
@@ -558,7 +558,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)	// TODO: be more flexible if buffer too small
     {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	debug(1, "fcgi message buffer too small (%d)\n", maxbufferlen);
 	exit(EXIT_FAILURE);
     }
 //    retval = write(debugfd, buffer, len);
@@ -584,13 +584,13 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 	    const char *value = config_get_init_value(projname, i);
 	    if (!value)
 		break;
-	    fprintf(stderr, "Param %s=%s\n", key, value);
+	    debug(1, "Param %s=%s\n", key, value);
 
 	    retval = fcgi_param_list_write(parambuffer, remain_len, key, value);
 	    if (-1 == retval)
 	    {
 		// TODO: be more flexible if buffer too small
-		fprintf(stderr, "fcgi parameter buffer too small (%d)\n", maxbufferlen);
+		debug(1, "fcgi parameter buffer too small (%d)\n", maxbufferlen);
 		exit(EXIT_FAILURE);
 
 	    }
@@ -603,7 +603,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 
 	if (i>=128)
 	{
-	    fprintf(stderr, "fcgi parameter too many key/value pairs\n");
+	    debug(1, "fcgi parameter too many key/value pairs\n");
 	    exit(EXIT_FAILURE);
 
 	}
@@ -614,7 +614,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)	// TODO: be more flexible if buffer too small
     {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	debug(1, "fcgi message buffer too small (%d)\n", maxbufferlen);
 	exit(EXIT_FAILURE);
     }
 //    retval = write(debugfd, buffer, len);
@@ -631,7 +631,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)	// TODO: be more flexible if buffer too small
     {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	debug(1, "fcgi message buffer too small (%d)\n", maxbufferlen);
 	exit(EXIT_FAILURE);
     }
 //    retval = write(debugfd, buffer, len);
@@ -648,7 +648,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)
     {
-	fprintf(stderr, "fcgi message buffer too small (%d)\n", maxbufferlen);
+	debug(1, "fcgi message buffer too small (%d)\n", maxbufferlen);
 	exit(EXIT_FAILURE);
     }
 //    retval = write(debugfd, buffer, len);
@@ -677,7 +677,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     while (retval>0)
     {
 	retval = read(childunixsocketfd, buffer, maxbufferlen);
-//	fprintf(stderr, "init project '%s' received:\n%.*s\n", projname, retval, buffer);
+//	debug(1, "init project '%s' received:\n%.*s\n", projname, retval, buffer);
     }
 
 
@@ -686,7 +686,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
      */
     close(childunixsocketfd);
 //    close(debugfd);
-    fprintf(stderr, "init child process for project '%s' done. waiting for input..\n", projname);
+    debug(1, "init child process for project '%s' done. waiting for input..\n", projname);
 
     // TODO: do we need this distinction over here?
     if (childproc)
@@ -695,7 +695,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     }
     else
     {
-	fprintf(stderr, "no child process found to initialize\n");
+	debug(1, "no child process found to initialize\n");
 	exit(EXIT_FAILURE);
     }
     free(buffer);
@@ -710,11 +710,11 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     const char *project_name = qgis_project_get_name(project);
     const char *command = config_get_process( project_name );
 
-    fprintf(stderr, "project '%s' start new child process '%s'\n", project_name, command);
+    debug(1, "project '%s' start new child process '%s'\n", project_name, command);
 
     if (NULL == command || 0 == strlen(command))
     {
-	fprintf(stderr, "error: no process path specified. Not starting any process\n");
+	printlog("project '%s' error: no process path specified. Not starting any process", project_name);
 	return NULL;
     }
 
@@ -783,7 +783,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	     * exit here, because we can not get any more numbers.
 	     * Or we have a programmers error here..
 	     */
-	    fprintf(stderr, "error: out of numbers to create socket name. exit");
+	    debug(1, "error: out of numbers to create socket name. exit");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -809,7 +809,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 		exit(EXIT_FAILURE);
 	    }
 	}
-	fprintf(stderr, "start project '%s', bound socket to '\\0%s'\n", project_name, childsockaddr.sun_path+1);
+	debug(1, "start project '%s', bound socket to '\\0%s'\n", project_name, childsockaddr.sun_path+1);
 	break;
     }
 
@@ -938,12 +938,12 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	    logerror("error creating thread");
 	    exit(EXIT_FAILURE);
 	}
-	fprintf(stderr, "[%lu] started process %lu\n", pthread_self(), threads[i]);
+	debug(1, "[%lu] started process %lu\n", pthread_self(), threads[i]);
     }
     /* wait for those threads */
     for (i=0; i<num; i++)
     {
-	fprintf(stderr, "[%lu] join process %lu\n", pthread_self(), threads[i]);
+	debug(1, "[%lu] join process %lu\n", pthread_self(), threads[i]);
 	retval = pthread_join(threads[i], NULL);
 	if (retval)
 	{
@@ -968,12 +968,12 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
     if (do_exchange_processes)
     {
 	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
-	fprintf(stderr, "project '%s' moved %d processes from active list to shutdown list\n", project->name, retval);
+	debug(1, "project '%s' moved %d processes from active list to shutdown list\n", project->name, retval);
 	retval = qgis_process_list_send_signal(project->shutdownproclist, SIGTERM);
-	fprintf(stderr, "project '%s' send %d processes the TERM signal\n", project->name, retval);
+	debug(1, "project '%s' send %d processes the TERM signal\n", project->name, retval);
     }
     retval = qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
-    fprintf(stderr, "project '%s' moved %d processes from init list to active list\n", project->name, retval);
+    debug(1, "project '%s' moved %d processes from init list to active list\n", project->name, retval);
 
     retval = pthread_rwlock_unlock(&project->rwlock);
     if (retval)
@@ -1082,7 +1082,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 
 	    if ( !get_program_shutdown() )
 	    {
-		fprintf(stderr, "project '%s' restarting process\n", proj->name);
+		debug(1, "project '%s' restarting process\n", proj->name);
 
 		/* child process terminated, restart anew */
 		/* TODO: react on child processes exiting immediately.
@@ -1106,7 +1106,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 
 		if ( !get_program_shutdown() )
 		{
-		    fprintf(stderr, "project '%s' restarting process\n", proj->name);
+		    debug(1, "project '%s' restarting process\n", proj->name);
 
 		    /* child process terminated, restart anew */
 		    /* TODO: react on child processes exiting immediately.
