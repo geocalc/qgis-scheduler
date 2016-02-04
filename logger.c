@@ -173,7 +173,7 @@ static void *thread_logger(void *arg)
  * create thread to read from pipe
  * and output in new format to logfile.
  */
-int logger_init(int in_daemon_mode)
+int logger_init(void)
 {
     int retval;
 
