@@ -39,6 +39,8 @@
 #include <sys/queue.h>
 #include <assert.h>
 
+#include "logger.h"
+
 
 struct fcgi_data_s
 {
