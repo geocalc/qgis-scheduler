@@ -160,7 +160,7 @@ struct thread_connection_handler_args
 };
 
 
-static const char version[] = "0.6";
+static const char version[] = "0.6.1";
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 1;
 static const int daemon_no_change_dir = 0;
