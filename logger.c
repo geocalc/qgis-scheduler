@@ -65,8 +65,7 @@ int logger_init(void)
 	int retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 	if (-1 == retval)
 	{
-	    fprintf(stderr, "can not open log file '%s': ", logfilename);
-	    logerror(NULL);
+	    logerror("can not open log file '%s': ", logfilename);
 	    exit(EXIT_FAILURE);
 	}
 	int logfd = retval;

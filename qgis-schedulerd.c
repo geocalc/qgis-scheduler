@@ -203,8 +203,7 @@ void write_pid_file(const char *path)
     FILE *f = fopen(path, "w");
     if (NULL == f)
     {
-	fprintf(stderr, "can not open pidfile '%s': ", path);
-	logerror(NULL);
+	logerror("can not open pidfile '%s': ", path);
 	exit(EXIT_FAILURE);
     }
 
@@ -219,8 +218,7 @@ void remove_pid_file(const char *path)
     int retval = unlink(path);
     if (-1 == retval)
     {
-	fprintf(stderr, "can not remove pidfile '%s': ", path);
-	logerror(NULL);
+	logerror("can not remove pidfile '%s': ", path);
 	// intentionally no exit() call
     }
 }

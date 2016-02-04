@@ -311,14 +311,12 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	    case ENOENT:
 	    case ENOTDIR:
 	    case EOVERFLOW:
-		fprintf(stderr, "error accessing file '%s': ", configpath);
-		logerror(NULL);
+		logerror("error accessing file '%s': ", configpath);
 		fprintf(stderr, "file is not watched for changes\n");
 		break;
 
 	    default:
-		fprintf(stderr, "error accessing file '%s': ", configpath);
-		logerror(NULL);
+		logerror("error accessing file '%s': ", configpath);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -861,8 +859,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 
 
 	execl(command, command, NULL);
-	fprintf(stderr, "could not execute '%s': ", command);
-	logerror(NULL);
+	logerror("could not execute '%s': ", command);
 	exit(EXIT_FAILURE);
     }
     else if (0 < pid)
