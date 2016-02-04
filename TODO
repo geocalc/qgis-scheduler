@@ -41,4 +41,5 @@
 
 + be able to select file logging or syslog logging in config file
 
-  
++ write statistics to logfile if sigusr1 is received
+
