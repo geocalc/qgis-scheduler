@@ -128,6 +128,7 @@
 #include "fcgi_state.h"
 #include "fcgi_data.h"
 #include "qgis_config.h"
+#include "logger.h"
 
 //#include <sys/types.h>	// für open()
 //#include <sys/stat.h>
@@ -1228,6 +1229,7 @@ int main(int argc, char **argv)
 	exit(EXIT_FAILURE);
     }
 
+    logger_init();
 
     if ( !no_daemon )
     {
@@ -1768,6 +1770,8 @@ int main(int argc, char **argv)
     config_shutdown();
     close(signalpipe_rd);
     close(signalpipe_wr);
+    printlog("shut down %s", basename(argv[0]));
+    logger_stop();
 
     return exitvalue;
 }
