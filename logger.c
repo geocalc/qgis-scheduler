@@ -180,7 +180,7 @@ int logger_init(int in_daemon_mode)
     const char *logfilename = config_get_logfile();
     if (logfilename)
     {
-	retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
+	retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 	if (-1 == retval)
 	{
 	    fprintf(stderr, "can not open log file '%s': ", logfilename);
