@@ -33,10 +33,14 @@
 #ifndef LOGGER_H_
 #define LOGGER_H_
 
+#ifndef __GNUC__
+# define __attribute__(a)
+#endif
+
 int logger_init(void);
-int printlog(const char *format, ...);
-int debug(int level, const char *format, ...);
-int logerror(const char *format, ...);
+int printlog(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
+int debug(int level, const char *format, ...) __attribute__ ((__format__ (__printf__, 2, 3)));
+int logerror(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
 
 #endif /* LOGGER_H_ */
