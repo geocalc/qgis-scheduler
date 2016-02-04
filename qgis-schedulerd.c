@@ -520,16 +520,19 @@ void *thread_handle_connection(void *arg)
 
 
 	/* find the relevant project by name */
-	project = find_project_by_name(projectlist, request_project_name);
+	if (request_project_name)
+	    project = find_project_by_name(projectlist, request_project_name);
 
     }
 
 
 
-    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+    struct qgis_process_list_s *proclist = NULL;
 
     /* here we do point 5 */
+    if (project)
     {
+	proclist = qgis_project_get_process_list(project);
 
 	/* get the number of new started processes which then become idle
 	 * processes.
@@ -564,9 +567,14 @@ void *thread_handle_connection(void *arg)
 	    start_new_process_detached(missing_processes, project, 0);
 	}
     }
+    else
+    {
+	printlog("[%lu] Found no project for request from %s", thread_id, tinfo->hostname);
+    }
 
     /* find the next idling process and attach a thread to it */
-    proc = qgis_process_list_mutex_find_process_by_status(proclist, PROC_IDLE);
+    if (proclist)
+	proc = qgis_process_list_mutex_find_process_by_status(proclist, PROC_IDLE);
     if ( !proc )
     {
 	/* Found no idle processes.
