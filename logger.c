@@ -51,37 +51,25 @@
 #include "qgis_config.h"
 
 
-struct thread_logger_args
-{
-    int in_daemon_mode;
-};
-
-static int logfd = -1;
-
-
 
 
 /* opens the logfile specified by config,
- * redirects stdout and stderr to pipe,
- * create thread to read from pipe
- * and output in new format to logfile.
+ * redirects stdout and stderr to logfile.
  */
 int logger_init(void)
 {
-    int retval;
-
     const char *logfilename = config_get_logfile();
     if (logfilename)
     {
 
-	retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
+	int retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 	if (-1 == retval)
 	{
 	    fprintf(stderr, "can not open log file '%s': ", logfilename);
 	    perror(NULL);
 	    exit(EXIT_FAILURE);
 	}
-	logfd = retval;
+	int logfd = retval;
 
 
 	/* redirect stdout and stderr to logfile */
@@ -98,6 +86,8 @@ int logger_init(void)
 	    perror("can not dup to stderr");
 	    exit(EXIT_FAILURE);
 	}
+
+	close(logfd);
     }
 
     return 0;
@@ -106,16 +96,6 @@ int logger_init(void)
 
 void logger_stop(void)
 {
-//    assert(logger_thread);
-//    int retval = pthread_cancel(logger_thread);
-//    if (retval)
-//    {
-//	errno = retval;
-//	xperror("error creating thread");
-//	exit(EXIT_FAILURE);
-//    }
-    if (logfd >= 0)
-	close(logfd);
 }
 
 
