@@ -190,75 +190,92 @@ int logger_init(int in_daemon_mode)
 	logfd = retval;
     }
 
-    /* create internal logging pipe */
-    int pipes[2];
-    retval = pipe2(pipes, O_CLOEXEC);
-    if (-1 == retval)
-    {
-	perror("can not open pipe");
-	exit(EXIT_FAILURE);
-    }
-    pipefd = pipes[0];
-    int pipe_wr = pipes[1];
+//    /* create internal logging pipe */
+//    int pipes[2];
+//    retval = pipe2(pipes, O_CLOEXEC);
+//    if (-1 == retval)
+//    {
+//	perror("can not open pipe");
+//	exit(EXIT_FAILURE);
+//    }
+//    pipefd = pipes[0];
+//    int pipe_wr = pipes[1];
+//
+//    /* save old stdout/stderr if not in daemon mode */
+//    if ( !in_daemon_mode )
+//    {
+//	retval = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC);
+//	if (-1 == retval)
+//	{
+//	    perror("can not dup stdout");
+//	    exit(EXIT_FAILURE);
+//	}
+//	new_stdout = retval;
+//
+//	retval = fcntl(STDERR_FILENO, F_DUPFD_CLOEXEC);
+//	if (-1 == retval)
+//	{
+//	    perror("can not dup stderr");
+//	    exit(EXIT_FAILURE);
+//	}
+//	new_stderr = retval;
+//    }
+//
+//    /* create thread to read from pipe and push to logfile or stderr */
+//    /* NOTE: aside from the general rule
+//     * "malloc() and free() within the same function"
+//     * we transfer the responsibility for this memory
+//     * to the thread itself.
+//     */
+//    struct thread_logger_args *targs = malloc(sizeof(*targs));
+//    assert(targs);
+//    if ( !targs )
+//    {
+//	perror("could not allocate memory");
+//	exit(EXIT_FAILURE);
+//    }
+//    targs->in_daemon_mode = in_daemon_mode;
+//
+//    retval = pthread_create(&logger_thread, NULL, thread_logger, targs);
+//    if (retval)
+//    {
+//	errno = retval;
+//	perror("error creating thread");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//    /* redirect stdout and stderr to pipe */
+//    retval = dup3(pipe_wr, STDOUT_FILENO, O_CLOEXEC);
+//    if (-1 == retval)
+//    {
+//	perror("can not dup to stdout");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//    retval = dup3(pipe_wr, STDERR_FILENO, O_CLOEXEC);
+//    if (-1 == retval)
+//    {
+//	perror("can not dup to stderr");
+//	exit(EXIT_FAILURE);
+//    }
 
-    /* save old stdout/stderr if not in daemon mode */
-    if ( !in_daemon_mode )
+    /* redirect stdout and stderr to logfile */
+    if (logfilename)
     {
-	retval = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC);
+	retval = dup3(logfd, STDOUT_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    perror("can not dup stdout");
+	    perror("can not dup to stdout");
 	    exit(EXIT_FAILURE);
 	}
-	new_stdout = retval;
 
-	retval = fcntl(STDERR_FILENO, F_DUPFD_CLOEXEC);
+	retval = dup3(logfd, STDERR_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    perror("can not dup stderr");
+	    perror("can not dup to stderr");
 	    exit(EXIT_FAILURE);
 	}
-	new_stderr = retval;
     }
-
-    /* create thread to read from pipe and push to logfile or stderr */
-    /* NOTE: aside from the general rule
-     * "malloc() and free() within the same function"
-     * we transfer the responsibility for this memory
-     * to the thread itself.
-     */
-    struct thread_logger_args *targs = malloc(sizeof(*targs));
-    assert(targs);
-    if ( !targs )
-    {
-	perror("could not allocate memory");
-	exit(EXIT_FAILURE);
-    }
-    targs->in_daemon_mode = in_daemon_mode;
-
-    retval = pthread_create(&logger_thread, NULL, thread_logger, targs);
-    if (retval)
-    {
-	errno = retval;
-	perror("error creating thread");
-	exit(EXIT_FAILURE);
-    }
-
-    /* redirect stdout and stderr to pipe */
-    retval = dup3(pipe_wr, STDOUT_FILENO, O_CLOEXEC);
-    if (-1 == retval)
-    {
-	perror("can not dup to stdout");
-	exit(EXIT_FAILURE);
-    }
-
-    retval = dup3(pipe_wr, STDERR_FILENO, O_CLOEXEC);
-    if (-1 == retval)
-    {
-	perror("can not dup to stderr");
-	exit(EXIT_FAILURE);
-    }
-
 
     return 0;
 }
@@ -266,14 +283,16 @@ int logger_init(int in_daemon_mode)
 
 void logger_stop(void)
 {
-    assert(logger_thread);
-    int retval = pthread_cancel(logger_thread);
-    if (retval)
-    {
-	errno = retval;
-	xperror("error creating thread");
-	exit(EXIT_FAILURE);
-    }
+//    assert(logger_thread);
+//    int retval = pthread_cancel(logger_thread);
+//    if (retval)
+//    {
+//	errno = retval;
+//	xperror("error creating thread");
+//	exit(EXIT_FAILURE);
+//    }
+    if (logfd >= 0)
+	close(logfd);
 }
 
 
