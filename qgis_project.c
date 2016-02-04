@@ -910,9 +910,14 @@ void *thread_start_new_child(void *arg)
  */
 void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
+    assert(project);
+    assert(num > 0);
+
     pthread_t threads[num];
     int i;
     int retval;
+
+    printlog("Starting %d process%s for project '%s'", num, (num>1)?"es":"", project->name);
 
     /* start all thread in parallel */
     for (i=0; i<num; i++)

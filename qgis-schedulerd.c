@@ -259,6 +259,15 @@ void *thread_handle_connection(void *arg)
 
     debug(1, "start a new connection thread\n");
 
+    struct timespec ts;
+    retval = clock_gettime(get_valid_clock_id(), &ts);
+    if (-1 == retval)
+    {
+	logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	exit(EXIT_FAILURE);
+    }
+
+
 //    char debugfile[128];
 //    sprintf(debugfile, "/tmp/threadconnect.%lu.dump", thread_id);
 //    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
@@ -564,7 +573,7 @@ void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	printlog("Found no free process for network request from %s. Answer overload and close connection\n", tinfo->hostname);
+	printlog("[%lu] Found no free process for network request from %s. Answer overload and close connection\n", thread_id, tinfo->hostname);
 	/* NOTE: intentionally no mutex unlock here. We checked all processes,
 	 * locked and unlocked all entries. Now there is no locked mutex left.
 	 */
@@ -701,7 +710,7 @@ void *thread_handle_connection(void *arg)
 	{
 	    pid_t pid = qgis_process_get_pid(proc);
 	    const char *projname = qgis_project_get_name(project);
-	    printlog("use process %d to handle request for %s, project %s", pid, tinfo->hostname, projname );
+	    printlog("[%lu] Use process %d to handle request for %s, project %s", thread_id, pid, tinfo->hostname, projname );
 	}
 
 	/* change the connection flag of the fastcgi connection to not
@@ -1019,8 +1028,25 @@ void *thread_handle_connection(void *arg)
     }
 //    close(debugfd);
 
+    struct timespec nextts;
+    retval = clock_gettime(get_valid_clock_id(), &nextts);
+    if (-1 == retval)
+    {
+	logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	exit(EXIT_FAILURE);
+    }
+
+    struct timespec subts;
+    subts.tv_sec = nextts.tv_sec - ts.tv_sec;
+    subts.tv_nsec = nextts.tv_nsec - ts.tv_nsec;
+    if (0 > subts.tv_nsec)
+    {
+	subts.tv_nsec += 1000*1000*1000;
+	subts.tv_sec--;
+    }
+    printlog("[%lu] done connection, %ld.%03ld sec", thread_id, subts.tv_sec, subts.tv_nsec/(1000*1000));
+
     /* clean up */
-    debug(1, "[%ld] end connection thread\n", thread_id);
     close (inetsocketfd);
     fcgi_data_list_delete(datalist);
     free(tinfo->hostname);
@@ -1157,9 +1183,10 @@ int main(int argc, char **argv)
     printlog("starting %s with pid %d", basename(argv[0]), getpid());
 
 
+    test_set_valid_clock_id();
+
     /* prepare inet socket connection for application server process (this)
      */
-
     {
 	struct addrinfo hints;
 	struct addrinfo *result = NULL, *rp = NULL;
@@ -1528,7 +1555,7 @@ int main(int argc, char **argv)
 			}
 			else
 			{
-			    printlog("Accepted connection from host %s, port %s", hbuf, sbuf);
+			    //printlog("Accepted connection from host %s, port %s", hbuf, sbuf);
 			    targs->hostname = strdup(hbuf);
 			}
 
@@ -1540,6 +1567,11 @@ int main(int argc, char **argv)
 			    errno = retval;
 			    logerror("error creating thread");
 			    exit(EXIT_FAILURE);
+			}
+
+			if (targs->hostname)
+			{
+			    printlog("Accepted connection from host %s, port %s. Handle connection in thread [%lu]", hbuf, sbuf, thread);
 			}
 
 		    }
