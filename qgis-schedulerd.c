@@ -129,6 +129,7 @@
 #include "fcgi_data.h"
 #include "qgis_config.h"
 #include "logger.h"
+#include "timer.h"
 
 //#include <sys/types.h>	// für open()
 //#include <sys/stat.h>
@@ -260,7 +261,7 @@ void *thread_handle_connection(void *arg)
     debug(1, "start a new connection thread\n");
 
     struct timespec ts;
-    retval = clock_gettime(get_valid_clock_id(), &ts);
+    retval = qgis_timer_start(&ts);
     if (-1 == retval)
     {
 	logerror("clock_gettime(%d,..)", get_valid_clock_id());
@@ -1028,23 +1029,15 @@ void *thread_handle_connection(void *arg)
     }
 //    close(debugfd);
 
-    struct timespec nextts;
-    retval = clock_gettime(get_valid_clock_id(), &nextts);
+
+    retval = qgis_timer_stop(&ts);
     if (-1 == retval)
     {
 	logerror("clock_gettime(%d,..)", get_valid_clock_id());
 	exit(EXIT_FAILURE);
     }
+    printlog("[%lu] done connection, %ld.%03ld sec", thread_id, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
-    struct timespec subts;
-    subts.tv_sec = nextts.tv_sec - ts.tv_sec;
-    subts.tv_nsec = nextts.tv_nsec - ts.tv_nsec;
-    if (0 > subts.tv_nsec)
-    {
-	subts.tv_nsec += 1000*1000*1000;
-	subts.tv_sec--;
-    }
-    printlog("[%lu] done connection, %ld.%03ld sec", thread_id, subts.tv_sec, subts.tv_nsec/(1000*1000));
 
     /* clean up */
     close (inetsocketfd);
