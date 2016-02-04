@@ -1076,14 +1076,14 @@ struct signal_data_s
  *       Use write in here?
  */
 int signalpipe_wr = -1;
-void signalaction(int signal, siginfo_t *info, void *ucontext)
+void signalaction(int sig, siginfo_t *info, void *ucontext)
 {
     int retval;
     struct signal_data_s sigdata;
-    sigdata.signal = signal;
+    sigdata.signal = sig;
     sigdata.pid = info->si_pid;
-    debug(1, "got signal %d from pid %d\n", signal, info->si_pid);
-    switch (signal)
+    debug(1, "got signal %d from pid %d\n", sig, info->si_pid);
+    switch (sig)
     {
     case SIGCHLD:	// fall through
     case SIGTERM:	// fall through
@@ -1116,7 +1116,7 @@ void signalaction(int signal, siginfo_t *info, void *ucontext)
 	break;
 
     default:
-	debug(1, "Huh? Got unexpected signal %d. Ignored\n", signal);
+	debug(1, "Huh? Got unexpected signal %d. Ignored\n", sig);
 	break;
     }
 }
