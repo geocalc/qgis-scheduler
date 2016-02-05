@@ -40,6 +40,7 @@
 #include <errno.h>
 
 #include "logger.h"
+#include "timer.h"
 
 
 struct qgis_process_s
@@ -50,6 +51,7 @@ struct qgis_process_s
     int process_socket_fd;	// fd transferred to the qgis process
     int client_socket_fd;	// fd this scheduler connects to child process
     pthread_mutex_t mutex;	// thread mutex to serialize access
+    struct timespec starttime;	// stored start time to measure process runtime
 };
 
 
@@ -91,6 +93,13 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     {
 	errno = retval;
 	logerror("error: pthread_mutex_init");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = qgis_timer_start(&proc->starttime);
+    if (-1 == retval)
+    {
+	logerror("clock_gettime()");
 	exit(EXIT_FAILURE);
     }
 
@@ -237,6 +246,13 @@ pid_t qgis_process_get_pid(struct qgis_process_s *proc)
 {
     assert(proc);
     return proc?proc->pid:-1;
+}
+
+
+const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc)
+{
+    assert(proc);
+    return &proc->starttime;
 }
 
 

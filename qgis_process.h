@@ -39,6 +39,7 @@
 
 
 struct qgis_process_s;
+struct timespec;
 
 enum qgis_process_state_e
 {
@@ -61,6 +62,7 @@ enum qgis_process_state_e qgis_process_get_state(struct qgis_process_s *proc);
 int qgis_process_get_socketfd(struct qgis_process_s *proc);
 pthread_mutex_t *qgis_process_get_mutex(struct qgis_process_s *proc);
 pid_t qgis_process_get_pid(struct qgis_process_s *proc);
+const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc);
 
 
 #endif /* QGIS_PROCESS_H_ */
