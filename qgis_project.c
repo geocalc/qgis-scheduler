@@ -52,6 +52,7 @@
 #include "qgis_config.h"
 #include "fcgi_state.h"
 #include "logger.h"
+#include "timer.h"
 
 
 //#define DISABLED_INIT
@@ -885,7 +886,9 @@ void *thread_start_new_child(void *arg)
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
     struct thread_init_new_child_args initargs;
+    struct timespec ts;
 
+    qgis_timer_start(&ts);
     initargs.proc = qgis_project_thread_function_start_new_child(arg);
 #ifdef DISABLED_INIT
 #warning disabled init phase
@@ -897,6 +900,9 @@ void *thread_start_new_child(void *arg)
 	qgis_project_thread_function_init_new_child(&initargs);
     }
 #endif
+    qgis_timer_stop(&ts);
+    const char *projname = qgis_project_get_name(tinfo->project);
+    printlog("Startup time for project '%s' %ld.%03ld sec", projname, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
     free(arg);
     return NULL;
