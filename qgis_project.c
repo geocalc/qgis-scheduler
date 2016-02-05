@@ -1072,10 +1072,12 @@ void start_new_process_detached(int num, struct qgis_project_s *project, int do_
  * test and remove the old entry and maybe restart anew.
  * test all three lists initproclist, activeproclist and shutdownproclist.
  */
-void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
+int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 {
     assert(proj);
     assert(pid>0);
+
+    int ret = 0;
 
     if (proj)
     {
@@ -1085,6 +1087,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
 	if (proc)
 	{
+	    ret++;
 	    /* that process belongs to our active list.
 	     * restart the process if not during shutdown.
 	     */
@@ -1094,6 +1097,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	    if ( !get_program_shutdown() )
 	    {
 		debug(1, "project '%s' restarting process\n", proj->name);
+		printlog("Project '%s', process %d died, restarting process", proj->name, pid);
 
 		/* child process terminated, restart anew */
 		/* TODO: react on child processes exiting immediately.
@@ -1109,6 +1113,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	    proc = qgis_process_list_find_process_by_pid(proclist, pid);
 	    if (proc)
 	    {
+		ret++;
 		/* that process belongs to our active list.
 		 * restart the process if not during shutdown.
 		 */
@@ -1118,6 +1123,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		if ( !get_program_shutdown() )
 		{
 		    debug(1, "project '%s' restarting process\n", proj->name);
+		    printlog("Project '%s', process %d died, restarting process", proj->name, pid);
 
 		    /* child process terminated, restart anew */
 		    /* TODO: react on child processes exiting immediately.
@@ -1135,6 +1141,7 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    proc = qgis_process_list_find_process_by_pid(proclist, pid);
 		    if (proc)
 		    {
+			ret++;
 			/* that process belongs to our list of deleted processes.
 			 * just remove it from this list.
 			 */
@@ -1145,6 +1152,8 @@ void qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	    }
 	}
     }
+
+    return ret;
 }
 
 
