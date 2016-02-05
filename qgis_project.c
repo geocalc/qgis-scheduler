@@ -56,6 +56,8 @@
 
 
 //#define DISABLED_INIT
+#define MIN_PROCESS_RUNTIME_SEC		300
+#define MIN_PROCESS_RUNTIME_NANOSEC	0
 
 
 
@@ -1091,6 +1093,16 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 	    /* that process belongs to our active list.
 	     * restart the process if not during shutdown.
 	     */
+	    struct timespec ts = *qgis_process_get_starttime(proc);
+	    int retval = qgis_timer_stop(&ts);
+	    if (-1 == retval)
+	    {
+		logerror("clock_gettime(%d,..)", get_valid_clock_id());
+		exit(EXIT_FAILURE);
+	    }
+	    if ( MIN_PROCESS_RUNTIME_SEC > ts.tv_sec || (MIN_PROCESS_RUNTIME_SEC == ts.tv_sec && MIN_PROCESS_RUNTIME_NANOSEC >= ts.tv_nsec) )
+		printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
+
 	    qgis_process_list_remove_process(proclist, proc);
 	    qgis_process_delete(proc);
 
@@ -1117,6 +1129,16 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		/* that process belongs to our active list.
 		 * restart the process if not during shutdown.
 		 */
+		struct timespec ts = *qgis_process_get_starttime(proc);
+		int retval = qgis_timer_stop(&ts);
+		if (-1 == retval)
+		{
+		    logerror("clock_gettime(%d,..)", get_valid_clock_id());
+		    exit(EXIT_FAILURE);
+		}
+		if ( MIN_PROCESS_RUNTIME_SEC > ts.tv_sec || (MIN_PROCESS_RUNTIME_SEC == ts.tv_sec && MIN_PROCESS_RUNTIME_NANOSEC >= ts.tv_nsec) )
+		    printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
+
 		qgis_process_list_remove_process(proclist, proc);
 		qgis_process_delete(proc);
 
