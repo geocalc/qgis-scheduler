@@ -57,7 +57,7 @@ int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum)
 int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid);
 void start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes);
 void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes);
-
+int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd);
 
 
 #endif /* QGIS_PROJECT_H_ */

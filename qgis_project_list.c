@@ -368,3 +368,47 @@ void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
 }
 
 
+/* notification from the inotify thread: some file has changed.
+ * Go through all projects, check the watch descriptor (wd) and the file name.
+ *
+ */
+void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
+{
+    assert(list);
+    if (list)
+    {
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+
+	    qgis_project_check_inotify_config_changed(myproj, wd);
+
+//	    if (retval)
+//		// found process, no need to look further
+//		break;
+	}
+//	if (!retval)
+//	    // did not find any matching process
+//	    printlog("Process %d died, but did not find any matching project?", pid);
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
+
+

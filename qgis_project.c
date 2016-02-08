@@ -50,13 +50,14 @@
 
 #include "qgis_process_list.h"
 #include "qgis_config.h"
+#include "qgis_inotify.h"
 #include "fcgi_state.h"
 #include "logger.h"
 #include "timer.h"
 
 
 //#define DISABLED_INIT
-#define MIN_PROCESS_RUNTIME_SEC		300
+#define MIN_PROCESS_RUNTIME_SEC		5
 #define MIN_PROCESS_RUNTIME_NANOSEC	0
 
 
@@ -71,7 +72,7 @@ struct qgis_project_s
     const char *configbasename;		// only config file name without path
     pthread_t config_watch_threadid;
     pthread_rwlock_t rwlock;
-    int inotifyfd;
+//    int inotifyfd;
     int inotifywatchfd;
 };
 
@@ -132,140 +133,23 @@ void qgis_project_restart_processes(struct qgis_project_s *project)
 }
 
 
-void qgis_project_config_change(struct qgis_project_s *project, const char *filename)
+/* checks if the file name and watch descriptor belong to this project
+ * initiate a process restart if the config did change.
+ */
+int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd)
 {
-    /* this file has been changed.
-     * check if the file belongs to our projects
-     */
-    assert(project);
-    assert(filename);
+    int ret = 0;
 
-    int retval = strcmp(filename, project->configbasename);
-    if (0 == retval)
+    if (wd == project->inotifywatchfd)
     {
+	ret = 1;
+
 	/* match, start new processes and then move them to idle list */
-	debug(1, "found config change in project '%s', update processes\n", project->name);
+	printlog("Project '%s' config change. Restart processes", project->name);
 	qgis_project_restart_processes(project);
     }
 
-}
-
-
-
-/* watches changes in the configuration file.
- * uses inotify.
- */
-static void *thread_watch_config(void *arg)
-{
-    assert(arg);
-    struct thread_watch_config_args *tinfo = arg;
-    struct qgis_project_s *project = tinfo->project;
-    assert(project);
-    pthread_t thread_id = pthread_self();
-
-
-    const char *projname = project->name;
-    debug(1, "[%lu] started watcher thread for project '%s', looking for changes in '%s'\n", thread_id, projname, project->configpath);
-
-
-    static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;
-    struct inotify_event *inotifyevent = malloc(sizeof_inotifyevent);
-    assert(inotifyevent);
-    if ( !inotifyevent )
-    {
-	logerror("could not allocate memory");
-	exit(EXIT_FAILURE);
-    }
-
-    for (;;)
-    {
-	int retval = read(project->inotifyfd, inotifyevent, sizeof_inotifyevent);
-	if (-1 == retval)
-	{
-	    switch (errno)
-	    {
-	    case EINTR:
-		/* We received an interrupt, possibly a termination signal.
-		 */
-		debug(1, "[%lu] read() inotify_event received interrupt\n", thread_id);
-		break;
-
-	    default:
-		logerror("read() inotify_event");
-		exit(EXIT_FAILURE);
-		// no break needed
-	    }
-	}
-	else
-	{
-	    int size_read = retval;
-	    debug(1, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
-
-	    while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
-	    {
-		if (inotifyevent->wd == project->inotifywatchfd)
-		{
-		    switch(inotifyevent->mask)
-		    {
-		    case IN_CLOSE_WRITE:
-			/* The file has been written or copied to this path
-			 * Restart the processes
-			 */
-			debug(1, "got event IN_CLOSE_WRITE for project %s\n", projname );
-			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-			qgis_project_config_change(project, inotifyevent->name);
-			break;
-
-		    case IN_DELETE:
-			/* The file has been erased from this path.
-			 * Don't care, just mark the service as not restartable. (or better close this project and kill child progs?)
-			 */
-			debug(1, "got event IN_DELETE for project %s\n", projname );
-			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-			break;
-
-		    case IN_MOVED_TO:
-			/* The file has been overwritten by a move to this path
-			 * Restart the processes
-			 */
-			debug(1, "got event IN_MOVED_TO for project %s\n", projname );
-			debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-			qgis_project_config_change(project, inotifyevent->name);
-			break;
-
-		    case IN_IGNORED:
-			// Watch was removed. We can exit this thread
-			debug(1, "got event IN_IGNORED for project %s\n", projname );
-			//		debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-			if (get_program_shutdown())
-			{
-			    goto thread_watch_config_end_for_loop;
-			}
-			break;
-
-		    default:
-			debug(1, "error: got unexpected event %d for project %s\n", inotifyevent->mask, projname );
-			break;
-		    }
-		}
-		else
-		{
-		    debug(1, "error: project %s, got event %d for unknown watch %d. Ignored\n", projname, inotifyevent->mask, inotifyevent->wd );
-		}
-
-		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
-	    }
-	    assert(0 == size_read);
-
-	}
-    }
-
-thread_watch_config_end_for_loop:
-
-    debug(1, "[%lu] shutdown watcher thread for project '%s'\n", thread_id, projname);
-    free(inotifyevent);
-    free(arg);
-    return NULL;
+    return ret;
 }
 
 
@@ -329,90 +213,13 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	    {
 		/* if I can stat the file I assume we can read it.
 		 * Now setup the inotify descriptor.
-		 *
-		 * The process should be restarted if a new configuration is
-		 * available.
-		 * This may happen by editing the file in place (1), moving another
-		 * file to the same place (2), copying another file to the same
-		 * place (3) or creating the file in the directory (4).
-		 * Looking at the man page we get:
-		 * In case of (1) we receive the event IN_CLOSE_WRITE for the file
-		 * and the directory as well.
-		 * In case of (2) we receive the events IN_ATTRIB, IN_DELETE_SELF
-		 * and IN_IGNORED for the configuration file, and IN_DELETE and
-		 * IN_MOVED_TO for the directory.
-		 * In case of (3) we receive the event IN_CLOSE_WRITE for the
-		 * directory.
-		 * In case of (4) we receive the event IN_CLOSE_WRITE for the
-		 * directory.
-		 * If the file is deleted the project may reject starting further
-		 * processes and keep the current ones to feed the network clients.
-		 *
-		 * With some tests we get:
-		 * Looking at the directory and the target file name alone we get
-		 * the event IN_CLOSE_WRITE for the case (1), (3) and (4) and the
-		 * event IN_MOVED_TO for the case (2).
-		 *
-		 * So in summary we watch the directory for changes and react on
-		 * the file name of the configuration file.
-		 *
-		 * Currently we do not handle deleting and creating of the whole
-		 * directory. This case may expose some bugs though..
 		 */
-		retval = inotify_init1(IN_CLOEXEC);
-		if (-1 == retval)
-		{
-		    logerror("inotify_init1");
-		    exit(EXIT_FAILURE);
-		}
-		proj->inotifyfd = retval;
-
-		char *directoryname = strdup(configpath);
-		assert(directoryname);
-		if ( !directoryname )
-		{
-		    logerror("could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-
-		directoryname = dirname(directoryname);
-
-		retval = inotify_add_watch(proj->inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO|IN_IGNORED);
-		if (-1 == retval)
-		{
-		    logerror("inotify_add_watch");
-		    exit(EXIT_FAILURE);
-		}
+		retval = qgis_inotify_watch_file(configpath);
 		proj->inotifywatchfd = retval;
 
 		proj->configbasename = basename((char *)configpath);
 		proj->configpath = configpath;
 
-		/* start a new thread to watch the configuration file
-		 */
-		/* NOTE: aside from the general rule
-		 * "malloc() and free() within the same function"
-		 * we transfer the responsibility for this memory
-		 * to the thread itself.
-		 */
-		struct thread_watch_config_args *targs = malloc(sizeof(*targs));
-		assert(targs);
-		if ( !targs )
-		{
-		    logerror("could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-		targs->project = proj;
-
-		retval = pthread_create(&proj->config_watch_threadid, NULL, thread_watch_config, targs);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error creating thread");
-		    exit(EXIT_FAILURE);
-		}
-
-		free(directoryname);
 	    }
 	    else
 	    {
@@ -430,35 +237,6 @@ void qgis_project_delete(struct qgis_project_s *proj)
     if (proj)
     {
 	debug(1, "deleting project '%s'\n", proj->name);
-	if (proj->inotifyfd)
-	{
-	    debug(1, "found inotify fd for project '%s'\n", proj->name);
-	    int retval;
-	    if (proj->inotifywatchfd)
-	    {
-		debug(1, "removing inotify watch for project '%s'\n", proj->name);
-		retval = inotify_rm_watch(proj->inotifyfd, proj->inotifywatchfd);
-		if (-1 == retval)
-		{
-		    logerror("inotify_rm_watch");
-		    // no exit on purpose
-		}
-
-		// if we have a valid inotify watch fd, then there must be a watcher thread?
-		assert(proj->config_watch_threadid);
-		debug(1, "[%lu] join process %lu\n", pthread_self(), proj->config_watch_threadid);
-		int retval = pthread_join(proj->config_watch_threadid, NULL);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error joining thread");
-		    exit(EXIT_FAILURE);
-		}
-	    }
-
-	    debug(1, "close inotify fd for project '%s'\n", proj->name);
-	    close(proj->inotifyfd);
-	}
 
 	qgis_process_list_delete(proj->initproclist);
 	qgis_process_list_delete(proj->activeproclist);

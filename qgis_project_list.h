@@ -55,6 +55,7 @@ struct qgis_project_s *qgis_proj_list_get_next_project(struct qgis_project_itera
 void qgis_proj_list_return_iterator(struct qgis_project_list_s *list);
 
 void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid);
+void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd);
 
 
 #endif /* QGIS_PROJECT_LIST_H_ */
