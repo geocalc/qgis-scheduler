@@ -284,17 +284,9 @@ int logerror(const char *format, ...)
 	if (0 == strsize)
 	    timebuffer[0] = '\0';
 
-	{
-	    strsize += 3;		// add size of "%m\n"
-
-	    // print string
-	    char strbuffer[strsize+1];
-	    strcpy(strbuffer, timebuffer);
-	    strcat(strbuffer, "%m\n");
-
-	    errno = myerrno;
-	    retval = dprintf(STDERR_FILENO, strbuffer);
-	}
+	// print string
+	errno = myerrno;
+	retval = dprintf(STDERR_FILENO, "%s%m\n", timebuffer);
 
     }
 
