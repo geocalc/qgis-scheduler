@@ -107,20 +107,22 @@ static void *inotify_thread_watch(void *arg)
 	}
 	else
 	{
+	    struct inotify_event *tmp_in_event = inotifyevent;
 	    int size_read = retval;
-	    debug(1, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*inotifyevent), inotifyevent->len);
+	    debug(1, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*tmp_in_event), tmp_in_event->len);
+	    int inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
 
-	    while (size_read >= sizeof(*inotifyevent) + inotifyevent->len)
+	    while (size_read >= sizeof(*tmp_in_event) + tmp_in_event->len)
 	    {
-		switch(inotifyevent->mask)
+		switch(tmp_in_event->mask)
 		{
 		case IN_CLOSE_WRITE:
 		    /* The file has been written or copied to this path
 		     * Restart the processes
 		     */
 		    debug(1, "got event IN_CLOSE_WRITE\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		    inotify_check_watchlist_for_watch(inotifyevent);
+		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    inotify_check_watchlist_for_watch(tmp_in_event);
 		    break;
 
 		case IN_DELETE:
@@ -128,7 +130,7 @@ static void *inotify_thread_watch(void *arg)
 		     * Don't care, just mark the service as not restartable. (or better close this project and kill child progs?)
 		     */
 		    debug(1, "got event IN_DELETE\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    break;
 
 		case IN_MOVED_TO:
@@ -136,14 +138,14 @@ static void *inotify_thread_watch(void *arg)
 		     * Restart the processes
 		     */
 		    debug(1, "got event IN_MOVED_TO\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
-		    inotify_check_watchlist_for_watch(inotifyevent);
+		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    inotify_check_watchlist_for_watch(tmp_in_event);
 		    break;
 
 		case IN_IGNORED:
 		    // Watch was removed. We can exit this thread
 		    debug(1, "got event IN_IGNORED\n");
-		    //		debug(1, "mask 0x%x, len %d, name %s\n", inotifyevent->mask, inotifyevent->len, inotifyevent->name);
+		    //		debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    if (get_program_shutdown())
 		    {
 			goto thread_watch_config_end_for_loop;
@@ -151,10 +153,31 @@ static void *inotify_thread_watch(void *arg)
 		    break;
 
 		default:
-		    debug(1, "error: got unexpected event %d\n", inotifyevent->mask);
+		    debug(1, "error: got unexpected event %d\n", tmp_in_event->mask);
 		    break;
 		}
-		size_read -= sizeof(*inotifyevent) + inotifyevent->len;
+
+		if (size_read > sizeof(*tmp_in_event) + tmp_in_event->len)
+		{
+		    /* try to set the pointer to the next event location */
+		    tmp_in_event = (struct inotify_event *)(((unsigned char *)tmp_in_event) + inotifyeventlen);
+		    /* if the new length is greater than the size of the
+		     * buffer then exit this loop.
+		     */
+
+		    size_read -= inotifyeventlen;
+		    inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
+		    assert(inotifyeventlen <= size_read);
+		    if (inotifyeventlen > size_read)
+		    {
+			break;
+		    }
+		}
+		else
+		{
+		    size_read -= inotifyeventlen;
+		    inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
+		}
 	    }
 	    assert(0 == size_read);
 
