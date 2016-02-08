@@ -805,6 +805,8 @@ void *qgis_project_thread_start_process_detached(void *arg)
 
     start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
 
+    free(arg);
+
     return NULL;
 }
 
