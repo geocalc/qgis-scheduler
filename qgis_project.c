@@ -128,7 +128,7 @@ void qgis_project_restart_processes(struct qgis_project_s *project)
     if (project)
     {
 	int numproc = qgis_process_list_get_num_process(project->activeproclist);
-	start_new_process_wait(numproc, project, 1);
+	start_new_process_detached(numproc, project, 1);
     }
 }
 
