@@ -128,6 +128,7 @@
 #include "fcgi_state.h"
 #include "fcgi_data.h"
 #include "qgis_config.h"
+#include "qgis_inotify.h"
 #include "logger.h"
 #include "timer.h"
 
@@ -1373,6 +1374,10 @@ int main(int argc, char **argv)
 
     projectlist = qgis_proj_list_new();
 
+    /* start the inotify watch module */
+    qgis_inotify_init(projectlist);
+
+
     /* start the child processes */
     {
 	/* do for every project:
@@ -1827,6 +1832,7 @@ int main(int argc, char **argv)
     debug(1, "closing network socket\n");
     fflush(stderr);
     close(serversocketfd);
+    qgis_inotify_delete();
 //    qgis_process_list_delete(proclist);
     qgis_proj_list_delete(projectlist);
 
