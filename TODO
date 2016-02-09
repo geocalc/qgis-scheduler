@@ -33,3 +33,5 @@
 
 + NEED glibc >= 2.21 . We get SEGFAULT because fork() and dprintf() won't go well, see https://sourceware.org/bugzilla/show_bug.cgi?id=12847
 
++ write a man page
+
