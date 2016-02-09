@@ -14,6 +14,20 @@ AC_PROG_CC
 # FIXME: Replace `main' with a function in `-liniparser':
 AC_CHECK_LIB([iniparser], [main])
 
+# check for glibc version >= 2.21.
+# check for presence of glibc version >= 2.21. Previous versions cause this
+# program to receive SIGSEGV.
+# see https://sourceware.org/bugzilla/show_bug.cgi?id=12847
+#
+# glibc >= 2.21 has removed the function "sigvec".
+# note: This behaviour only appreas with glibc <2.21. so better check
+# with test program and  gnu_get_libc_version (). If that program fails
+# then there is no glibc. If it succeeds, we can check the version.
+# #include <stdio.h>
+# #include <gnu/libc-version.h>
+# int main (void) { puts (gnu_get_libc_version ()); return 0; }
+AC_CHECK_LIB([c], [sigvec], [] , AC_DEFINE([HAVE_GLIBC_VERSION_2_21], [1], [Define to 1 if version of glibc >= 2.21]))
+
 # check for pthreads
 # see https://airtower.wordpress.com/2010/06/14/autotools-and-pthreads/
 # and http://www.gnu.org/software/autoconf-archive/ax_pthread.html
