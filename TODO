@@ -1,6 +1,7 @@
 + delete all environment variables before starting a new child process
 
 + hand over those URLs which can not be recognized by the scan settings to a set of programs handling global requests
++ hold a general process group or general project separate of the configured projects to handle requests which do not fit into all other projects
 
 + parse the configuration file at program start and warn about incorrect settings (e.g. empty scan_param= or empty scan_regex= or errors compiling regular expression).
   remove the project from the project list on any error.
@@ -11,11 +12,7 @@
 
 + reload the configuration with SIGHUP. Eventually stop and start the child processes. Eventually track for changes and react on the changes only??
 
-+ track qgis config file for changes and restart the child processes in case
-
 + test for existence of config path "cwd" and exit with error (global config) or write error to log file (project config)
-
-+ hold a general process group or general project separate of the configured projects to handle requests which do not fit into all other projects
 
 + create a whole fcgi session from input data in one function call, so we do not care about 16bit message sizes
 
