@@ -5,8 +5,6 @@
 + parse the configuration file at program start and warn about incorrect settings (e.g. empty scan_param= or empty scan_regex= or errors compiling regular expression).
   remove the project from the project list on any error.
 
-+ use autotools for the build process
-
 + assign path of the config file by autotools parameter
 
 + test for execution times. warn in log file if execution time exceeds a limit
@@ -30,8 +28,6 @@
 + be able to select file logging or syslog logging in config file
 
 + write statistics to logfile if sigusr1 is received
-
-+ NEED glibc >= 2.21 . We get SEGFAULT because fork() and dprintf() won't go well, see https://sourceware.org/bugzilla/show_bug.cgi?id=12847
 
 + write a man page
 
