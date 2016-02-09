@@ -12,7 +12,7 @@ AC_PROG_CC
 
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-liniparser':
-AC_CHECK_LIB([iniparser], [main])
+AC_CHECK_LIB([iniparser], [main], [], AC_MSG_ERROR([can not find lib iniparser from https://github.com/ndevilla/iniparser]))
 
 # check for glibc version >= 2.21.
 # check for presence of glibc version >= 2.21. Previous versions cause this
