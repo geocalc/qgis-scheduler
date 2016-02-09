@@ -50,7 +50,74 @@
 
 #include "qgis_config.h"
 
+#include "config.h"
+//#undef HAVE_GLIBC_VERSION_2_21	/* used for testing purpose */
 
+
+static int my_vdprintf(int fd, const char *format, va_list ap) __attribute__ ((__format__ (__printf__, 2, 0)));
+static int my_dprintf(int fd, const char *format, ...) __attribute__ ((__format__ (__printf__, 2, 3)));
+
+
+
+int my_vdprintf(int fd, const char *format, va_list ap)
+{
+    int retval;
+#ifdef HAVE_GLIBC_VERSION_2_21	/* glibc >= 2.21 */
+    retval = vdprintf(fd, format, ap);
+#else
+    /* workaround for glibc bug which does not handle
+     * dprintf() and fork() properly.
+     * Solved in glibc-2.21
+     * see https://sourceware.org/bugzilla/show_bug.cgi?id=12847
+     */
+    {
+	static const int newbuffersize = 256;
+	char newbuffer[newbuffersize];
+
+	retval = vsnprintf(newbuffer, newbuffersize, format, ap);
+	if (-1 == retval)
+	    return retval;
+	if (newbuffersize <= retval)
+	    // according to man page the output was truncated
+	    retval = newbuffersize-1;
+	retval = write(STDERR_FILENO, newbuffer, retval);
+    }
+#endif
+
+    return retval;
+}
+
+
+int my_dprintf(int fd, const char *format, ...)
+{
+    va_list args;
+    int retval;
+
+    va_start(args, format);
+#ifdef HAVE_GLIBC_VERSION_2_21	/* glibc >= 2.21 */
+    retval = vdprintf(fd, format, args);
+#else
+    /* workaround for glibc bug which does not handle
+     * dprintf() and fork() properly.
+     * Solved in glibc-2.21
+     */
+    {
+	static const int newbuffersize = 256;
+	char newbuffer[newbuffersize];
+
+	retval = vsnprintf(newbuffer, newbuffersize, format, args);
+	if (-1 == retval)
+	    return retval;
+	if (newbuffersize <= retval)
+	    // according to man page the output was truncated
+	    retval = newbuffersize-1;
+	retval = write(STDERR_FILENO, newbuffer, retval);
+    }
+#endif
+    va_end(args);
+
+    return retval;
+}
 
 
 /* opens the logfile specified by config,
@@ -136,26 +203,7 @@ int printlog(const char *format, ...)
 	strcat(strbuffer, "\n");
 
 	va_start(args, format);
-#if 0	/* glibc >= 2.21 */
-	retval = vdprintf(STDERR_FILENO, strbuffer, args);
-#else
-	/* workaround for glibc bug which does not handle
-	 * dprintf() and fork() properly.
-	 * Solved in glibc-2.21
-	 */
-	{
-	    static const int newbuffersize = 256;
-	    char newbuffer[newbuffersize];
-
-	    retval = vsnprintf(newbuffer, newbuffersize, strbuffer, args);
-	    if (-1 == retval)
-		return retval;
-	    if (newbuffersize <= retval)
-		// according to man page the output was truncated
-		retval = newbuffersize-1;
-	    retval = write(STDERR_FILENO, newbuffer, retval);
-	}
-#endif
+	retval = my_vdprintf(STDERR_FILENO, strbuffer, args);
 	va_end(args);
     }
 
@@ -210,26 +258,7 @@ int debug(int level, const char *format, ...)
 	    strcat(strbuffer, "\n");
 
 	    va_start(args, format);
-#if 0	/* glibc >= 2.21 */
-	    retval = vdprintf(STDERR_FILENO, strbuffer, args);
-#else
-	    /* workaround for glibc bug which does not handle
-	     * dprintf() and fork() properly.
-	     * Solved in glibc-2.21
-	     */
-	    {
-		static const int newbuffersize = 256;
-		char newbuffer[newbuffersize];
-
-		retval = vsnprintf(newbuffer, newbuffersize, strbuffer, args);
-		if (-1 == retval)
-		    return retval;
-		if (newbuffersize <= retval)
-		    // according to man page the output was truncated
-		    retval = newbuffersize-1;
-		retval = write(STDERR_FILENO, newbuffer, retval);
-	    }
-#endif
+	    retval = my_vdprintf(STDERR_FILENO, strbuffer, args);
 	    va_end(args);
 	}
     }
@@ -291,26 +320,7 @@ int logerror(const char *format, ...)
 
 	    va_start(args, format);
 	    errno = myerrno;
-#if 0	/* glibc >= 2.21 */
-	    retval = vdprintf(STDERR_FILENO, strbuffer, args);
-#else
-	    /* workaround for glibc bug which does not handle
-	     * dprintf() and fork() properly.
-	     * Solved in glibc-2.21
-	     */
-	    {
-		static const int newbuffersize = 256;
-		char newbuffer[newbuffersize];
-
-		retval = vsnprintf(newbuffer, newbuffersize, strbuffer, args);
-		if (-1 == retval)
-		    return retval;
-		if (newbuffersize <= retval)
-		    // according to man page the output was truncated
-		    retval = newbuffersize-1;
-		retval = write(STDERR_FILENO, newbuffer, retval);
-	    }
-#endif
+	    retval = my_vdprintf(STDERR_FILENO, strbuffer, args);
 	    va_end(args);
 	}
     }
@@ -343,26 +353,7 @@ int logerror(const char *format, ...)
 
 	// print string
 	errno = myerrno;
-#if 0	/* glibc >= 2.21 */
-	retval = dprintf(STDERR_FILENO, "%s%m\n", timebuffer);
-#else
-	/* workaround for glibc bug which does not handle
-	 * dprintf() and fork() properly.
-	 * Solved in glibc-2.21
-	 */
-	{
-	    static const int newbuffersize = 256;
-	    char newbuffer[newbuffersize];
-
-	    retval = snprintf(newbuffer, newbuffersize, "%s%m\n", timebuffer);
-	    if (-1 == retval)
-		return retval;
-	    if (newbuffersize <= retval)
-		// according to man page the output was truncated
-		retval = newbuffersize-1;
-	    retval = write(STDERR_FILENO, newbuffer, retval);
-	}
-#endif
+	retval = my_dprintf(STDERR_FILENO, "%s%m\n", timebuffer);
 
     }
 
