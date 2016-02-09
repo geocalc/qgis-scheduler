@@ -1,0 +1,15 @@
+How to setup the development environment. 
+
+Install autotools archive
+Ubuntu:
+apt-get install autoconf-archive
+Gentoo:
+emerge -a sys-devel/autoconf-archive
+
+
+Setup build system
+Call:
+autoreconf --install
+./configure
+make
+
