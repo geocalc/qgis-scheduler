@@ -1279,6 +1279,21 @@ int main(int argc, char **argv)
     }
 
 
+    /* change root directory if requested */
+    {
+	const char *chrootpath = config_get_chroot();
+	if (chrootpath)
+	{
+	    retval = chroot(chrootpath);
+	    if (retval)
+	    {
+		logerror("error: can not change root directory to '%s'", chrootpath);
+		exit(EXIT_FAILURE);
+	    }
+	}
+    }
+
+
     /* change uid if requested */
     {
 	const char *chuser = config_get_chuser();
@@ -1310,10 +1325,11 @@ int main(int argc, char **argv)
 		    logerror("can not get the id of user '%s'", chuser);
 		else
 		    printlog("can not get the id of user '%s'. exiting", chuser);
-		return EXIT_FAILURE;
+		exit(EXIT_FAILURE);
 	    }
 	}
     }
+
 
     /* be a good server and change your working directory to root '/'.
      * Each child process may set its own working directory by changing
