@@ -46,7 +46,7 @@
 #define DEFAULT_CONFIG_LISTEN_VALUE	"*"
 #define CONFIG_PORT_KEY			":port"
 #define DEFAULT_CONFIG_PORT_VALUE	"10177"
-#define CONFIG_USER_KEY			":user"
+#define CONFIG_USER_KEY			":chuser"
 #define DEFAULT_CONFIG_USER_VALUE	NULL
 #define CONFIG_PID_KEY			":pidfile"
 #define DEFAULT_CONFIG_PID_VALUE	NULL
@@ -273,7 +273,7 @@ const char *config_get_network_port(void)
 }
 
 
-const char *config_get_user(void)
+const char *config_get_chuser(void)
 {
     assert(config_opts);
 

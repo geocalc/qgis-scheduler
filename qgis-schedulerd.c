@@ -1281,7 +1281,7 @@ int main(int argc, char **argv)
 
     /* change uid if requested */
     {
-	const char *chuser = config_get_user();
+	const char *chuser = config_get_chuser();
 	if (chuser)
 	{
 	    errno = 0;

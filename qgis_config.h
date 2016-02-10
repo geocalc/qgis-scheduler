@@ -39,7 +39,7 @@ int config_get_num_projects(void);
 const char *config_get_name_project(int num);
 const char *config_get_network_listen(void);
 const char *config_get_network_port(void);
-const char *config_get_user(void);
+const char *config_get_chuser(void);
 const char *config_get_pid_path(void);
 const char *config_get_logfile(void);
 int config_get_debuglevel(void);
