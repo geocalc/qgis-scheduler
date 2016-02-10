@@ -182,7 +182,6 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
      * is correct (stat()), then watch the file with inotify for changes
      * If the file changed, kill all processes and restart them anew.
      */
-    // TODO: create a separate inotify watch module
     if (configpath)
     {
 	struct stat statbuf;
@@ -469,16 +468,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 //    close(debugfd);
     debug(1, "init child process for project '%s' done. waiting for input..\n", projname);
 
-    // TODO: do we need this distinction over here?
-    if (childproc)
-    {
-	qgis_process_set_state_idle(childproc);
-    }
-    else
-    {
-	debug(1, "no child process found to initialize\n");
-	exit(EXIT_FAILURE);
-    }
+    qgis_process_set_state_idle(childproc);
     free(buffer);
 }
 
