@@ -46,8 +46,10 @@
 #define DEFAULT_CONFIG_LISTEN_VALUE	"*"
 #define CONFIG_PORT_KEY			":port"
 #define DEFAULT_CONFIG_PORT_VALUE	"10177"
-#define CONFIG_USER_KEY			":chuser"
-#define DEFAULT_CONFIG_USER_VALUE	NULL
+#define CONFIG_CHUSER_KEY		":chuser"
+#define DEFAULT_CONFIG_CHUSER_VALUE	NULL
+#define CONFIG_CHROOT_KEY		":chroot"
+#define DEFAULT_CONFIG_CHROOT_VALUE	NULL
 #define CONFIG_PID_KEY			":pidfile"
 #define DEFAULT_CONFIG_PID_VALUE	NULL
 #define CONFIG_PROCESS_KEY		":process"
@@ -285,7 +287,33 @@ const char *config_get_chuser(void)
 	exit(EXIT_FAILURE);
     }
 
-    const char *ret = iniparser_getstring(config_opts, CONFIG_USER_KEY, DEFAULT_CONFIG_USER_VALUE);
+    const char *ret = iniparser_getstring(config_opts, CONFIG_CHUSER_KEY, DEFAULT_CONFIG_CHUSER_VALUE);
+
+    retval = pthread_rwlock_unlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_chroot(void)
+{
+    assert(config_opts);
+
+    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire read-write lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, CONFIG_CHROOT_KEY, DEFAULT_CONFIG_CHROOT_VALUE);
 
     retval = pthread_rwlock_unlock(&config_rwlock);
     if (retval)
