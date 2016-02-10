@@ -1331,6 +1331,20 @@ int main(int argc, char **argv)
     }
 
 
+    {
+	/* check if the user can break out of the chroot jail */
+	/* TODO linux: check capability CAP_SYS_CHROOT */
+	const char *chroot = config_get_chroot();
+	if ( chroot )
+	{
+	    uid_t uid = getuid();
+	    uid_t euid = geteuid();
+	    if ( !uid || !euid )
+		printlog("WARNING: chroot requested but did not set (effective) userid different from root. This renders the chroot useless. Did you forget to set 'chuser'?");
+	}
+    }
+
+
     /* be a good server and change your working directory to root '/'.
      * Each child process may set its own working directory by changing
      * the value of cwd=
