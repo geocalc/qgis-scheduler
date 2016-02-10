@@ -47,7 +47,7 @@
 #define CONFIG_PORT_KEY			":port"
 #define DEFAULT_CONFIG_PORT_VALUE	"10177"
 #define CONFIG_USER_KEY			":user"
-#define DEFAULT_CONFIG_USER_VALUE	"root"
+#define DEFAULT_CONFIG_USER_VALUE	NULL
 #define CONFIG_PID_KEY			":pidfile"
 #define DEFAULT_CONFIG_PID_VALUE	NULL
 #define CONFIG_PROCESS_KEY		":process"
