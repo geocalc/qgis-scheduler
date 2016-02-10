@@ -120,6 +120,7 @@
 #include <fastcgi.h>
 #include <regex.h>
 #include <fcntl.h>
+#include <pwd.h>
 
 #include "qgis_project_list.h"
 //#include "qgis_project.h"
@@ -1277,6 +1278,42 @@ int main(int argc, char **argv)
 	exit(EXIT_FAILURE);
     }
 
+
+    /* change uid if requested */
+    {
+	const char *chuser = config_get_user();
+	if (chuser)
+	{
+	    errno = 0;
+	    struct passwd *pwnam = getpwnam(chuser);
+	    if (pwnam)
+	    {
+		gid_t gid = pwnam->pw_gid;
+		retval = setgid(gid);
+		if (retval)
+		{
+		    logerror("error: can not set gid to %d (%s)", gid, chuser);
+		    exit(EXIT_FAILURE);
+		}
+
+		uid_t uid = pwnam->pw_uid;
+		retval = setuid(uid);
+		if (retval)
+		{
+		    logerror("error: can not set uid to %d (%s)", uid, chuser);
+		    exit(EXIT_FAILURE);
+		}
+	    }
+	    else
+	    {
+		if (errno)
+		    logerror("can not get the id of user '%s'", chuser);
+		else
+		    printlog("can not get the id of user '%s'. exiting", chuser);
+		return EXIT_FAILURE;
+	    }
+	}
+    }
 
     /* be a good server and change your working directory to root '/'.
      * Each child process may set its own working directory by changing
