@@ -876,7 +876,8 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
 	    qgis_process_list_remove_process(proclist, proc);
-	    qgis_shutdown_add_process(proc);
+	    qgis_process_delete(proc);
+//	    qgis_shutdown_add_process(proc);
 
 	    if ( !get_program_shutdown() )
 	    {
@@ -913,7 +914,8 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
 		qgis_process_list_remove_process(proclist, proc);
-		qgis_shutdown_add_process(proc);
+		qgis_process_delete(proc);
+//		qgis_shutdown_add_process(proc);
 
 		if ( !get_program_shutdown() )
 		{
@@ -942,7 +944,8 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 			 * move the process entry to the shutdown list to care for.
 			 */
 			qgis_process_list_remove_process(proclist, proc);
-			qgis_shutdown_add_process(proc);
+			qgis_process_delete(proc);
+//			qgis_shutdown_add_process(proc);
 		    }
 		}
 	    }
