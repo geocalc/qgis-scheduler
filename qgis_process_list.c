@@ -39,6 +39,7 @@
 #include <signal.h>
 
 #include "logger.h"
+#include "timer.h"
 
 
 struct qgis_process_list_s
@@ -750,6 +751,78 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
     }
 
     return num;
+}
+
+
+/* sends an appropriate shutdown signal to every process in this list */
+void qgis_process_list_signal_shutdown(struct qgis_process_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    qgis_process_signal_shutdown(np->proc);
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
+
+
+/* Returns the earliest signal timer found in the list of processes.
+ * Or 0,0 if no signal timer is found in the list or the list is empty.
+ */
+void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, struct timespec *maxtimeval)
+{
+    assert(list);
+    if (list)
+    {
+	struct timespec maxts = {0,0};
+
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    const struct timespec *ts = qgis_process_get_signaltime(np->proc);
+
+	    if ( !qgis_timer_is_empty(ts))
+		if ( qgis_timer_isgreaterthan(&maxts, ts) || qgis_timer_is_empty(&maxts) )
+		    maxts = *ts;
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	*maxtimeval = maxts;
+    }
 }
 
 

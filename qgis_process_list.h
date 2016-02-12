@@ -60,6 +60,8 @@ int qgis_process_list_get_num_process(struct qgis_process_list_s *list);
 int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state);
 
 int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal);
+void qgis_process_list_signal_shutdown(struct qgis_process_list_s *list);
+void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, struct timespec *maxtimeval);
 
 #endif /* QGIS_PROCESS_LIST_H_ */
 
