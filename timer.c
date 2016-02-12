@@ -36,6 +36,10 @@
 #include "qgis_config.h"
 
 
+#define TIMESPEC_NSEC_ONE_SECOND	(1000*1000*1000)
+
+
+
 int qgis_timer_start(struct timespec *timer)
 {
     assert(timer);
@@ -59,7 +63,7 @@ int qgis_timer_stop(struct timespec *timer)
 	    timer->tv_nsec = newtime.tv_nsec - oldtime.tv_nsec;
 	    if (0 > timer->tv_nsec)
 	    {
-		timer->tv_nsec += 1000*1000*1000;
+		timer->tv_nsec += TIMESPEC_NSEC_ONE_SECOND;
 		timer->tv_sec--;
 	    }
     }
@@ -86,7 +90,7 @@ int qgis_timer_sub(const struct timespec *timer, struct timespec *timersub)
 	    timersub->tv_nsec = newtime.tv_nsec - timer->tv_nsec;
 	    if (0 > timersub->tv_nsec)
 	    {
-		timersub->tv_nsec += 1000*1000*1000;
+		timersub->tv_nsec += TIMESPEC_NSEC_ONE_SECOND;
 		timersub->tv_sec--;
 	    }
     }
@@ -104,6 +108,12 @@ void qgis_timer_add(struct timespec *timer, const struct timespec *timeradd)
 
     timer->tv_sec += timeradd->tv_sec;
     timer->tv_nsec += timeradd->tv_nsec;
+    if (TIMESPEC_NSEC_ONE_SECOND <= timer->tv_nsec)
+    {
+	/* handle value overflow */
+	timer->tv_sec += timer->tv_nsec/TIMESPEC_NSEC_ONE_SECOND;
+	timer->tv_nsec %= TIMESPEC_NSEC_ONE_SECOND;
+    }
 }
 
 
