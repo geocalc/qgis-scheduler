@@ -153,7 +153,7 @@ static void *qgis_shutdown_thread(void *arg)
 	    else
 		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
 
-	    if (retval)
+	    if ( 0 != retval && ETIMEDOUT != retval )
 	    {
 		errno = retval;
 		logerror("error: can not wait on condition");
