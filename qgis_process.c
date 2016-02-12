@@ -382,6 +382,13 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	    qgis_process_send_signal(proc, SIGKILL);
 	    proc->state = PROC_KILL;
 	}
+	else
+	{
+	    /* the process has received a signal just some time fractions ago.
+	     * check if it still exists. if not change its status to EXIT.
+	     */
+	    qgis_process_send_signal(proc, 0);
+	}
 	break;
     }
     case PROC_KILL:
@@ -400,6 +407,13 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	     * change state to PROC_EXIT. We can not help it anymore.
 	     */
 	    qgis_process_set_state_exit(proc);
+	}
+	else
+	{
+	    /* the process has received a signal just some time fractions ago.
+	     * check if it still exists. if not change its status to EXIT.
+	     */
+	    qgis_process_send_signal(proc, 0);
 	}
 	break;
     }
