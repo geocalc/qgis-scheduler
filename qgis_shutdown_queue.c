@@ -144,7 +144,12 @@ static void *qgis_shutdown_thread(void *arg)
 			logerror("error: can not get clock value");
 			exit(EXIT_FAILURE);
 		    }
-		    ts_sig.tv_nsec += 200*1000*1000;
+		    static const struct timespec ts_timeout = {
+			    tv_sec: 0,
+			    tv_nsec: 200*1000*1000
+		    };
+		    qgis_timer_add(&ts_sig, &ts_timeout);
+
 		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
 		}
 		else
