@@ -295,11 +295,19 @@ static void qgis_process_set_state_exit(struct qgis_process_s *proc)
 }
 
 
+/* send a signal "signum" to the process "proc.pid".
+ * if the signal is ok start a timer. if not check if the process still exists
+ * (with errno = ESRCH). if it does not, change its status to EXIT. if it does
+ * (and signal is not ok) print an error.
+ * if "signum" = 0 (just check for existence of proc.pid in kernel space), then
+ * if the process does not exist, change its status to EXIT. else do nothing
+ * (no timer start and no error message).
+ */
 static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
 {
     assert(proc);
-    assert(proc->pid);
-    assert(signum > 0);
+    assert(proc->pid > 0);
+    assert(signum >= 0);
 
     int retval = kill(proc->pid, signum);
     if (retval)
@@ -311,13 +319,13 @@ static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
 	     */
 	    qgis_process_set_state_exit(proc);
 	}
-	else
+	else if (signum)
 	{
 	    logerror("error: %s:%d kill pid %d", __FUNCTION__, __LINE__, proc->pid);
 	    exit(EXIT_FAILURE);
 	}
     }
-    else
+    else if (signum)
     {
 	retval = qgis_timer_start(&proc->signaltime);
 	if (-1 == retval)
