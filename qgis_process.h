@@ -54,6 +54,8 @@ enum qgis_process_state_e
 
 extern const struct timespec default_signal_timeout;
 
+const char *get_state_str(enum qgis_process_state_e state);
+
 struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd);
 void qgis_process_delete(struct qgis_process_s *proc);
 

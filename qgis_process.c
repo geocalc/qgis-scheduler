@@ -72,7 +72,7 @@ const struct timespec default_signal_timeout =
 
 
 
-static const char *get_state_str(enum qgis_process_state_e state)
+const char *get_state_str(enum qgis_process_state_e state)
 {
     switch (state)
     {
