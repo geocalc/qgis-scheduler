@@ -68,4 +68,73 @@ int qgis_timer_stop(struct timespec *timer)
 }
 
 
+/* calculates the difference between the time specified in "timer" and the
+ * current time. The result is stored in "timersub".
+ * Returns -1 in case of an error.
+ */
+int qgis_timer_sub(const struct timespec *timer, struct timespec *timersub)
+{
+    assert(timer);
+    assert(timersub);
+
+    struct timespec newtime;
+
+    int retval = clock_gettime(get_valid_clock_id(), &newtime);
+    if (-1 != retval)
+    {
+	    timersub->tv_sec = newtime.tv_sec - timer->tv_sec;
+	    timersub->tv_nsec = newtime.tv_nsec - timer->tv_nsec;
+	    if (0 > timersub->tv_nsec)
+	    {
+		timersub->tv_nsec += 1000*1000*1000;
+		timersub->tv_sec--;
+	    }
+    }
+
+    return retval;
+}
+
+
+/* simply adds "timeradd" to "timer"
+ */
+void qgis_timer_add(struct timespec *timer, const struct timespec *timeradd)
+{
+    assert(timer);
+    assert(timeradd);
+
+    timer->tv_sec += timeradd->tv_sec;
+    timer->tv_nsec += timeradd->tv_nsec;
+}
+
+
+int qgis_timer_isgreaterthan(const struct timespec *timer1, const struct timespec *timer2)
+{
+    assert(timer1);
+    assert(timer2);
+
+    if ( (timer1->tv_sec > timer2->tv_sec)
+	 ||
+	 (
+		 (timer1->tv_sec == timer2->tv_sec)
+		 &&
+		 (timer1->tv_nsec > timer2->tv_nsec)
+	 )
+       )
+	return 1;
+
+    return 0;
+}
+
+
+int qgis_timer_is_empty(const struct timespec *timer)
+{
+    assert(timer);
+
+    if (timer->tv_sec || timer->tv_nsec)
+	return 0;
+
+    return 1;
+}
+
+
 

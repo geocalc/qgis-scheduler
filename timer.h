@@ -37,7 +37,10 @@
 
 int qgis_timer_start(struct timespec *timer);
 int qgis_timer_stop(struct timespec *timer);
-
+int qgis_timer_sub(const struct timespec *timer, struct timespec *timersub);
+void qgis_timer_add(struct timespec *timer, const struct timespec *timeradd);
+int qgis_timer_isgreaterthan(const struct timespec *timer1, const struct timespec *timer2);
+int qgis_timer_is_empty(const struct timespec *timer);
 
 
 #endif /* TIMER_H_ */
