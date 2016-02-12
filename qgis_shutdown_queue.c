@@ -79,8 +79,13 @@ static void *qgis_shutdown_thread(void *arg)
 
 	/* look through all processes in the busy list if the status changed.
 	 * if it does change to shutdown list */
-	qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, PROC_IDLE);
-	qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, PROC_OPEN_IDLE);
+	static const enum qgis_process_state_e statemovelist[] = { PROC_IDLE, PROC_OPEN_IDLE, PROC_TERM, PROC_KILL, PROC_EXIT};
+	int i;
+	for (i=0; i<(sizeof(statemovelist)/sizeof(*statemovelist)); i++)
+	{
+	    retval = qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, statemovelist[i]);
+	    debug(1, "shutdown: transferred %d %s programs from busylist to shutdownlist", retval, get_state_str(statemovelist[i]));
+	}
 
 	/* send a signal to all processes in the shutdown list.
 	 * If the process already died, set its state to EXIT.
