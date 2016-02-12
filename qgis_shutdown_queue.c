@@ -343,7 +343,35 @@ void qgis_shutdown_wait_empty(void)
  */
 void qgis_shutdown_process_died(pid_t pid)
 {
-    assert(0);
+    debug(1,"qgis_shutdown: process %d died", pid);
+
+    /* remove the process with "pid" from the lists,
+     * then signal the thread.
+     */
+    //int retval =
+
+    int retval = pthread_mutex_lock(&shutdownmutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not lock mutex");
+	exit(EXIT_FAILURE);
+    }
+    has_list_change = 1;
+    retval = pthread_cond_signal(&shutdowncondition);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not wait on condition");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_mutex_unlock(&shutdownmutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not unlock mutex");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
