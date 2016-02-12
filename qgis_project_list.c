@@ -412,3 +412,38 @@ void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
 }
 
 
+/* shut down this project list, i.e. move all processes from all projects
+ * to the shutdown list.
+ */
+void qgis_proj_list_shutdown(struct qgis_project_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+	    qgis_project_shutdown(myproj);
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
+
+
