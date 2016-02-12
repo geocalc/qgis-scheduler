@@ -54,6 +54,7 @@
 #include "fcgi_state.h"
 #include "logger.h"
 #include "timer.h"
+#include "qgis_shutdown_queue.h"
 
 
 //#define DISABLED_INIT
@@ -954,6 +955,20 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 //
 //    return -1;
 //}
+
+
+/* move all processes from the lists to the shutdown module */
+void qgis_project_shutdown(struct qgis_project_s *proj)
+{
+    assert(proj);
+
+    if (proj)
+    {
+	qgis_shutdown_add_process_list(proj->initproclist);
+	qgis_shutdown_add_process_list(proj->activeproclist);
+	qgis_shutdown_add_process_list(proj->shutdownproclist);
+    }
+}
 
 
 /* Get a list of al processes belonging to this project and send them the kill
