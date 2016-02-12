@@ -132,6 +132,7 @@
 #include "qgis_inotify.h"
 #include "logger.h"
 #include "timer.h"
+#include "qgis_shutdown_queue.h"
 
 #include "config.h"
 
@@ -1446,6 +1447,8 @@ int main(int argc, char **argv)
     /* start the inotify watch module */
     qgis_inotify_init(projectlist);
 
+    /* start the process shutdown module */
+    qgis_shutdown_init();
 
     /* start the child processes */
     {
@@ -1901,9 +1904,23 @@ int main(int argc, char **argv)
     debug(1, "closing network socket\n");
     fflush(stderr);
     close(serversocketfd);
+
+    /* close the inotify module, so no processes are recreated afterwards
+     * because of a change in the configuration.
+     */
     qgis_inotify_delete();
-//    qgis_process_list_delete(proclist);
+
+    /* move the processes from the working lists to the shutdown module */
+    qgis_proj_list_shutdown(projectlist);
+
+
+    /* remove the projects */
     qgis_proj_list_delete(projectlist);
+
+    /* wait for the shutdown module so it has closed all its processes
+     * Then clean up the module */
+    qgis_shutdown_wait_empty();
+    qgis_shutdown_delete();
 
     {
 	const char *pidfile = config_get_pid_path();
