@@ -91,7 +91,7 @@
 
 
 static dictionary *config_opts = NULL;
-static pthread_rwlock_t config_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 static int does_program_shutdown = 0;
 static clockid_t system_clk_id = 0;
 
@@ -120,21 +120,21 @@ int config_load(const char *path)
      */
     assert(path);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     config_opts = iniparser_load(path);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
     if (!config_opts)
@@ -148,21 +148,21 @@ void config_shutdown(void)
 {
     // no assert: it's ok to call this with config_opts==NULL
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     iniparser_freedict(config_opts);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -174,21 +174,21 @@ int config_get_num_projects(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     int ret = iniparser_getnsec(config_opts);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -201,21 +201,21 @@ const char *config_get_name_project(int num)
     assert(config_opts);
     assert(num >= 0);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getsecname(config_opts, num);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -227,21 +227,21 @@ const char *config_get_network_listen(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_LISTEN_KEY, DEFAULT_CONFIG_LISTEN_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -253,21 +253,21 @@ const char *config_get_network_port(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_PORT_KEY, DEFAULT_CONFIG_PORT_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -279,21 +279,21 @@ const char *config_get_chuser(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_CHUSER_KEY, DEFAULT_CONFIG_CHUSER_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -305,21 +305,21 @@ const char *config_get_chroot(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_CHROOT_KEY, DEFAULT_CONFIG_CHROOT_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -331,21 +331,21 @@ const char *config_get_pid_path(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_PID_KEY, DEFAULT_CONFIG_PID_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -357,21 +357,21 @@ const char *config_get_logfile(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, CONFIG_LOGFILE, DEFAULT_CONFIG_LOGFILE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -383,21 +383,21 @@ int config_get_debuglevel(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
     int ret = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -415,11 +415,11 @@ const char *config_get_process(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -438,11 +438,11 @@ const char *config_get_process(const char *project)
     if (DEFAULT_CONFIG_PROCESS_VALUE == ret)
 	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -459,11 +459,11 @@ const char *config_get_process_args(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -482,11 +482,11 @@ const char *config_get_process_args(const char *project)
     if (DEFAULT_CONFIG_PROCESS_ARGS_VALUE == ret)
 	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -503,11 +503,11 @@ int config_get_min_idle_processes(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -526,11 +526,11 @@ int config_get_min_idle_processes(const char *project)
     if (INT32_MIN == ret)
 	ret = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -547,11 +547,11 @@ int config_get_max_idle_processes(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -570,11 +570,11 @@ int config_get_max_idle_processes(const char *project)
     if (INT32_MIN == ret)
 	ret = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -592,11 +592,11 @@ const char *config_get_scan_parameter_key(const char *project)
 
     if (project)
     {
-	int retval = pthread_rwlock_wrlock(&config_rwlock);
+	int retval = pthread_mutex_lock(&config_lock);
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("error acquire mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -610,11 +610,11 @@ const char *config_get_scan_parameter_key(const char *project)
 	free (key);
 
 
-	retval = pthread_rwlock_unlock(&config_rwlock);
+	retval = pthread_mutex_unlock(&config_lock);
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("error unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -633,11 +633,11 @@ const char *config_get_scan_parameter_regex(const char *project)
 
     if (project)
     {
-	int retval = pthread_rwlock_wrlock(&config_rwlock);
+	int retval = pthread_mutex_lock(&config_lock);
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("error acquire mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -651,11 +651,11 @@ const char *config_get_scan_parameter_regex(const char *project)
 	free (key);
 
 
-	retval = pthread_rwlock_unlock(&config_rwlock);
+	retval = pthread_mutex_unlock(&config_lock);
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("error unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -673,11 +673,11 @@ const char *config_get_working_directory(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -696,11 +696,11 @@ const char *config_get_working_directory(const char *project)
     if (INVALID_STRING == ret)
 	ret = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -717,11 +717,11 @@ const char *config_get_project_config_path(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -737,11 +737,11 @@ const char *config_get_project_config_path(const char *project)
 	free (key);
     }
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -756,11 +756,11 @@ const char *config_get_init_key(const char *project, int num)
     assert(config_opts);
     assert(project);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -782,11 +782,11 @@ const char *config_get_init_key(const char *project, int num)
 	free (key);
     }
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -801,11 +801,11 @@ const char *config_get_init_value(const char *project, int num)
     assert(config_opts);
     assert(project);
 
-    int retval = pthread_rwlock_wrlock(&config_rwlock);
+    int retval = pthread_mutex_lock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire read-write lock");
+	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -827,11 +827,11 @@ const char *config_get_init_value(const char *project, int num)
 	free (key);
     }
 
-    retval = pthread_rwlock_unlock(&config_rwlock);
+    retval = pthread_mutex_unlock(&config_lock);
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock read-write lock");
+	logerror("error unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
