@@ -1720,26 +1720,18 @@ int main(int argc, char **argv)
 	    }
 
 
-	    /* read from pipe until all data has be read */
-	    struct signal_data_s sigdata;
-	    do {
-		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
-		if (-1 == retval)
-		{
-		    if (EAGAIN!=errno && EWOULDBLOCK!=errno)
-		    {
-			logerror("error: reading signal data");
-			exit(EXIT_FAILURE);
-		    }
-		}
-		/* note: we do not need to evaluate "sigdata". Either it
-		 * contains a signal of SIGTERM, SIGINT, SIGQUIT or it
-		 * contains a signal of SIGCHLD.
-		 * In the former case we alread know that we have to shut down.
-		 * In the latter case we get to know the child exited during
-		 * the clean up transition.
-		 */
-	    } while (retval>0);
+	    /* note: we do not need to empty the signal pipe. Either it
+	     * contains a signal of SIGTERM, SIGINT, SIGQUIT or it
+	     * contains a signal of SIGCHLD.
+	     * In the former case we already know that we have to shut down.
+	     * In the latter case we get to know the child which has exited
+	     * during the clean up sequence.
+	     */
+
+	    /* close the pipe */
+	    close(signalpipe_rd);
+	    close(signalpipe_wr);
+	    signalpipe_rd = signalpipe_wr = -1;
 
 	    /* exit the main loop */
 	    break;
@@ -1777,8 +1769,6 @@ int main(int argc, char **argv)
 	}
     }
     config_shutdown();
-    close(signalpipe_rd);
-    close(signalpipe_wr);
     printlog("shut down %s", basename(argv[0]));
 
     return exitvalue;
