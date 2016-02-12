@@ -38,9 +38,17 @@
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <signal.h>
 
 #include "logger.h"
 #include "timer.h"
+
+
+/* Default time to wait between sending SIGTERM and SIGKILL */
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
+
 
 
 struct qgis_process_s
@@ -52,8 +60,15 @@ struct qgis_process_s
     int client_socket_fd;	// fd this scheduler connects to child process
     pthread_mutex_t mutex;	// thread mutex to serialize access
     struct timespec starttime;	// stored start time to measure process runtime
+    struct timespec signaltime;	// stored time of last signal send to this process
 };
 
+
+const struct timespec default_signal_timeout =
+{
+	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
+	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
+};
 
 
 
@@ -71,6 +86,14 @@ static const char *get_state_str(enum qgis_process_state_e state)
 	return "PROC_OPEN_IDLE";
     case PROC_BUSY:
 	return "PROC_BUSY";
+    case PROC_TERM:
+	return "PROC_TERM";
+    case PROC_KILL:
+	return "PROC_KILL";
+    case PROC_EXIT:
+	return "PROC_EXIT";
+    default:
+	assert(0);
     }
     return NULL;
 }
@@ -253,6 +276,134 @@ const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc)
 {
     assert(proc);
     return &proc->starttime;
+}
+
+
+const struct timespec *qgis_process_get_signaltime(struct qgis_process_s *proc)
+{
+    assert(proc);
+    return &proc->signaltime;
+}
+
+
+static void qgis_process_set_state_exit(struct qgis_process_s *proc)
+{
+    printlog("shutdown process %d", proc->pid);
+    assert(proc);
+    proc->state = PROC_EXIT;
+    close(proc->client_socket_fd);
+}
+
+
+static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
+{
+    assert(proc);
+    assert(proc->pid);
+    assert(signum > 0);
+
+    int retval = kill(proc->pid, signum);
+    if (retval)
+    {
+	if (ESRCH == errno)
+	{
+	    /* process does not exist anymore.
+	     * change state to PROC_EXIT.
+	     */
+	    qgis_process_set_state_exit(proc);
+	}
+	else
+	{
+	    logerror("error: %s:%d kill pid %d", __FUNCTION__, __LINE__, proc->pid);
+	    exit(EXIT_FAILURE);
+	}
+    }
+    else
+    {
+	retval = qgis_timer_start(&proc->signaltime);
+	if (-1 == retval)
+	{
+	    logerror("clock_gettime()");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+}
+
+void qgis_process_signal_shutdown(struct qgis_process_s *proc)
+{
+    /* If the process is not in shutdown transition (PROC_TERM, PROC_KILL,
+     * PROC_EXIT) then signal SIGTERM, change state to PROC_TERM and store
+     * the time of signal in signaltime.
+     * If the process is in state PROC_TERM and the signal has been send
+     * n seconds ago (default n=10), then signal SIGKILL, change state to
+     * PROC_KILL and store the time of signal in signaltime.
+     * If the process is in state PROC_KILL and the signal has been send
+     * n seconds ago (default n=10), then change state to PROC_EXIT. (This
+     * means we can not help that stubborn process which does not react to
+     * signal(SIGKILL))
+     */
+    assert(proc);
+    int retval;
+
+    switch(proc->state)
+    {
+    case PROC_START:
+    case PROC_INIT:
+    case PROC_IDLE:
+    case PROC_OPEN_IDLE:
+    case PROC_BUSY:
+	qgis_process_send_signal(proc, SIGTERM);
+	proc->state = PROC_TERM;
+	break;
+
+    case PROC_TERM:
+    {
+	struct timespec tm;
+	retval = qgis_timer_sub(&proc->signaltime, &tm);
+	if (-1 == retval)
+	{
+	    logerror("clock_gettime()");
+	    exit(EXIT_FAILURE);
+	}
+
+	if (qgis_timer_isgreaterthan(&tm, &default_signal_timeout))
+	{
+	    /* the process still exists after n seconds timeout.
+	     * send a SIGKILL and change state to PROC_KILL.
+	     */
+	    qgis_process_send_signal(proc, SIGKILL);
+	    proc->state = PROC_KILL;
+	}
+	break;
+    }
+    case PROC_KILL:
+    {
+	struct timespec tm;
+	retval = qgis_timer_sub(&proc->signaltime, &tm);
+	if (-1 == retval)
+	{
+	    logerror("clock_gettime()");
+	    exit(EXIT_FAILURE);
+	}
+
+	if (qgis_timer_isgreaterthan(&tm, &default_signal_timeout))
+	{
+	    /* the process still exists after n seconds timeout?!?
+	     * change state to PROC_EXIT. We can not help it anymore.
+	     */
+	    qgis_process_set_state_exit(proc);
+	}
+	break;
+    }
+    case PROC_EXIT:
+	/* process is dead already. nothing to be done */
+	break;
+
+    default:
+	printlog("error: %s:%d unknown state %d", __FUNCTION__, __LINE__, proc->state);
+    }
+
+
 }
 
 

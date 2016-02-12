@@ -39,16 +39,20 @@
 
 
 struct qgis_process_s;
-struct timespec;
 
 enum qgis_process_state_e
 {
-    PROC_START = 0,
-    PROC_INIT,
-    PROC_IDLE,
+    PROC_START = 0,	// process has started and needs to be initialized
+    PROC_INIT,		// process gets initialized
+    PROC_IDLE,		// process is initialized and ready to work
     PROC_OPEN_IDLE,
-    PROC_BUSY,
+    PROC_BUSY,		// process is busy with an fcgi request
+    PROC_TERM,		// process received the term signal
+    PROC_KILL,		// process received the kill signal
+    PROC_EXIT		// process is not existend anymore
 };
+
+extern const struct timespec default_signal_timeout;
 
 struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd);
 void qgis_process_delete(struct qgis_process_s *proc);
@@ -63,6 +67,8 @@ int qgis_process_get_socketfd(struct qgis_process_s *proc);
 pthread_mutex_t *qgis_process_get_mutex(struct qgis_process_s *proc);
 pid_t qgis_process_get_pid(struct qgis_process_s *proc);
 const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc);
+const struct timespec *qgis_process_get_signaltime(struct qgis_process_s *proc);
+void qgis_process_signal_shutdown(struct qgis_process_s *proc);
 
 
 #endif /* QGIS_PROCESS_H_ */
