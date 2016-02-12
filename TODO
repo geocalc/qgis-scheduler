@@ -28,3 +28,8 @@
 
 + write a man page
 
++ have a look at the file descriptor limit during startup and write a warning if we get close to soft or hard limits
+
++ if no free idle process is available for the work wait some timeout if a process gets available.
++ in meantime start a new process.
+
