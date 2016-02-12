@@ -1090,19 +1090,29 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     debug(1, "got signal %d from pid %d\n", sig, info->si_pid);
     switch (sig)
     {
-    case SIGCHLD:	// fall through
+    case SIGCHLD:
+	/* got a child signal. Additionally
+	 * call the shutdown handler, maybe it knows what to do with this
+	 */
+	qgis_shutdown_process_died(info->si_pid);
+	// no break
+
     case SIGTERM:	// fall through
     case SIGINT:	// fall through
     case SIGQUIT:
-	/* write signal to main thread */
-	assert(signalpipe_wr >= 0);
-	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
-	if (-1 == retval)
+	/* write signal to main thread in case we are not in the progress
+	 * of shutting down */
+	if ( !get_program_shutdown() )
 	{
-	    logerror("write signal data");
-	    exit(EXIT_FAILURE);
+	    assert(signalpipe_wr >= 0);
+	    retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
+	    if (-1 == retval)
+	    {
+		logerror("write signal data");
+		exit(EXIT_FAILURE);
+	    }
+	    debug(1, "wrote %d bytes to sig pipe\n", retval);
 	}
-	debug(1, "wrote %d bytes to sig pipe\n", retval);
 	break;
 
     case SIGSEGV:
@@ -1111,11 +1121,11 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	syncfs(STDOUT_FILENO);
 	/* reinstall default handler and fire signal again */
 	{
-//	    struct sigaction action;
-//	    memset(&action, 0, sizeof(action));
-//	    action.sa_handler = SIG_DFL;
-//	    sigaction(SIGSEGV, &action, NULL);
-	    signal(SIGSEGV, SIG_DFL);
+	    struct sigaction action;
+	    memset(&action, 0, sizeof(action));
+	    action.sa_handler = SIG_DFL;
+	    sigaction(SIGSEGV, &action, NULL);
+//	    signal(SIGSEGV, SIG_DFL);
 	    raise(SIGSEGV);
 	}
 	break;
@@ -1518,13 +1528,7 @@ int main(int argc, char **argv)
     int maxfd = max(serversocketfd,signalpipe_rd);
     maxfd++;
 
-    /* set timeout to infinite */
-    struct timeval timeout, *timeout_ptr = NULL;
-    timeout.tv_sec = 10;	// wait 10 seconds for a child process to terminate
-    timeout.tv_usec = 0;
 
-    int has_finished_first_run = 0;
-    int has_finished_second_run = 0;
     int has_finished = 0;
     int is_readable_serversocket = 0;
     int is_readable_signalpipe = 0;
@@ -1541,7 +1545,7 @@ int main(int argc, char **argv)
 	    FD_SET(serversocketfd, &rfds);
 	if (!is_readable_signalpipe)
 	    FD_SET(signalpipe_rd, &rfds);
-	retval = select(maxfd, &rfds,NULL,NULL,timeout_ptr);
+	retval = select(maxfd, &rfds, NULL, NULL, NULL);
 	if (-1 == retval)
 	{
 	    switch (errno)
@@ -1687,219 +1691,62 @@ int main(int argc, char **argv)
 	 */
 	if ( get_program_shutdown() )
 	{
-	    /* On the first run send all child processes the TERM signal,
-	     * then wait for the processes to exit normally. During this
-	     * we are called by the signal handler for the CHLD signal.
-	     * During this we check for all child processes to terminate.
-	     * If all processed have terminated, we do exit this. Else we start
-	     * a second round of killing all processes and then exit this.
+	    /* we received a termination signal.
+	     * reinstall the default signal handler,
+	     * empty the pipe (if some other signals have arrived)
+	     * and exit this loop
 	     */
+	    struct sigaction action;
+	    memset(&action, 0, sizeof(action));
+	    action.sa_handler = SIG_DFL;
 
-	    if (has_finished_second_run)
+	    retval = sigaction(SIGTERM, &action, NULL);
+	    if (retval)
 	    {
-		/* if none of the child processes did terminate on timeout
-		 * we exit with failure
-		 */
-		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
-		{
-		    exitvalue = EXIT_FAILURE;
-		    break;
-		}
-		else
-		{
-		    debug(1, "got interrupt after sending SIGKILL. Have a look of processes running?\n");
-		    int children = 0;
-		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-		    while ( projiterator )
-		    {
-			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-			struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-
-			if ( !proc )
-			{
-			    /* all child processes did exit, we can end this */
-			    exitvalue = EXIT_SUCCESS;
-			    //break; // TODO: this breaks the inner loop not the outer one
-			}
-			else
-			{
-			    children++;
-			    break;
-			}
-		    }
-		    qgis_proj_list_return_iterator(projectlist);
-
-		    if (children)
-		    {
-			debug(1, "still found processes after sending SIGKILL\n");
-		    }
-		    else
-		    {
-			/* all child processes did exit, we can end this */
-			exitvalue = EXIT_SUCCESS;
-			has_finished = 1;
-			debug(1, "no more processes found after sending SIGKILL\n");
-		    }
-
-		}
+		logerror("error: can not install signal handler");
+		exit(EXIT_FAILURE);
 	    }
-	    else if (has_finished_first_run)
+	    retval = sigaction(SIGQUIT, &action, NULL);
+	    if (retval)
 	    {
-
-		/* if none of the child processes did terminate on timeout
-		 * we can start the next round of sending signals
-		 */
-		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
-		{
-		    debug(1, "timeout, sending SIGKILL to remaining processes\n");
-
-		    int children = 0;
-
-		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-		    while ( projiterator )
-		    {
-			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-			int i;
-			pid_t *pidlist = NULL;
-			int pidlen = 0;
-			retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
-			for(i=0; i<pidlen; i++)
-			{
-			    pid_t pid = pidlist[i];
-			    retval = kill(pid, SIGKILL);
-			    if (0 > retval)
-			    {
-				switch(errno)
-				{
-				case ESRCH:
-				    /* child process is not existent anymore.
-				     * erase it from the list of available processes
-				     */
-				{
-				    debug(1, "process %d is gone, removing from list\n", pid);
-
-				    struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
-				    if (myproc)
-				    {
-					qgis_process_list_remove_process(proclist, myproc);
-					qgis_process_delete(myproc);
-				    }
-				    else
-				    {
-					debug(1, "process %d not found in list\n", pid);
-				    }
-				}
-				break;
-				default:
-				    logerror("error: could not send KILL signal");
-				}
-			    }
-			    else
-			    {
-				children++;
-			    }
-
-			}
-			free(pidlist);
-		    }
-		    qgis_proj_list_return_iterator(projectlist);
-
-		    if (0 < children)
-		    {
-			debug(1, "termination signal timeout, sending SIGKILL to %d child processes..\n", children);
-			timeout.tv_sec = 10;
-			has_finished_second_run = 1;
-		    }
-		    else
-		    {
-			/* no more child processes found to send signal.
-			 * exit immediately.
-			 */
-			debug(1, "termination signal timeout, shut down\n");
-			has_finished = 1;
-			break;
-		    }
-		}
-		else
-		{
-		    debug(1, "got interrupt after sending SIGTERM. Have a look of processes running?\n");
-		    int children = 0;
-		    struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-		    while ( projiterator )
-		    {
-			struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-			struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
-
-			struct qgis_process_s *proc = qgis_process_list_get_first_process(proclist);
-			if ( !proc )
-			{
-			}
-			else
-			{
-			    children++;
-			    break; // this breaks the inner loop not the outer one
-			}
-		    }
-		    qgis_proj_list_return_iterator(projectlist);
-
-		    if (children)
-		    {
-			debug(1, "still found processes after sending SIGTERM\n");
-		    }
-		    else
-		    {
-			/* all child processes did exit, we can end this */
-			exitvalue = EXIT_SUCCESS;
-			has_finished = 1;
-			debug(1, "no more processes found after sending SIGTERM\n");
-		    }
-
-		}
-
-
+		logerror("error: can not install signal handler");
+		exit(EXIT_FAILURE);
 	    }
-	    else
+	    retval = sigaction(SIGINT, &action, NULL);
+	    if (retval)
 	    {
-		/* got the signal to shut down this scheduler
-		 * signal all projects to shut down the list of processes
-		 */
-		int children = 0;
-
-		struct qgis_project_iterator *projiterator = qgis_proj_list_get_iterator(projectlist);
-		while ( projiterator )
-		{
-		    struct qgis_project_s *project = qgis_proj_list_get_next_project(&projiterator);
-		    children += qgis_project_shutdown_all_processes(project, SIGTERM);
-		}
-		qgis_proj_list_return_iterator(projectlist);
-
-		if (0 < children)
-		{
-		    debug(1, "termination signal received, sending SIGTERM to %d child processes..\n", children);
-		    /* set timeout to "some seconds" */
-		    timeout_ptr = &timeout;
-		    timeout.tv_sec = 10;
-		    has_finished_first_run = 1;
-		}
-		else
-		{
-		    /* no more child processes found to send signal.
-		     * exit immediately.
-		     */
-		    debug(1, "termination signal received, no more processes to signal, shut down\n");
-		    has_finished = 1;
-		    break;
-		}
-
+		logerror("error: can not install signal handler");
+		exit(EXIT_FAILURE);
 	    }
 
+
+	    /* read from pipe until all data has be read */
+	    struct signal_data_s sigdata;
+	    do {
+		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
+		if (-1 == retval)
+		{
+		    if (EAGAIN!=errno && EWOULDBLOCK!=errno)
+		    {
+			logerror("error: reading signal data");
+			exit(EXIT_FAILURE);
+		    }
+		}
+		/* note: we do not need to evaluate "sigdata". Either it
+		 * contains a signal of SIGTERM, SIGINT, SIGQUIT or it
+		 * contains a signal of SIGCHLD.
+		 * In the former case we alread know that we have to shut down.
+		 * In the latter case we get to know the child exited during
+		 * the clean up transition.
+		 */
+	    } while (retval>0);
+
+	    /* exit the main loop */
+	    break;
 	}
 
     }
 
-    /* at this point no more child processes should be running anymore */
 
     debug(1, "closing network socket\n");
     fflush(stderr);
