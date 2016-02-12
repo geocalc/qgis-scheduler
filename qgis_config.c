@@ -174,7 +174,7 @@ int config_get_num_projects(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -201,7 +201,7 @@ const char *config_get_name_project(int num)
     assert(config_opts);
     assert(num >= 0);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -227,7 +227,7 @@ const char *config_get_network_listen(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -253,7 +253,7 @@ const char *config_get_network_port(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -279,7 +279,7 @@ const char *config_get_chuser(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -305,7 +305,7 @@ const char *config_get_chroot(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -331,7 +331,7 @@ const char *config_get_pid_path(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -357,7 +357,7 @@ const char *config_get_logfile(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -383,7 +383,7 @@ int config_get_debuglevel(void)
 {
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -415,7 +415,7 @@ const char *config_get_process(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -459,7 +459,7 @@ const char *config_get_process_args(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -503,7 +503,7 @@ int config_get_min_idle_processes(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -547,7 +547,7 @@ int config_get_max_idle_processes(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -592,7 +592,7 @@ const char *config_get_scan_parameter_key(const char *project)
 
     if (project)
     {
-	int retval = pthread_rwlock_rdlock(&config_rwlock);
+	int retval = pthread_rwlock_wrlock(&config_rwlock);
 	if (retval)
 	{
 	    errno = retval;
@@ -633,7 +633,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 
     if (project)
     {
-	int retval = pthread_rwlock_rdlock(&config_rwlock);
+	int retval = pthread_rwlock_wrlock(&config_rwlock);
 	if (retval)
 	{
 	    errno = retval;
@@ -673,7 +673,7 @@ const char *config_get_working_directory(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -717,7 +717,7 @@ const char *config_get_project_config_path(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -756,7 +756,7 @@ const char *config_get_init_key(const char *project, int num)
     assert(config_opts);
     assert(project);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
@@ -801,7 +801,7 @@ const char *config_get_init_value(const char *project, int num)
     assert(config_opts);
     assert(project);
 
-    int retval = pthread_rwlock_rdlock(&config_rwlock);
+    int retval = pthread_rwlock_wrlock(&config_rwlock);
     if (retval)
     {
 	errno = retval;
