@@ -392,14 +392,7 @@ void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
 	    struct qgis_project_s *myproj = np->proj;
 
 	    qgis_project_check_inotify_config_changed(myproj, wd);
-
-//	    if (retval)
-//		// found process, no need to look further
-//		break;
 	}
-//	if (!retval)
-//	    // did not find any matching process
-//	    printlog("Process %d died, but did not find any matching project?", pid);
 
 	retval = pthread_rwlock_unlock(&list->rwlock);
 	if (retval)

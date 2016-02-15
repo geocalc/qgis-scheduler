@@ -122,7 +122,7 @@ static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
  * and new processes to active list,
  * and kill all old processes from shutdown list.
  */
-void qgis_project_restart_processes(struct qgis_project_s *project)
+static void qgis_project_restart_processes(struct qgis_project_s *project)
 {
     assert(project);
     if (project)
@@ -777,7 +777,7 @@ struct thread_start_process_detached_args
 };
 
 
-void *qgis_project_thread_start_process_detached(void *arg)
+static void *qgis_project_thread_start_process_detached(void *arg)
 {
     assert(arg);
     struct thread_start_process_detached_args *tinfo = arg;
@@ -876,7 +876,6 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
 	    qgis_process_list_remove_process(proclist, proc);
-//	    qgis_process_delete(proc);
 	    qgis_shutdown_add_process(proc);
 
 	    if ( !get_program_shutdown() )
@@ -914,7 +913,6 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
 		qgis_process_list_remove_process(proclist, proc);
-//		qgis_process_delete(proc);
 		qgis_shutdown_add_process(proc);
 
 		if ( !get_program_shutdown() )
@@ -944,7 +942,6 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 			 * move the process entry to the shutdown list to care for.
 			 */
 			qgis_process_list_remove_process(proclist, proc);
-//			qgis_process_delete(proc);
 			qgis_shutdown_add_process(proc);
 		    }
 		}
@@ -954,13 +951,6 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 
     return ret;
 }
-
-
-//int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc)
-//{
-//
-//    return -1;
-//}
 
 
 /* move all processes from the lists to the shutdown module */
@@ -974,57 +964,6 @@ void qgis_project_shutdown(struct qgis_project_s *proj)
 	qgis_shutdown_add_process_list(proj->activeproclist);
 	qgis_shutdown_add_process_list(proj->shutdownproclist);
     }
-}
-
-
-/* Get a list of al processes belonging to this project and send them the kill
- * signal "signum".
- * return: number of processes send "signum" */
-int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum)
-{
-    assert(proj);
-
-    int children = 0;
-    struct qgis_process_list_s *proclist = qgis_project_get_process_list(proj);
-    int retval;
-    int i;
-    pid_t *pidlist = NULL;
-    int pidlen = 0;
-    retval = qgis_process_list_get_pid_list(proclist, &pidlist, &pidlen);
-    for(i=0; i<pidlen; i++)
-    {
-	pid_t pid = pidlist[i];
-	retval = kill(pid, signum);
-	if (0 > retval)
-	{
-	    switch(errno)
-	    {
-	    case ESRCH:
-		/* child process is not existent anymore.
-		 * erase it from the list of available processes
-		 */
-	    {
-		struct qgis_process_s *myproc = qgis_process_list_find_process_by_pid(proclist, pid);
-		if (myproc)
-		{
-		    qgis_process_list_remove_process(proclist, myproc);
-		    qgis_process_delete(myproc);
-		}
-	    }
-	    break;
-	    default:
-		logerror("error: could not send TERM signal");
-	    }
-	}
-	else
-	{
-	    children++;
-	}
-
-    }
-    free(pidlist);
-
-    return children;
 }
 
 
