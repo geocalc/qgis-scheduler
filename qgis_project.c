@@ -600,6 +600,29 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     {
 	/* child */
 
+
+	/* Add the configured environment to the existing environment */
+	/* Note: shall we clean up before? */
+	int i;
+	static const int maxenv = 25;
+	for (i=0; i<maxenv; i++)
+	{
+	    const char *key = config_get_env_key(project_name, i);
+	    if ( !key )
+		break;
+	    const char *value = config_get_env_value(project_name, i);
+	    if ( !value )
+		break;
+
+	    debug(1, "project %s: add %s = %s to environment", project_name, key, value);
+	    retval = setenv(key, value, 1);
+	    if (retval)
+	    {
+		logerror("error can not set environment with key='%s' and value='%s'", key, value);
+		exit(EXIT_FAILURE);
+	    }
+	}
+
 	/* change working dir
 	 * close file descriptor stdin = 0
 	 * assign socket file descriptor to fd 0
