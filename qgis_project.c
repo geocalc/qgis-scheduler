@@ -629,15 +629,15 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
 	 * fork
 	 * exec
 	 */
-	int ret = chdir(config_get_working_directory(project_name));
-	if (-1 == ret)
+	retval = chdir(config_get_working_directory(project_name));
+	if (-1 == retval)
 	{
 	    logerror("error calling chdir");
 	}
 
 
-	ret = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
-	if (-1 == ret)
+	retval = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
+	if (-1 == retval)
 	{
 	    logerror("error calling dup2");
 	    exit(EXIT_FAILURE);
