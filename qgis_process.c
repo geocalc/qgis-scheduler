@@ -135,8 +135,9 @@ void qgis_process_delete(struct qgis_process_s *proc)
     if (proc)
     {
 	// ignore return value, maybe this file is already closed. I don't care
-	//close(proc->process_socket_fd);
-	int retval = pthread_mutex_destroy(&proc->mutex);
+	int retval = close(proc->process_socket_fd);
+	debug(1, "closed child process socket fd %d, retval %d, errno %d", proc->client_socket_fd, retval, errno);
+	retval = pthread_mutex_destroy(&proc->mutex);
 	if (retval)
 	{
 	    errno = retval;
@@ -291,8 +292,6 @@ static void qgis_process_set_state_exit(struct qgis_process_s *proc)
     printlog("shutdown process %d", proc->pid);
     assert(proc);
     proc->state = PROC_EXIT;
-//    int retval = close(proc->client_socket_fd);
-//    debug(1, "closed client socket fd %d, retval %d, errno %d", proc->client_socket_fd, retval, errno);
 }
 
 
