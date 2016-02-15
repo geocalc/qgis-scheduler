@@ -390,6 +390,10 @@ struct qgis_process_s *qgis_process_list_find_idle_return_busy(struct qgis_proce
 		logerror("error unlock mutex");
 		exit(EXIT_FAILURE);
 	    }
+
+	    if (NULL != proc)
+		// we found a matching process. no need to look further
+		break;
 	}
 
 	retval = pthread_rwlock_unlock(&list->rwlock);
