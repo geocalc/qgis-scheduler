@@ -211,7 +211,7 @@ int printlog(const char *format, ...)
 }
 
 
-int debug(int level, const char *format, ...)
+int mydebug(int level, const char *format, ...)
 {
     assert(format);
     assert(level>0);

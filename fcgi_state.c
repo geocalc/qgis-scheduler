@@ -40,6 +40,7 @@
 #include <assert.h>
 #include <sys/queue.h>
 #include <fastcgi.h>
+#include <pthread.h>
 
 #include "logger.h"
 

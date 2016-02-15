@@ -37,9 +37,12 @@
 # define __attribute__(a)
 #endif
 
+
+
 int logger_init(void);
 int printlog(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
-int debug(int level, const char *format, ...) __attribute__ ((__format__ (__printf__, 2, 3)));
+#define debug(level, format, ...)	mydebug(level, "[%lu] %s():%d " format, pthread_self(), __FUNCTION__, __LINE__, ## __VA_ARGS__)
+int mydebug(int level, const char *format, ...) __attribute__ ((__format__ (__printf__, 2, 3)));
 int logerror(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
 
