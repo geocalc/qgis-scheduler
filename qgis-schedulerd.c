@@ -577,9 +577,10 @@ void *thread_handle_connection(void *arg)
 	printlog("[%lu] Found no project for request from %s", thread_id, tinfo->hostname);
     }
 
-    /* find the next idling process and attach a thread to it */
+    /* find the next idling process, set its state to BUSY and attach a thread to it */
     if (proclist)
-	proc = qgis_process_list_mutex_find_process_by_status(proclist, PROC_IDLE);
+	proc = qgis_process_list_find_idle_return_busy(proclist);
+
     if ( !proc )
     {
 	/* Found no idle processes.
@@ -707,19 +708,6 @@ void *thread_handle_connection(void *arg)
     /* here we do point 6, 7, 8 */
     else
     {
-	/* change the state of process to BUSY
-	 * and unlock the mutex protection
-	 */
-	qgis_process_set_state_busy(proc, thread_id);
-	pthread_mutex_t *mutex = qgis_process_get_mutex(proc);
-	retval = pthread_mutex_unlock(mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock mutex");
-	    exit(EXIT_FAILURE);
-	}
-	mutex = NULL;
 
 	{
 	    pid_t pid = qgis_process_get_pid(proc);
@@ -1214,7 +1202,7 @@ int main(int argc, char **argv)
 
     logger_init();
     printlog("starting %s with pid %d", basename(argv[0]), getpid());
-
+    debug(1, "started main thread");
 
     test_set_valid_clock_id();
 
