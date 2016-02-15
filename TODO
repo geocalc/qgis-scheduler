@@ -8,8 +8,6 @@
 
 + assign path of the config file by autotools parameter
 
-+ test for execution times. warn in log file if execution time exceeds a limit
-
 + reload the configuration with SIGHUP. Eventually stop and start the child processes. Eventually track for changes and react on the changes only??
 
 + test for existence of config path "cwd" and exit with error (global config) or write error to log file (project config)
@@ -19,8 +17,6 @@
 + add include= key to config file, to include a whole subdirectory of files. Better administration when adding projects to the configuration
 
 + disable initialization if no init data is configured
-
-+ during shutdown make a poll frequency of 1 second (instead of 10) to check for child procs already gone
 
 + be able to select file logging or syslog logging in config file
 
