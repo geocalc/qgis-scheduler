@@ -569,7 +569,7 @@ void *thread_handle_connection(void *arg)
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones and add them to the existing processes */
-	    start_new_process_detached(missing_processes, project, 0);
+	    qgis_project_start_new_process_detached(missing_processes, project, 0);
 	}
     }
     else
@@ -1160,7 +1160,7 @@ void *thread_start_project_processes(void *arg)
      * its initialization.
      * Then add this project to the global list
      */
-    start_new_process_wait(num, project, 0);
+    qgis_project_start_new_process_wait(num, project, 0);
     qgis_proj_list_add_project(projectlist, project);
 
 

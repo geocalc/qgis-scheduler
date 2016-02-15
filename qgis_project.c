@@ -128,7 +128,7 @@ void qgis_project_restart_processes(struct qgis_project_s *project)
     if (project)
     {
 	int numproc = qgis_process_list_get_num_process(project->activeproclist);
-	start_new_process_detached(numproc, project, 1);
+	qgis_project_start_new_process_detached(numproc, project, 1);
     }
 }
 
@@ -652,7 +652,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     return NULL;
 }
 
-void *thread_start_new_child(void *arg)
+static void *qgis_project_thread_start_new_child(void *arg)
 {
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
@@ -685,7 +685,7 @@ void *thread_start_new_child(void *arg)
  * param do_exchange_processes: if true removes all active processes and replaces them with the new created ones.
  *                              else integrate them in the list of active processes.
  */
-void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
+void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     assert(project);
     assert(num > 0);
@@ -713,7 +713,7 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	}
 	targs->project = project;
 
-	retval = pthread_create(&threads[i], NULL, thread_start_new_child, targs);
+	retval = pthread_create(&threads[i], NULL, qgis_project_thread_start_new_child, targs);
 	if (retval)
 	{
 	    errno = retval;
@@ -794,7 +794,7 @@ void *qgis_project_thread_start_process_detached(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
+    qgis_project_start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
 
     free(arg);
 
@@ -803,7 +803,7 @@ void *qgis_project_thread_start_process_detached(void *arg)
 
 
 /* starts a new thread in detached state, which in turn calls start_new_process_wait() */
-void start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
+void qgis_project_start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
@@ -888,7 +888,7 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		/* TODO: react on child processes exiting immediately.
 		 * maybe store the creation time and calculate the execution time?
 		 */
-		start_new_process_detached(1, proj, 0);
+		qgis_project_start_new_process_detached(1, proj, 0);
 	    }
 	}
 	else
@@ -926,7 +926,7 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    /* TODO: react on child processes exiting immediately.
 		     * maybe store the creation time and calculate the execution time?
 		     */
-		    start_new_process_detached(1, proj, 0);
+		    qgis_project_start_new_process_detached(1, proj, 0);
 		}
 	    }
 	    else
