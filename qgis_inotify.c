@@ -253,6 +253,7 @@ void qgis_inotify_delete(void)
     }
 
     retval = close(inotifyfd);
+    debug(1, "closed inotify fd %d, retval %d, errno %d", inotifyfd, retval, errno);
     if (-1 == retval)
     {
 	logerror("can not close inotify fd");

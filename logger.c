@@ -153,7 +153,8 @@ int logger_init(void)
 	    exit(EXIT_FAILURE);
 	}
 
-	close(logfd);
+	retval = close(logfd);
+	debug(1, "closed log file fd %d, retval %d, errno %d", logfd, retval, errno);
     }
 
     return 0;

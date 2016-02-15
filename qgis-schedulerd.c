@@ -783,7 +783,7 @@ void *thread_handle_connection(void *arg)
 	retval = getsockname(childunixsocketfd, &sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
-	    logerror("error retrieving the name of child process socket");
+	    logerror("error retrieving the name of child process socket %d", childunixsocketfd);
 	    exit(EXIT_FAILURE);
 	}
 	/* leave the original child socket and create a new one on the opposite
@@ -1036,7 +1036,8 @@ void *thread_handle_connection(void *arg)
 	    }
 
 	}
-	close (childunixsocketfd);
+	retval = close (childunixsocketfd);
+	debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
 	free(buffer);
 	qgis_process_set_state_idle(proc);
     }
@@ -1053,7 +1054,8 @@ void *thread_handle_connection(void *arg)
 
 
     /* clean up */
-    close (inetsocketfd);
+    retval = close (inetsocketfd);
+    debug(1, "closed internet socket fd %d, retval %d, errno %d", inetsocketfd, retval, errno);
     fcgi_data_list_delete(datalist);
     free(tinfo->hostname);
     free(arg);
@@ -1742,7 +1744,8 @@ int main(int argc, char **argv)
 
     debug(1, "closing network socket\n");
     fflush(stderr);
-    close(serversocketfd);
+    retval = close(serversocketfd);
+    debug(1, "closed internet server socket fd %d, retval %d, errno %d", serversocketfd, retval, errno);
 
     /* close the inotify module, so no processes are recreated afterwards
      * because of a change in the configuration.

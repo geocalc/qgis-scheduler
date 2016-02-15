@@ -299,7 +299,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
-	logerror("error retrieving the name of child process socket");
+	logerror("error retrieving the name of child process socket %d", childunixsocketfd);
 	exit(EXIT_FAILURE);
     }
     /* leave the original child socket and create a new one on the opposite
@@ -465,7 +465,8 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     /* ok, we did read each and every byte from child process.
      * now close this and set idle
      */
-    close(childunixsocketfd);
+    retval = close(childunixsocketfd);
+    debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
 //    close(debugfd);
     debug(1, "init child process for project '%s' done. waiting for input..\n", projname);
 

@@ -291,7 +291,8 @@ static void qgis_process_set_state_exit(struct qgis_process_s *proc)
     printlog("shutdown process %d", proc->pid);
     assert(proc);
     proc->state = PROC_EXIT;
-    close(proc->client_socket_fd);
+    int retval = close(proc->client_socket_fd);
+    debug(1, "closed client socket fd %d, retval %d, errno %d", proc->client_socket_fd, retval, errno);
 }
 
 
