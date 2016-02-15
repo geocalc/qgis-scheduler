@@ -360,8 +360,11 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
     case PROC_IDLE:
     case PROC_OPEN_IDLE:
     case PROC_BUSY:
-	qgis_process_send_signal(proc, SIGTERM);
+	/* note: set status before call to function because
+	 * qgis_process_send_signal() may change state to EXIT
+	 */
 	proc->state = PROC_TERM;
+	qgis_process_send_signal(proc, SIGTERM);
 	break;
 
     case PROC_TERM:
@@ -379,8 +382,11 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	    /* the process still exists after n seconds timeout.
 	     * send a SIGKILL and change state to PROC_KILL.
 	     */
-	    qgis_process_send_signal(proc, SIGKILL);
+	    /* note: set status before call to function because
+	     * qgis_process_send_signal() may change state to EXIT
+	     */
 	    proc->state = PROC_KILL;
+	    qgis_process_send_signal(proc, SIGKILL);
 	}
 	else
 	{
