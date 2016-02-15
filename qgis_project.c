@@ -113,7 +113,6 @@ static unsigned int socket_id = 0;
 static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-void start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes);
 
 
 /* restarts all processes.
@@ -721,12 +720,12 @@ void start_new_process_wait(int num, struct qgis_project_s *project, int do_exch
 	    logerror("error creating thread");
 	    exit(EXIT_FAILURE);
 	}
-	debug(1, "[%lu] started process %lu\n", pthread_self(), threads[i]);
+	debug(1, "[%lu] started thread %lu\n", pthread_self(), threads[i]);
     }
     /* wait for those threads */
     for (i=0; i<num; i++)
     {
-	debug(1, "[%lu] join process %lu\n", pthread_self(), threads[i]);
+	debug(1, "[%lu] join thread %lu\n", pthread_self(), threads[i]);
 	retval = pthread_join(threads[i], NULL);
 	if (retval)
 	{

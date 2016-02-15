@@ -310,6 +310,7 @@ static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
     assert(proc->pid > 0);
     assert(signum >= 0);
 
+    debug(1, "send signal %d to pid %d", signum, proc->pid);
     int retval = kill(proc->pid, signum);
     if (retval)
     {
@@ -318,6 +319,7 @@ static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
 	    /* process does not exist anymore.
 	     * change state to PROC_EXIT.
 	     */
+	    debug(1, "process %d does not exist, change state to EXIT", proc->pid);
 	    qgis_process_set_state_exit(proc);
 	}
 	else if (signum)
@@ -353,6 +355,7 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
      */
     assert(proc);
     int retval;
+    debug(1, "called shutdown process pid %d", proc->pid);
 
     switch(proc->state)
     {
