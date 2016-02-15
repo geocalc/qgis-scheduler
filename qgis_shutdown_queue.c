@@ -84,22 +84,29 @@ static void *qgis_shutdown_thread(void *arg)
 	for (i=0; i<(sizeof(statemovelist)/sizeof(*statemovelist)); i++)
 	{
 	    retval = qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, statemovelist[i]);
-	    debug(1, "shutdown: transferred %d %s programs from busylist to shutdownlist", retval, get_state_str(statemovelist[i]));
+	    debug(1, "transferred %d %s programs from busylist to shutdownlist", retval, get_state_str(statemovelist[i]));
 	}
 
 	/* send a signal to all processes in the shutdown list.
 	 * If the process already died, set its state to EXIT.
 	 */
+	debug(1, "send or evaluate signal to every process in shutdown list");
 	qgis_process_list_signal_shutdown(shutdownlist);
 
+	retval = qgis_process_list_get_num_process(shutdownlist);
+	debug(1, "got %d processes in shutdown list", retval);
+
 	/* clean the list from exited processes */
-	if ( qgis_process_list_get_num_process_by_status(shutdownlist, PROC_EXIT) )
+	int count = qgis_process_list_get_num_process_by_status(shutdownlist, PROC_EXIT);
+	debug(1, "found %d processes with status EXIT in shutdown list", count);
+	if ( count )
 	{
 	    /* TODO: Bad bad workaround. do this more efficiently in
 	     * qgis_process_list
 	     */
 	    struct qgis_process_list_s *exitlist = qgis_process_list_new();
-	    qgis_process_list_transfer_all_process_with_state(exitlist, shutdownlist, PROC_EXIT);
+	    retval = qgis_process_list_transfer_all_process_with_state(exitlist, shutdownlist, PROC_EXIT);
+	    debug(1, "transferred %d %s programs from shutdownlist to exitlist", retval, get_state_str(PROC_EXIT));
 	    qgis_process_list_delete(exitlist);
 	}
 
@@ -109,6 +116,7 @@ static void *qgis_shutdown_thread(void *arg)
 	 */
 	struct timespec ts_sig = {0,0};
 	qgis_process_list_get_min_signaltimer(shutdownlist, &ts_sig);
+	debug(1, "min signal timer is %ld,%03lds", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
 	if ( !qgis_timer_is_empty(&ts_sig) )
 	{
 	    qgis_timer_add(&ts_sig, &default_signal_timeout);
@@ -155,13 +163,20 @@ static void *qgis_shutdown_thread(void *arg)
 		    };
 		    qgis_timer_add(&ts_sig, &ts_timeout);
 
+		    debug(1, "wait %ld,%03ld seconds or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
 		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
 		}
 		else
+		{
+		    debug(1, "wait until next condition");
 		    retval = pthread_cond_wait(&shutdowncondition, &shutdownmutex);
+		}
 	    }
 	    else
+	    {
+		debug(1, "wait %ld,%03ld seconds or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
 		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
+	    }
 
 	    if ( 0 != retval && ETIMEDOUT != retval )
 	    {
@@ -169,6 +184,10 @@ static void *qgis_shutdown_thread(void *arg)
 		logerror("error: can not wait on condition");
 		exit(EXIT_FAILURE);
 	    }
+	}
+	else
+	{
+	    debug(1, "list changed, reevaluate");
 	}
 
 	has_list_change = 0; // reset api caller semaphore
@@ -348,7 +367,7 @@ void qgis_shutdown_wait_empty(void)
  */
 void qgis_shutdown_process_died(pid_t pid)
 {
-    debug(1,"qgis_shutdown: process %d died", pid);
+    debug(1,"process %d died", pid);
 
     /* remove the process with "pid" from the lists,
      * then signal the thread.
