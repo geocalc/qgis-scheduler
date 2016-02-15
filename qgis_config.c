@@ -72,6 +72,10 @@
 #define DEFAULT_CONFIG_PROJ_INITVAR	NULL
 #define CONFIG_PROJ_INITDATA		":initvalue"
 #define DEFAULT_CONFIG_PROJ_INITDATA	NULL
+#define CONFIG_PROJ_ENVVAR		":envkey"
+#define DEFAULT_CONFIG_PROJ_ENVVAR	NULL
+#define CONFIG_PROJ_ENVDATA		":envvalue"
+#define DEFAULT_CONFIG_PROJ_ENVDATA	NULL
 #define CONFIG_LOGFILE			":logfile"
 #define DEFAULT_CONFIG_LOGFILE		NULL
 #define CONFIG_DEBUGLEVEL		":debuglevel"
@@ -826,6 +830,102 @@ const char *config_get_init_value(const char *project, int num)
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITDATA);
 	free (key);
     }
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_env_key(const char *project, int num)
+{
+    const char *ret = INVALID_STRING;
+
+    assert(config_opts);
+    assert(project);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key;
+	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVVAR, num);
+	if (-1 == retval)
+	{
+	    logerror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
+	free (key);
+    }
+
+    if (INVALID_STRING == ret)
+	ret = iniparser_getstring(config_opts, CONFIG_PROJ_ENVVAR, DEFAULT_CONFIG_PROJ_ENVVAR);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+const char *config_get_env_value(const char *project, int num)
+{
+    const char *ret = INVALID_STRING;
+
+    assert(config_opts);
+    assert(project);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *key;
+	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVDATA, num);
+	if (-1 == retval)
+	{
+	    logerror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
+	free (key);
+    }
+
+    if (INVALID_STRING == ret)
+	ret = iniparser_getstring(config_opts, CONFIG_PROJ_ENVDATA, DEFAULT_CONFIG_PROJ_ENVDATA);
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
