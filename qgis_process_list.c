@@ -322,6 +322,89 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 //}
 //
 
+
+/* Looks for process entries with their status IDLE and return them
+ * (atomically) with their status changed to BUSY.
+ * This way the connections threads can get an idle process without race
+ * conditions.
+ * The thread id of the calling thread is written to the process dataset.
+ */
+struct qgis_process_s *qgis_process_list_find_idle_return_busy(struct qgis_process_list_s *list)
+{
+    struct qgis_process_s *proc = NULL;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	{
+	    pthread_mutex_t *mutex = qgis_process_get_mutex(np->proc);
+	    retval = pthread_mutex_lock(mutex);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error acquire mutex");
+		exit(EXIT_FAILURE);
+	    }
+
+	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
+	    if (PROC_IDLE == mystate)
+	    {
+		/* we found a process idling.
+		 * change its status to busy and return the process entry
+		 */
+		/* NOTE: This may take some time:
+		 * Get a lock on the mutex if another thread just holds the
+		 * lock. If there are many starting network connections at the
+		 * same time we may see threads waiting on one another. I.e.
+		 * thread1 gets the lock, tries and gets a proc busy state.
+		 * Meanwhile thread2 tries to get the lock and waits for
+		 * thread1. Then thread1 releases the lock, gets the next lock
+		 * and reads the process state information. Meanwhile thread2
+		 * gets the first lock, again reads the state being busy and
+		 * then tries to get the lock which is held by thread1.
+		 * How about testing for a lock and if it is held by another
+		 * thread go on to the next?
+		 */
+		retval = qgis_process_set_state_busy(np->proc, pthread_self());
+		if ( !retval )
+		{
+		    // set state BUSY is ok
+		    proc = np->proc;
+		}
+	    }
+
+	    retval = pthread_mutex_unlock(mutex);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error unlock mutex");
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return proc;
+}
+
+
 struct qgis_process_s *qgis_process_list_find_process_by_status(struct qgis_process_list_s *list, enum qgis_process_state_e state)
 {
     struct qgis_process_s *proc = NULL;
