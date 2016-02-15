@@ -68,9 +68,9 @@
 #define DEFAULT_CONFIG_CWD		"/"
 #define CONFIG_PROJ_CONFIG_PATH		":config_file"
 #define DEFAULT_CONFIG_PROJ_CONFIG_PATH	NULL
-#define CONFIG_PROJ_INITVAR		":initvar"
+#define CONFIG_PROJ_INITVAR		":initkey"
 #define DEFAULT_CONFIG_PROJ_INITVAR	NULL
-#define CONFIG_PROJ_INITDATA		":initdata"
+#define CONFIG_PROJ_INITDATA		":initvalue"
 #define DEFAULT_CONFIG_PROJ_INITDATA	NULL
 #define CONFIG_LOGFILE			":logfile"
 #define DEFAULT_CONFIG_LOGFILE		NULL
