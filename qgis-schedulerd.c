@@ -121,6 +121,8 @@
 #include <regex.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "qgis_project_list.h"
 //#include "qgis_project.h"
@@ -230,6 +232,58 @@ void remove_pid_file(const char *path)
     }
 }
 
+
+/* this scheduler needs a whole lot of file descriptors.
+ * check the number of possible open fd and adopt the limit settings to it.
+ */
+void check_ressource_limits(void)
+{
+    struct rlimit limits;
+
+    int retval = getrlimit(RLIMIT_NOFILE, &limits);
+    if (retval)
+    {
+	logerror("error: can not get ressource limits");
+	exit(EXIT_FAILURE);
+    }
+
+    const unsigned long fdlimit = limits.rlim_cur;
+    const unsigned long fdmax = limits.rlim_max;
+    debug(1, "got fd limit %lu - max limit %lu", fdlimit, fdmax);
+
+    /* calculated amount of open file descriptors needed:
+     * number of projects * 2 open sockets * ~20 fds per child process
+     *  + number of connection threads (= number of projects * number of processes)
+     *  + 2 logfile + 1 network listener
+     * e.g. 23 projects => ~20 *2 *23 + ~3 *23 +2 +3 = 996
+     * Open file descriptors needed outside this program is ~900-1000
+     * (measured with "lsof").
+     */
+    const int num_projects = config_get_num_projects();
+    int num_processes = 0;
+    int i;
+    for (i=0; i<num_projects; i++)
+    {
+	const char *proj_name = config_get_name_project(i);
+	const int max_proc = config_get_max_idle_processes(proj_name);
+	num_processes += max_proc;
+    }
+    const unsigned long fdlimit_needed = num_projects *2 *20 +num_processes +7 + 950;
+    debug(1, "calculated needed fd limit %lu", fdlimit_needed);
+
+    if (fdlimit < fdlimit_needed)
+    {
+	printlog("WARNING: too low max limit of open files = %lu. Setting limit to %lu. Consider changing \"soft nofile\" entry in /etc/security/limits.conf to %lu or more", fdlimit, fdlimit_needed, fdlimit_needed);
+
+	limits.rlim_cur = fdlimit_needed;
+	retval = setrlimit(RLIMIT_NOFILE, &limits);
+	if (retval)
+	{
+	    logerror("error: can not set ressource limits");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
 
 
 struct qgis_project_list_s *projectlist = NULL;
@@ -1205,6 +1259,7 @@ int main(int argc, char **argv)
     debug(1, "started main thread");
 
     test_set_valid_clock_id();
+    check_ressource_limits();
 
     /* prepare inet socket connection for application server process (this)
      */
