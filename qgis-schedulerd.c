@@ -1201,7 +1201,7 @@ int main(int argc, char **argv)
 
 
     logger_init();
-    printlog("starting %s with pid %d", basename(argv[0]), getpid());
+    printlog("starting %s version %s with pid %d", basename(argv[0]), version, getpid());
     debug(1, "started main thread");
 
     test_set_valid_clock_id();
