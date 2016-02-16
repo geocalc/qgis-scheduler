@@ -11,8 +11,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 
 # Checks for libraries.
-# FIXME: Replace `main' with a function in `-liniparser':
-AC_CHECK_LIB([iniparser], [main], [], AC_MSG_ERROR([can not find lib iniparser from https://github.com/ndevilla/iniparser]))
+AC_CHECK_LIB([iniparser], [iniparser_load], [], AC_MSG_ERROR([can not find lib iniparser from https://github.com/ndevilla/iniparser]))
 
 # check for glibc version >= 2.21.
 # check for presence of glibc version >= 2.21. Previous versions cause this
@@ -38,7 +37,7 @@ CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 CC="$PTHREAD_CC"
 
 # Checks for header files.
-AC_CHECK_HEADERS([fcntl.h limits.h netdb.h stddef.h stdint.h stdlib.h string.h sys/socket.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h limits.h netdb.h stddef.h stdint.h stdlib.h string.h sys/socket.h unistd.h iniparser.h], [], AC_MSG_ERROR([can not find header needed]))
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_PID_T
