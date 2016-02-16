@@ -38,6 +38,7 @@ CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 CC="$PTHREAD_CC"
 
 # Checks for header files.
+AC_HEADER_ASSERT
 AC_CHECK_HEADERS([assert.h errno.h fcntl.h getopt.h iniparser.h libgen.h limits.h netdb.h pwd.h regex.h stddef.h stdint.h stdlib.h string.h sys/inotify.h sys/queue.h sys/resource.h sys/select.h sys/socket.h sys/stat.h sys/time.h sys/types.h sys/un.h unistd.h], [], AC_MSG_ERROR([can not find header needed]))
 AC_CHECK_HEADERS([fastcgi.h], [], AC_MSG_ERROR([can not find fast cgi header needed. Did you install http://www.fastcgi.com/ ?]))
 
