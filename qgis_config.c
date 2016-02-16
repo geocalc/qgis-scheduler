@@ -28,7 +28,7 @@
 */
 
 
-#define _GNU_SOURCE
+#include "config.h"
 
 #include "qgis_config.h"
 

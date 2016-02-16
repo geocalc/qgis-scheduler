@@ -100,7 +100,7 @@
 
 
 
-#define _GNU_SOURCE
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -136,7 +136,6 @@
 #include "timer.h"
 #include "qgis_shutdown_queue.h"
 
-#include "config.h"
 
 //#include <sys/types.h>	// für open()
 //#include <sys/stat.h>
@@ -175,7 +174,7 @@ static const int daemon_no_close_streams = 1;
 
 
 
-#ifndef _GNU_SOURCE
+#ifndef HAVE_BASENAME
 const char *basename(const char *path)
 {
     const char *base = strrchr(path, '/');

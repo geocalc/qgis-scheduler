@@ -32,7 +32,7 @@
 
 #include "logger.h"
 
-#define _GNU_SOURCE
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,7 +50,6 @@
 
 #include "qgis_config.h"
 
-#include "config.h"
 //#undef HAVE_GLIBC_VERSION_2_21	/* used for testing purpose */
 
 
