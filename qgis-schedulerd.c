@@ -421,48 +421,13 @@ void *thread_handle_connection(void *arg)
 	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
 
 
-	int can_read_networksock = 0;
-	struct pollfd pfd;
-	pfd.fd = inetsocketfd;
+	/* set read to blocking mode */
+	retval = change_file_mode_blocking(inetsocketfd, 1);
 
 	int has_finished = 0;
 	while ( !has_finished )
 	{
 	    /* wait for connection data */
-	    debug(1, "poll on network connections");
-	    if ( !can_read_networksock )
-		pfd.events = POLLIN;
-	    else
-		pfd.events = 0;
-	    retval = poll(&pfd, 1, -1);
-	    if (-1 == retval)
-	    {
-		switch (errno)
-		{
-		case EINTR:
-		    /* We received a termination signal.
-		     * End this thread, close all file descriptors
-		     * and let the main thread clean up.
-		     */
-		    debug(1, "received interrupt");
-		    break;
-
-		default:
-		    logerror("error: %s() calling poll", __FUNCTION__);
-		    exit(EXIT_FAILURE);
-		    // no break needed
-		}
-		break;
-	    }
-
-	    if (POLLIN & pfd.revents)
-	    {
-		debug(1, "can read from network socket");
-		can_read_networksock = 1;
-	    }
-
-	    if (can_read_networksock)
-	    {
 		debug(1, "read data from network socket: ");
 
 		int readbytes = read(inetsocketfd, buffer, maxbufsize);
@@ -572,6 +537,7 @@ void *thread_handle_connection(void *arg)
 			}
 			debug(1, "found project '%s' in query string", request_project_name);
 			has_finished = 1;
+
 			break;
 		    }
 		    default:
@@ -581,8 +547,6 @@ void *thread_handle_connection(void *arg)
 
 
 		}
-		can_read_networksock = 0;
-	    }
 
 	}
 
@@ -741,6 +705,9 @@ void *thread_handle_connection(void *arg)
 	    const char *projname = qgis_project_get_name(project);
 	    printlog("[%lu] Use process %d to handle request for %s, project %s", thread_id, pid, tinfo->hostname, projname );
 	}
+
+	/* set read to non-blocking mode */
+	retval = change_file_mode_blocking(inetsocketfd, 0);
 
 	/* change the connection flag of the fastcgi connection to not
 	 * FCGI_KEEP_CONN. This way the child process closes the unix socket
