@@ -173,7 +173,7 @@ int qgis_process_set_state_idle(struct qgis_process_s *proc)
 	//case PROC_OPEN_IDLE:
 	default:
 	    // is this an error?
-	    debug(1, "warning: trying to set %s from %s for process %d\n",get_state_str(PROC_IDLE),get_state_str(proc->state),proc->pid);
+	    debug(1, "warning: trying to set %s from %s for process %d",get_state_str(PROC_IDLE),get_state_str(proc->state),proc->pid);
 	    /* do nothing */
 	    break;
 	}
@@ -204,7 +204,7 @@ int qgis_process_set_state_busy(struct qgis_process_s *proc, pthread_t thread_id
 	//case PROC_OPEN_IDLE:
 	default:
 	    // is this an error?
-	    debug(1, "warning: trying to set %s from %s for process %d\n",get_state_str(PROC_BUSY),get_state_str(proc->state),proc->pid);
+	    debug(1, "warning: trying to set %s from %s for process %d",get_state_str(PROC_BUSY),get_state_str(proc->state),proc->pid);
 	    /* do nothing */
 	    break;
 	}
@@ -235,7 +235,7 @@ int qgis_process_set_state_init(struct qgis_process_s *proc, pthread_t thread_id
 	//case PROC_OPEN_IDLE:
 	default:
 	    // is this an error?
-	    debug(1, "warning: trying to set %s from %s for process %d\n",get_state_str(PROC_INIT),get_state_str(proc->state),proc->pid);
+	    debug(1, "warning: trying to set %s from %s for process %d",get_state_str(PROC_INIT),get_state_str(proc->state),proc->pid);
 	    /* do nothing */
 	    break;
 	}

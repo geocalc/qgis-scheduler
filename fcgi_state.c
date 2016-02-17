@@ -323,7 +323,7 @@ int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
 	struct fcgi_param_list_iterator_s *it = paramlist->head.tqh_first;
 	for (it = paramlist->head.tqh_first; it != NULL; it = it->entries.tqe_next)
 	{
-	    int retval = debug(1, "%s=%s\n", it->param.name, it->param.value);
+	    int retval = debug(1, "%s=%s", it->param.name, it->param.value);
 	    if (-1 == retval)
 	    {
 		logerror("error fprintf");
@@ -531,7 +531,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
 	default:
-	    debug(1, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
+	    debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	    exit(EXIT_FAILURE);
 
 	}
@@ -596,7 +596,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
     default:
-	debug(1, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
+	debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
 
     }
@@ -760,7 +760,7 @@ int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *messa
 //    case FCGI_GET_VALUES_RESULT:
 //    case FCGI_UNKNOWN_TYPE:
     default:
-	debug(1, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
+	debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
     }
 
@@ -799,60 +799,60 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 		    bytes_printed += debug(1, "FCGI_FILTER");
 		    break;
 		default:
-		    debug(1, "error: unknown role %d\n", role);
+		    debug(1, "error: unknown role %d", role);
 		    break;
 		}
-		bytes_printed += debug(1, ", 0x%02x}}\n", message->message.beginrequestbody.flags);
+		bytes_printed += debug(1, ", 0x%02x}}", message->message.beginrequestbody.flags);
 		break;
 	    }
 	    case FCGI_ABORT_REQUEST:
-		bytes_printed += debug(1, "{FCGI_ABORT_REQUEST, %d}\n", requestId);
+		bytes_printed += debug(1, "{FCGI_ABORT_REQUEST, %d}", requestId);
 		break;
 	    case FCGI_END_REQUEST:
 	    {
 		int appStatus = ASSEMBLE_FCGI_NUMBERS32(message->message.endrequestbody.appStatus);
-		bytes_printed += debug(1, "{FCGI_END_REQUEST, %d, { %d, \n", requestId, appStatus);
+		bytes_printed += debug(1, "{FCGI_END_REQUEST, %d, { %d, ", requestId, appStatus);
 		switch (message->message.endrequestbody.protocolStatus)
 		{
 		case FCGI_REQUEST_COMPLETE:
-		    bytes_printed += debug(1, "FCGI_REQUEST_COMPLETE}}\n");
+		    bytes_printed += debug(1, "FCGI_REQUEST_COMPLETE}}");
 		    break;
 		case FCGI_CANT_MPX_CONN:
-		    bytes_printed += debug(1, "FCGI_CANT_MPX_CONN}}\n");
+		    bytes_printed += debug(1, "FCGI_CANT_MPX_CONN}}");
 		    break;
 		case FCGI_OVERLOADED:
-		    bytes_printed += debug(1, "FCGI_OVERLOADED}}\n");
+		    bytes_printed += debug(1, "FCGI_OVERLOADED}}");
 		    break;
 		case FCGI_UNKNOWN_ROLE:
-		    bytes_printed += debug(1, "FCGI_UNKNOWN_ROLE}}\n");
+		    bytes_printed += debug(1, "FCGI_UNKNOWN_ROLE}}");
 		    break;
 		default:
-		    debug(1, "error: unknown protocol status %d\n", message->message.endrequestbody.protocolStatus);
+		    debug(1, "error: unknown protocol status %d", message->message.endrequestbody.protocolStatus);
 		    break;
 		}
 		break;
 	    }
 	    case FCGI_PARAMS:
-		bytes_printed += debug(1, "{FCGI_PARAMS, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		bytes_printed += debug(1, "{FCGI_PARAMS, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
 		break;
 	    case FCGI_STDIN:
-		bytes_printed += debug(1, "{FCGI_STDIN, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		bytes_printed += debug(1, "{FCGI_STDIN, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
 		break;
 	    case FCGI_STDOUT:
-		bytes_printed += debug(1, "{FCGI_STDOUT, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		bytes_printed += debug(1, "{FCGI_STDOUT, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
 		break;
 	    case FCGI_STDERR:
-		bytes_printed += debug(1, "{FCGI_STDERR, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		bytes_printed += debug(1, "{FCGI_STDERR, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
 		break;
 	    case FCGI_DATA:
-		bytes_printed += debug(1, "{FCGI_DATA, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}\n", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
+		bytes_printed += debug(1, "{FCGI_DATA, %d, { \"%."STR(MAX_MESSAGE_PRINT_LEN)"s\"%s = %u}", requestId, (message->content?message->content:""), (message->contentLength>MAX_MESSAGE_PRINT_LEN?"...":""), message->contentLength);
 		break;
 
 	//    case FCGI_GET_VALUES:
 	//    case FCGI_GET_VALUES_RESULT:
 	//    case FCGI_UNKNOWN_TYPE:
 	    default:
-		debug(1, "error: unknown request id in message: %d\n", fcgi_message_get_requestid(message));
+		debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
 		exit(EXIT_FAILURE);
 	    }
 

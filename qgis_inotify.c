@@ -94,11 +94,10 @@ static void *inotify_thread_watch(void *arg)
 //    struct thread_watch_config_args *tinfo = arg;
 //    struct qgis_project_s *project = tinfo->project;
 //    assert(project);
-    pthread_t thread_id = pthread_self();
 
 
 //    const char *projname = project->name;
-    debug(1, "[%lu] started inotify watcher thread\n", thread_id);
+    debug(1, "started inotify watcher thread");
 
 
     static const int sizeof_inotifyevent = sizeof(struct inotify_event) + NAME_MAX + 1;
@@ -121,7 +120,7 @@ static void *inotify_thread_watch(void *arg)
 	    case EINTR:
 		/* We received an interrupt, possibly a termination signal.
 		 */
-		debug(1, "[%lu] read() inotify_event received interrupt\n", thread_id);
+		debug(1, "read() inotify_event received interrupt");
 		break;
 
 	    default:
@@ -134,7 +133,7 @@ static void *inotify_thread_watch(void *arg)
 	{
 	    struct inotify_event *tmp_in_event = inotifyevent;
 	    int size_read = retval;
-	    debug(1, "[%lu] inotify read %d bytes, sizeof event %lu, len %u\n", thread_id, size_read, sizeof(*tmp_in_event), tmp_in_event->len);
+	    debug(1, "inotify read %d bytes, sizeof event %lu, len %u", size_read, sizeof(*tmp_in_event), tmp_in_event->len);
 	    int inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
 
 	    while (size_read >= sizeof(*tmp_in_event) + tmp_in_event->len)
@@ -145,8 +144,8 @@ static void *inotify_thread_watch(void *arg)
 		    /* The file has been written or copied to this path
 		     * Restart the processes
 		     */
-		    debug(1, "got event IN_CLOSE_WRITE\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    debug(1, "got event IN_CLOSE_WRITE");
+		    debug(1, "mask 0x%x, len %d, name %s", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    inotify_check_watchlist_for_watch(tmp_in_event);
 		    break;
 
@@ -154,23 +153,23 @@ static void *inotify_thread_watch(void *arg)
 		    /* The file has been erased from this path.
 		     * Don't care, just mark the service as not restartable. (or better close this project and kill child progs?)
 		     */
-		    debug(1, "got event IN_DELETE\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    debug(1, "got event IN_DELETE");
+		    debug(1, "mask 0x%x, len %d, name %s", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    break;
 
 		case IN_MOVED_TO:
 		    /* The file has been overwritten by a move to this path
 		     * Restart the processes
 		     */
-		    debug(1, "got event IN_MOVED_TO\n");
-		    debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    debug(1, "got event IN_MOVED_TO");
+		    debug(1, "mask 0x%x, len %d, name %s", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    inotify_check_watchlist_for_watch(tmp_in_event);
 		    break;
 
 		case IN_IGNORED:
 		    // Watch was removed. We can exit this thread
-		    debug(1, "got event IN_IGNORED\n");
-		    //		debug(1, "mask 0x%x, len %d, name %s\n", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
+		    debug(1, "got event IN_IGNORED");
+		    //		debug(1, "mask 0x%x, len %d, name %s", tmp_in_event->mask, tmp_in_event->len, tmp_in_event->name);
 		    if (get_program_shutdown())
 		    {
 			goto thread_watch_config_end_for_loop;
@@ -178,7 +177,7 @@ static void *inotify_thread_watch(void *arg)
 		    break;
 
 		default:
-		    debug(1, "error: got unexpected event %d\n", tmp_in_event->mask);
+		    debug(1, "error: got unexpected event %d", tmp_in_event->mask);
 		    break;
 		}
 
@@ -211,7 +210,7 @@ static void *inotify_thread_watch(void *arg)
 
     thread_watch_config_end_for_loop:
 
-    debug(1, "[%lu] shutdown watcher thread\n", thread_id);
+    debug(1, "shutdown watcher thread");
     free(inotifyevent);
 //    free(arg);
     return NULL;
@@ -310,7 +309,7 @@ int qgis_inotify_watch_file(const char *path)
 	    case ENOTDIR:
 	    case EOVERFLOW:
 		logerror("error accessing file '%s': ", path);
-		debug(1, "file is not watched for changes\n");
+		debug(1, "file is not watched for changes");
 		break;
 
 	    default:
@@ -408,7 +407,7 @@ int qgis_inotify_watch_file(const char *path)
 	    }
 	    else
 	    {
-		//debug(1, "error '%s' is no regular file\n", configpath);
+		//debug(1, "error '%s' is no regular file", configpath);
 		printlog("INFO: Inotify can not watch '%s', no regular file", path);
 	    }
 	}

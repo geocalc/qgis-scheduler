@@ -317,7 +317,7 @@ void *thread_handle_connection(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    debug(1, "start a new connection thread\n");
+    debug(1, "start a new connection thread");
 
     struct timespec ts;
     retval = qgis_timer_start(&ts);
@@ -448,9 +448,8 @@ void *thread_handle_connection(void *arg)
 		    break;
 		}
 #ifdef PRINT_NETWORK_DATA
-		debug(1, "\n[%ld] network data:\n", thread_id);
+		debug(1, "network data:");
 		fwrite(buffer, 1, readbytes, stderr);
-		debug(1, "\n");
 #endif
 
 		{
@@ -491,7 +490,7 @@ void *thread_handle_connection(void *arg)
 				{
 				    const char *param = fcgi_session_get_param(fcgi_session, key);
 				    const char *scanregex = config_get_scan_parameter_regex(proj_name);
-				    debug(1, "use regex %s\n", scanregex);
+				    debug(1, "use regex %s", scanregex);
 				    regex_t regex;
 				    /* Compile regular expression */
 				    retval = regcomp(&regex, scanregex, REG_EXTENDED);
@@ -501,7 +500,7 @@ void *thread_handle_connection(void *arg)
 					char *buffer = malloc(len);
 					(void) regerror (retval, &regex, buffer, len);
 
-					debug(1, "Could not compile regular expression: %s\n", buffer);
+					debug(1, "Could not compile regular expression: %s", buffer);
 					free(buffer);
 					exit(EXIT_FAILURE);
 				    }
@@ -522,7 +521,7 @@ void *thread_handle_connection(void *arg)
 					char *buffer = malloc(len);
 					(void) regerror (retval, &regex, buffer, len);
 
-					debug(1, "Could not match regular expression: %s\n", buffer);
+					debug(1, "Could not match regular expression: %s", buffer);
 					free(buffer);
 					exit(EXIT_FAILURE);
 				    }
@@ -532,16 +531,16 @@ void *thread_handle_connection(void *arg)
 				else
 				{
 				    // TODO: do not overflow the log with this message, do parse the config file at program start
-				    debug(1, "error: no regular expression found for project '%s'\n", proj_name);
+				    debug(1, "error: no regular expression found for project '%s'", proj_name);
 				}
 
 			    }
 			    else
 			    {
-				debug(1, "error: no name for project number %d in configuration found\n", i);
+				debug(1, "error: no name for project number %d in configuration found", i);
 			    }
 			}
-			debug(1, "found project '%s' in query string\n", request_project_name);
+			debug(1, "found project '%s' in query string", request_project_name);
 			has_finished = 1;
 			break;
 		    }
@@ -645,7 +644,7 @@ void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	printlog("[%lu] Found no free process for network request from %s. Answer overload and close connection\n", thread_id, tinfo->hostname);
+	printlog("[%lu] Found no free process for network request from %s. Answer overload and close connection", thread_id, tinfo->hostname);
 	/* NOTE: intentionally no mutex unlock here. We checked all processes,
 	 * locked and unlocked all entries. Now there is no locked mutex left.
 	 */
@@ -670,7 +669,7 @@ void *thread_handle_connection(void *arg)
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
 
-	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d", maxbufsize);
 	}
 
 
@@ -683,7 +682,7 @@ void *thread_handle_connection(void *arg)
 	{
 	    /* wait for connection data */
 
-	    debug(1, "[%ld] selecting on network connections\n", thread_id);
+	    debug(1, "polling on network connections");
 	    if ( !can_write_networksock )
 		pfd.events = POLL_OUT;
 	    else
@@ -708,6 +707,7 @@ void *thread_handle_connection(void *arg)
 		}
 		break;
 	    }
+	    debug(1, "poll() returned %d", retval);
 
 	    if (POLLOUT & pfd.revents)
 	    {
@@ -730,7 +730,7 @@ void *thread_handle_connection(void *arg)
 		    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
 
 		    int writebytes = write(inetsocketfd, sendbuffer, retval);
-		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "wrote %d", writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to network socket");
@@ -877,7 +877,7 @@ void *thread_handle_connection(void *arg)
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
-	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d", maxbufsize);
 
 	}
 	char *buffer = malloc(maxbufsize);
@@ -953,17 +953,17 @@ void *thread_handle_connection(void *arg)
 	    }
 	    if (POLLOUT & pfd[unixfd_slot].revents)
 	    {
-		debug(1, "[%ld]  can write to unix socket\n", thread_id);
+		debug(1, "can write to unix socket");
 		can_write_unixsock = 1;
 	    }
 	    if (POLLIN & pfd[networkfd_slot].revents)
 	    {
-		debug(1, "[%ld]  can read from network socket\n", thread_id);
+		debug(1, "can read from network socket");
 		can_read_networksock = 1;
 	    }
 	    if (POLLIN & pfd[unixfd_slot].revents)
 	    {
-		debug(1, "[%ld]  can read from unix socket\n", thread_id);
+		debug(1, "can read from unix socket");
 		can_read_unixsock = 1;
 	    }
 
@@ -981,7 +981,7 @@ void *thread_handle_connection(void *arg)
 		    int datalen = fcgi_data_get_datalen(fcgi_data);
 //		    retval = write(debugfd, data, datalen);
 		    int writebytes = write(childunixsocketfd, data, datalen);
-		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "wrote %d", writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to child process socket");
@@ -995,12 +995,12 @@ void *thread_handle_connection(void *arg)
 		 */
 		else if ( can_read_networksock )
 		{
-		    debug(1, "[%ld]  read data from network socket: ", thread_id);
+		    debug(1, "read data from network socket: ");
 		    int readbytes = read(inetsocketfd, buffer, maxbufsize);
 		    debug(1, "read %d, ", readbytes);
 		    if (-1 == readbytes)
 		    {
-			logerror("\nerror: reading from network socket");
+			logerror("error: reading from network socket");
 			exit(EXIT_FAILURE);
 		    }
 		    else if (0 == readbytes)
@@ -1009,13 +1009,12 @@ void *thread_handle_connection(void *arg)
 			break;
 		    }
 #ifdef PRINT_NETWORK_DATA
-		    debug(1, "\n[%ld] network data:\n", thread_id);
+		    debug(1, "network data:");
 		    fwrite(buffer, 1, readbytes, stderr);
-		    debug(1, "\n");
 #endif
 
 		    int writebytes = write(childunixsocketfd, buffer, readbytes);
-		    debug(1, "[%ld] wrote %d\n", thread_id, writebytes);
+		    debug(1, "wrote %d", writebytes);
 		    if (-1 == writebytes)
 		    {
 			logerror("error: writing to child process socket");
@@ -1028,7 +1027,7 @@ void *thread_handle_connection(void *arg)
 
 	    if (can_read_unixsock && can_write_networksock)
 	    {
-		debug(1, "[%ld]  read data from unix socket: ", thread_id);
+		debug(1, "read data from unix socket: ");
 		int readbytes = read(childunixsocketfd, buffer, maxbufsize);
 		debug(1, "read %d, ", readbytes);
 		if (-1 == readbytes)
@@ -1042,12 +1041,11 @@ void *thread_handle_connection(void *arg)
 		    break;
 		}
 #ifdef PRINT_SOCKET_DATA
-		debug(1, "fcgi data:\n");
+		debug(1, "fcgi data:");
 		fwrite(buffer, 1, readbytes, stderr);
-		debug(1, "\n");
 #endif
 		int writebytes = write(inetsocketfd, buffer, readbytes);
-		debug(1, "wrote %d\n", writebytes);
+		debug(1, "wrote %d", writebytes);
 		if (-1 == writebytes)
 		{
 		    logerror("error: writing to network socket");
@@ -1112,7 +1110,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     struct signal_data_s sigdata;
     sigdata.signal = sig;
     sigdata.pid = info->si_pid;
-    debug(1, "got signal %d from pid %d\n", sig, info->si_pid);
+    debug(1, "got signal %d from pid %d", sig, info->si_pid);
     switch (sig)
     {
     case SIGCHLD:
@@ -1136,7 +1134,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 		logerror("write signal data");
 		exit(EXIT_FAILURE);
 	    }
-	    debug(1, "wrote %d bytes to sig pipe\n", retval);
+	    debug(1, "wrote %d bytes to sig pipe", retval);
 	}
 	break;
 
@@ -1156,7 +1154,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	break;
 
     default:
-	debug(1, "Huh? Got unexpected signal %d. Ignored\n", sig);
+	debug(1, "Huh? Got unexpected signal %d. Ignored", sig);
 	break;
     }
 }
@@ -1262,7 +1260,7 @@ int main(int argc, char **argv)
 	int s = getaddrinfo(net_listen, net_port, &hints, &result);
 	if (s != 0)
 	{
-	    debug(1, "getaddrinfo: %s\n", gai_strerror(s));
+	    debug(1, "getaddrinfo: %s", gai_strerror(s));
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1298,7 +1296,7 @@ int main(int argc, char **argv)
 
 	if (rp == NULL)
 	{ /* No address succeeded */
-	    //debug(1, "Could not bind\n"); // TODO better message
+	    //debug(1, "Could not bind"); // TODO better message
 	    logerror("could not create network socket");
 	    exit(EXIT_FAILURE);
 	}
@@ -1503,7 +1501,7 @@ int main(int argc, char **argv)
 	    for (i=0; i<num_proj; i++)
 	    {
 		const char *projname = config_get_name_project(i);
-		debug(1, "found project '%s'. Startup child processes\n", projname);
+		debug(1, "found project '%s'. Startup child processes", projname);
 
 		const char *configpath = config_get_project_config_path(projname);
 		struct qgis_project_s *project = qgis_project_new(projname, configpath);
@@ -1586,7 +1584,7 @@ int main(int argc, char **argv)
 		 * Let the main thread clean up: Wait for all child processes
 		 * to end, close all remaining file descriptors and exit.
 		 */
-		debug(1, "received interrupt\n");
+		debug(1, "received interrupt");
 		break;
 
 	    default:
@@ -1602,12 +1600,12 @@ int main(int argc, char **argv)
 	    if (POLLIN & pfd[serverfd_slot].revents)
 	    {
 		is_readable_serversocket = 1;
-		debug(1, "can read from network socket\n");
+		debug(1, "can read from network socket");
 	    }
 	    if(POLLIN & pfd[pipefd_slot].revents)
 	    {
 		is_readable_signalpipe = 1;
-		debug(1, "can read from pipe\n");
+		debug(1, "can read from pipe");
 	    }
 
 	    if (is_readable_signalpipe)
@@ -1622,7 +1620,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-		    debug(1, "-- read %d bytes, got signal %d, child %d\n", retval, sigdata.signal, sigdata.pid);
+		    debug(1, "-- read %d bytes, got signal %d, child %d", retval, sigdata.signal, sigdata.pid);
 
 		    /* react on signals */
 		    switch (sigdata.signal)
@@ -1637,7 +1635,7 @@ int main(int argc, char **argv)
 		    case SIGINT:
 		    case SIGQUIT:
 			/* termination signal, kill all child processes */
-			debug(1, "exit program\n");
+			debug(1, "exit program");
 			set_program_shutdown(1);
 			break;
 		    }
@@ -1771,7 +1769,7 @@ int main(int argc, char **argv)
     }
 
 
-    debug(1, "closing network socket\n");
+    debug(1, "closing network socket");
     fflush(stderr);
     retval = close(serversocketfd);
     debug(1, "closed internet server socket fd %d, retval %d, errno %d", serversocketfd, retval, errno);
