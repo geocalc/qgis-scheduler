@@ -171,6 +171,7 @@ static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int default_min_free_processes = 1;
 static const int daemon_no_change_dir = 0;
 static const int daemon_no_close_streams = 1;
+static const int max_wait_for_idle_process = 5;
 
 
 
@@ -617,9 +618,21 @@ void *thread_handle_connection(void *arg)
 	printlog("[%lu] Found no project for request from %s", thread_id, tinfo->hostname);
     }
 
-    /* find the next idling process, set its state to BUSY and attach a thread to it */
+    /* find the next idling process, set its state to BUSY and attach a thread to it.
+     * try at most 5 seconds long to find an idle process */
+    /* TODO: better use pthread_condition_signal with timeout */
     if (proclist)
-	proc = qgis_process_list_find_idle_return_busy(proclist);
+    {
+	int i;
+	for (i=0; i<=max_wait_for_idle_process; i++)
+	{
+	    proc = qgis_process_list_find_idle_return_busy(proclist);
+	    if (proc || i>=max_wait_for_idle_process)
+		break;
+	    else
+		sleep(1);
+	}
+    }
 
     if ( !proc )
     {
