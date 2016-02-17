@@ -673,81 +673,33 @@ void *thread_handle_connection(void *arg)
 	}
 
 
-	int can_write_networksock = 0;
-	struct pollfd pfd;
-	pfd.fd = inetsocketfd;
 
-	int has_finished = 0;
-	while ( !has_finished )
+	/* parse and check the incoming message. If it is a
+	 * session initiation message from the web server then
+	 * immediately answer with an overload message and end
+	 * this thread.
+	 */
+	if (FCGI_RESPONDER == role)
 	{
-	    /* wait for connection data */
+	    char sendbuffer[sizeof(FCGI_EndRequestRecord)];
+	    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
+	    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
 
-	    debug(1, "polling on network connections");
-	    if ( !can_write_networksock )
-		pfd.events = POLL_OUT;
-	    else
-		pfd.events = 0;
-	    retval = poll(&pfd, 1, -1);
-	    if (-1 == retval)
+	    int writebytes = write(inetsocketfd, sendbuffer, retval);
+	    debug(1, "wrote %d btes to network socket", writebytes);
+	    if (-1 == writebytes)
 	    {
-		switch (errno)
-		{
-		case EINTR:
-		    /* We received a termination signal.
-		     * End this thread, close all file descriptors
-		     * and let the main thread clean up.
-		     */
-		    debug(1, "received interrupt");
-		    break;
-
-		default:
-		    logerror("error: %s() calling poll", __FUNCTION__);
-		    exit(EXIT_FAILURE);
-		    // no break needed
-		}
-		break;
-	    }
-	    debug(1, "poll() returned %d", retval);
-
-	    if (POLLOUT & pfd.revents)
-	    {
-		debug(1, "can write to network socket");
-		can_write_networksock = 1;
+		logerror("error: writing to network socket");
+		exit(EXIT_FAILURE);
 	    }
 
-	    if (can_write_networksock)
-	    {
-
-		/* parse and check the incoming message. If it is a
-		 * session initiation message from the web server then
-		 * immediately answer with an overload message and end
-		 * this thread.
-		 */
-		if (FCGI_RESPONDER == role)
-		{
-		    char sendbuffer[sizeof(FCGI_EndRequestRecord)];
-		    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
-		    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
-
-		    int writebytes = write(inetsocketfd, sendbuffer, retval);
-		    debug(1, "wrote %d", writebytes);
-		    if (-1 == writebytes)
-		    {
-			logerror("error: writing to network socket");
-			exit(EXIT_FAILURE);
-		    }
-
-		    /* we are done with the connection. The status
-		     * is send back to the web server. we can close
-		     * down and leave.
-		     */
-		    fcgi_message_delete(sendmessage);
-		}
-
-		has_finished = 1;
-	    }
-
+	    /* we are done with the connection. The status
+	     * is send back to the web server. we can close
+	     * down and leave.
+	     */
+	    fcgi_message_delete(sendmessage);
 	}
+
 
     }
     /* here we do point 6, 7, 8 */
@@ -1549,9 +1501,9 @@ int main(int argc, char **argv)
      */
 
     enum {
-    serverfd_slot = 0,
-    pipefd_slot = 1,
-    num_poll_slots
+	serverfd_slot = 0,
+	pipefd_slot = 1,
+	num_poll_slots
     };
     struct pollfd pfd[num_poll_slots];
 
