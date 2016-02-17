@@ -111,7 +111,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/select.h>
+#include <poll.h>
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
@@ -377,7 +377,7 @@ void *thread_handle_connection(void *arg)
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
-	    debug(1, "set maximum transfer buffer to %d\n", maxbufsize);
+	    debug(1, "set maximum transfer buffer to %d", maxbufsize);
 	}
 
 	char *buffer = malloc(maxbufsize);
@@ -390,33 +390,20 @@ void *thread_handle_connection(void *arg)
 	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
 
 
-	int maxfd = 0;
-	fd_set rfds;
 	int can_read_networksock = 0;
-
-
-	if (inetsocketfd > maxfd)
-	    maxfd = inetsocketfd;
-
-	maxfd++;
-
-	/* set timeout to infinite */
-	//    struct timeval timeout;
-	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	//    timeout.tv_usec = 0;
+	struct pollfd pfd;
+	pfd.fd = inetsocketfd;
 
 	int has_finished = 0;
 	while ( !has_finished )
 	{
-	    /* wait for connections, signals or timeout */
-	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	    //	timeout.tv_usec = 0;
-
-	    debug(1, "[%ld] selecting on network connections\n", thread_id);
-	    FD_ZERO(&rfds);
+	    /* wait for connection data */
+	    debug(1, "poll on network connections");
 	    if ( !can_read_networksock )
-		FD_SET(inetsocketfd, &rfds);
-	    retval = select(maxfd, &rfds, NULL, NULL, NULL /*&timeout*/);
+		pfd.events = POLLIN;
+	    else
+		pfd.events = 0;
+	    retval = poll(&pfd, 1, -1);
 	    if (-1 == retval)
 	    {
 		switch (errno)
@@ -426,32 +413,32 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    debug(1, "thread_handle_connection() received interrupt\n");
+		    debug(1, "received interrupt");
 		    break;
 
 		default:
-		    logerror("error: thread_handle_connection() calling select");
+		    logerror("error: %s() calling poll", __FUNCTION__);
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
 		break;
 	    }
 
-	    if (FD_ISSET(inetsocketfd, &rfds))
+	    if (POLLIN & pfd.revents)
 	    {
-		debug(1, "[%ld]  can read from network socket\n", thread_id);
+		debug(1, "can read from network socket");
 		can_read_networksock = 1;
 	    }
 
 	    if (can_read_networksock)
 	    {
-		debug(1, "[%ld]  read data from network socket: ", thread_id);
+		debug(1, "read data from network socket: ");
 
 		int readbytes = read(inetsocketfd, buffer, maxbufsize);
-		debug(1, "read %d, ", readbytes);
+		debug(1, "read %d", readbytes);
 		if (-1 == readbytes)
 		{
-		    logerror("\nerror: reading from network socket");
+		    logerror("error: reading from network socket");
 		    exit(EXIT_FAILURE);
 		}
 		else if (0 == readbytes)
@@ -670,33 +657,21 @@ void *thread_handle_connection(void *arg)
 	}
 
 
-	int maxfd = 0;
-	fd_set wfds;
 	int can_write_networksock = 0;
-
-
-	if (inetsocketfd > maxfd)
-	    maxfd = inetsocketfd;
-
-	maxfd++;
-
-	/* set timeout to infinite */
-	//    struct timeval timeout;
-	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	//    timeout.tv_usec = 0;
+	struct pollfd pfd;
+	pfd.fd = inetsocketfd;
 
 	int has_finished = 0;
 	while ( !has_finished )
 	{
-	    /* wait for connections, signals or timeout */
-	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	    //	timeout.tv_usec = 0;
+	    /* wait for connection data */
 
 	    debug(1, "[%ld] selecting on network connections\n", thread_id);
-	    FD_ZERO(&wfds);
 	    if ( !can_write_networksock )
-		FD_SET(inetsocketfd, &wfds);
-	    retval = select(maxfd, NULL, &wfds, NULL, NULL /*&timeout*/);
+		pfd.events = POLL_OUT;
+	    else
+		pfd.events = 0;
+	    retval = poll(&pfd, 1, -1);
 	    if (-1 == retval)
 	    {
 		switch (errno)
@@ -706,20 +681,20 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    debug(1, "thread_handle_connection() received interrupt\n");
+		    debug(1, "received interrupt");
 		    break;
 
 		default:
-		    logerror("error: thread_handle_connection() calling select");
+		    logerror("error: %s() calling poll", __FUNCTION__);
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
 		break;
 	    }
 
-	    if (FD_ISSET(inetsocketfd, &wfds))
+	    if (POLLOUT & pfd.revents)
 	    {
-		debug(1, "[%ld]  can write to network socket\n", thread_id);
+		debug(1, "can write to network socket");
 		can_write_networksock = 1;
 	    }
 
@@ -903,47 +878,37 @@ void *thread_handle_connection(void *arg)
 	struct fcgi_data_list_iterator_s *fcgi_data_iterator = fcgi_data_get_iterator(datalist);
 
 
+	enum {
+	    networkfd_slot = 0,
+	    unixfd_slot = 1,
+	    num_poll_slots
+	};
+	struct pollfd pfd[num_poll_slots];
+	pfd[networkfd_slot].fd = inetsocketfd;
+	pfd[unixfd_slot].fd = childunixsocketfd;
 
-	int maxfd = 0;
-	fd_set rfds;
-	fd_set wfds;
 	int can_read_networksock = 0;
 	int can_write_networksock = 0;
 	int can_read_unixsock = 0;
 	int can_write_unixsock = 0;
 
-
-	if (inetsocketfd > maxfd)
-	    maxfd = inetsocketfd;
-	if (childunixsocketfd > maxfd)
-	    maxfd = childunixsocketfd;
-
-	maxfd++;
-
-	/* set timeout to infinite */
-	//    struct timeval timeout;
-	//    timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	//    timeout.tv_usec = 0;
-
 	int has_finished = 0;
 	while ( !has_finished )
 	{
-	    /* wait for connections, signals or timeout */
-	    //	timeout.tv_sec = 60;	// wait 60 seconds for a child process to communicate
-	    //	timeout.tv_usec = 0;
-
-	    debug(1, "[%ld] selecting on network connections\n", thread_id);
-	    FD_ZERO(&rfds);
-	    FD_ZERO(&wfds);
+	    /* wait for connection data */
+	    debug(1, "poll on network connections");
+	    pfd[networkfd_slot].events = 0;
+	    pfd[unixfd_slot].events = 0;
 	    if ( !can_read_networksock && !fcgi_data_iterator_has_data(fcgi_data_iterator) )
-		FD_SET(inetsocketfd, &rfds);
+		pfd[networkfd_slot].events |= POLLIN;
 	    if ( !can_write_networksock )
-		FD_SET(inetsocketfd, &wfds);
+		pfd[networkfd_slot].events |= POLLOUT;
 	    if ( !can_read_unixsock )
-		FD_SET(childunixsocketfd, &rfds);
+		pfd[unixfd_slot].events |= POLLIN;
 	    if ( !can_write_unixsock )
-		FD_SET(childunixsocketfd, &wfds);
-	    retval = select(maxfd, &rfds, &wfds, NULL, NULL /*&timeout*/);
+		pfd[unixfd_slot].events |= POLLOUT;
+
+	    retval = poll(pfd, num_poll_slots, -1);
 	    if (-1 == retval)
 	    {
 		switch (errno)
@@ -953,33 +918,33 @@ void *thread_handle_connection(void *arg)
 		     * End this thread, close all file descriptors
 		     * and let the main thread clean up.
 		     */
-		    debug(1, "thread_handle_connection() received interrupt\n");
+		    debug(1, "received interrupt");
 		    break;
 
 		default:
-		    logerror("error: thread_handle_connection() calling select");
+		    logerror("error: %s() calling poll", __FUNCTION__);
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
 		break;
 	    }
 
-	    if (FD_ISSET(inetsocketfd, &wfds))
+	    if (POLLOUT & pfd[networkfd_slot].revents)
 	    {
-		debug(1, "[%ld]  can write to network socket\n", thread_id);
+		debug(1, "can write to network socket");
 		can_write_networksock = 1;
 	    }
-	    if (FD_ISSET(childunixsocketfd, &wfds))
+	    if (POLLOUT & pfd[unixfd_slot].revents)
 	    {
 		debug(1, "[%ld]  can write to unix socket\n", thread_id);
 		can_write_unixsock = 1;
 	    }
-	    if (FD_ISSET(inetsocketfd, &rfds))
+	    if (POLLIN & pfd[networkfd_slot].revents)
 	    {
 		debug(1, "[%ld]  can read from network socket\n", thread_id);
 		can_read_networksock = 1;
 	    }
-	    if (FD_ISSET(childunixsocketfd, &rfds))
+	    if (POLLIN & pfd[unixfd_slot].revents)
 	    {
 		debug(1, "[%ld]  can read from unix socket\n", thread_id);
 		can_read_unixsock = 1;
@@ -1568,10 +1533,15 @@ int main(int argc, char **argv)
      * this server.
      */
 
-    fd_set rfds;
-    int maxfd = max(serversocketfd,signalpipe_rd);
-    maxfd++;
+    enum {
+    serverfd_slot = 0,
+    pipefd_slot = 1,
+    num_poll_slots
+    };
+    struct pollfd pfd[num_poll_slots];
 
+    pfd[serverfd_slot].fd = serversocketfd;
+    pfd[pipefd_slot].fd = signalpipe_rd;
 
     int has_finished = 0;
     int is_readable_serversocket = 0;
@@ -1579,17 +1549,17 @@ int main(int argc, char **argv)
     printlog("Initialization done. Waiting for network connection requests..");
     while ( !has_finished )
     {
-	/* wait for connections, signals or timeout */
-	/* NOTE: I expect a linux behavior over here:
-	 * If select() is interrupted by a signal handler, the timeout value
-	 * is modified to contain the remaining time.
-	 */
-	FD_ZERO(&rfds);
+	/* wait for connections or signals */
 	if (!is_readable_serversocket)
-	    FD_SET(serversocketfd, &rfds);
+	    pfd[serverfd_slot].events = POLLIN;
+	else
+	    pfd[serverfd_slot].events = 0;
 	if (!is_readable_signalpipe)
-	    FD_SET(signalpipe_rd, &rfds);
-	retval = select(maxfd, &rfds, NULL, NULL, NULL);
+	    pfd[pipefd_slot].events = POLLIN;
+	else
+	    pfd[pipefd_slot].events = 0;
+
+	retval = poll(pfd, num_poll_slots, -1);
 	if (-1 == retval)
 	{
 	    switch (errno)
@@ -1599,11 +1569,11 @@ int main(int argc, char **argv)
 		 * Let the main thread clean up: Wait for all child processes
 		 * to end, close all remaining file descriptors and exit.
 		 */
-		debug(1, "main() received interrupt\n");
+		debug(1, "received interrupt\n");
 		break;
 
 	    default:
-		logerror("error: main() calling select");
+		logerror("error: %s() calling poll", __FUNCTION__);
 		exit(EXIT_FAILURE);
 		// no break needed
 	    }
@@ -1612,12 +1582,12 @@ int main(int argc, char **argv)
 
 	if (retval > 0)
 	{
-	    if (FD_ISSET(serversocketfd, &rfds))
+	    if (POLLIN & pfd[serverfd_slot].revents)
 	    {
 		is_readable_serversocket = 1;
 		debug(1, "can read from network socket\n");
 	    }
-	    if (FD_ISSET(signalpipe_rd, &rfds))
+	    if(POLLIN & pfd[pipefd_slot].revents)
 	    {
 		is_readable_signalpipe = 1;
 		debug(1, "can read from pipe\n");
