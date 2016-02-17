@@ -163,7 +163,7 @@ static void *qgis_shutdown_thread(void *arg)
 		    };
 		    qgis_timer_add(&ts_sig, &ts_timeout);
 
-		    debug(1, "wait %ld,%03ld seconds or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
+		    debug(1, "wait %ld,%03ld seconds (until %ld,%03ld) or until next condition", ts_timeout.tv_sec, (ts_timeout.tv_nsec/(1000*1000)), ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
 		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
 		}
 		else
@@ -174,7 +174,7 @@ static void *qgis_shutdown_thread(void *arg)
 	    }
 	    else
 	    {
-		debug(1, "wait %ld,%03ld seconds or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
+		debug(1, "wait until %ld,%03ld or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
 		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
 	    }
 
