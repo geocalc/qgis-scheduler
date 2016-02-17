@@ -602,14 +602,18 @@ void *thread_handle_connection(void *arg)
 	 * We get the correct number if we first count PROC_INIT and then
 	 * PROC_START, not the other way around.
 	 */
+	const char *projname = qgis_project_get_name(project);
+	int min_free_processes = config_get_min_idle_processes(projname);
+
 	int proc_state_idle = qgis_process_list_get_num_process_by_status(proclist, PROC_IDLE);
 	int proc_state_init = qgis_process_list_get_num_process_by_status(proclist, PROC_INIT);
 	int proc_state_start = qgis_process_list_get_num_process_by_status(proclist, PROC_START);
-// TODO: use project specific min process number
-	int missing_processes = default_min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
+
+	int missing_processes = min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones and add them to the existing processes */
+	    debug(1, "not enough processes for project %s, start %d new process", projname, missing_processes);
 	    qgis_project_start_new_process_detached(missing_processes, project, 0);
 	}
     }
