@@ -286,6 +286,36 @@ void check_ressource_limits(void)
 }
 
 
+int change_file_mode_blocking(int fd, int is_blocking)
+{
+    assert(fd>=0);
+
+    int retval = fcntl(fd, F_GETFL, 0);
+    if (-1 == retval)
+    {
+	logerror("error: fcntl(%d, F_GETFL, 0)", fd);
+	exit(EXIT_FAILURE);
+    }
+    int flags = retval;
+    debug(1, "got fd %d flags %#x", fd, flags);
+
+    if (is_blocking)
+	flags &= ~O_NONBLOCK;
+    else
+	flags |= O_NONBLOCK;
+
+    retval = fcntl(fd, F_SETFL, flags);
+    if (-1 == retval)
+    {
+	logerror("error: fcntl(%d, F_SETFL, %#x)", fd, flags);
+	exit(EXIT_FAILURE);
+    }
+    debug(1, "set fd %d flags %#x", fd, flags);
+
+    return retval;
+}
+
+
 struct qgis_project_list_s *projectlist = NULL;
 
 void *thread_handle_connection(void *arg)
