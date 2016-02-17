@@ -303,6 +303,8 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
     }
     /* leave the original child socket and create a new one on the opposite
      * side.
+     * create the socket in blocking mode (non SOCK_NONBLOCK) because we need the
+     * read() and write() calls waiting on it.
      */
     retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
