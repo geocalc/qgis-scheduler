@@ -121,6 +121,7 @@ struct fcgi_message_list_s
     TAILQ_HEAD(message_listhead_s, fcgi_message_list_iterator_s) head;	/* Linked list head */
     int bytes_written;	/* count of bytes written in fcgi_message_list_write() buffer */
     //pthread_rwlock_t rwlock;	/* lock used to protect list structures (add, remove, find, ..) */
+	/* Note: as long as only one thread does access this list, we do not need locks */
 };
 
 struct fcgi_session_s
@@ -935,7 +936,9 @@ struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_li
 	{
 	    struct fcgi_message_list_iterator_s *np = *messlist->head.tqh_last;
 
-	    message = np->mess;
+	    assert(np);
+	    if (np)
+		message = np->mess;
 	}
     }
 
