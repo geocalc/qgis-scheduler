@@ -248,7 +248,7 @@ int qgis_process_set_state_init(struct qgis_process_s *proc, pthread_t thread_id
 enum qgis_process_state_e qgis_process_get_state(struct qgis_process_s *proc)
 {
     assert(proc);
-    return proc?proc->state:-1;
+    return proc?proc->state:(enum qgis_process_state_e)-1;
 }
 
 

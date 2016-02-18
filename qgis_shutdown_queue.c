@@ -84,7 +84,7 @@ static void *qgis_shutdown_thread(void *arg)
 	 * if it does change to shutdown list */
 	static const enum qgis_process_state_e statemovelist[] = { PROC_IDLE, PROC_OPEN_IDLE, PROC_TERM, PROC_KILL, PROC_EXIT};
 	int i;
-	for (i=0; i<(sizeof(statemovelist)/sizeof(*statemovelist)); i++)
+	for (i=0; i<((int)(sizeof(statemovelist)/sizeof(*statemovelist))); i++)
 	{
 	    retval = qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, statemovelist[i]);
 	    debug(1, "transferred %d %s programs from busylist to shutdownlist", retval, get_state_str(statemovelist[i]));

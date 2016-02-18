@@ -483,9 +483,9 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
      * read the rest of the message.
      */
 
-    if ( message->bytes_read < sizeof(message->message.header))
+    if ( message->bytes_read < (int)sizeof(message->message.header))
     {
-	dataread = min(len, sizeof(message->message.header)-message->bytes_read);
+	dataread = min(len, (int)sizeof(message->message.header)-message->bytes_read);
 	memcpy((&message->message.header)+message->bytes_read, data, dataread );
 
 	/* did we read enough bytes? then go on parsing
@@ -493,7 +493,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 	 */
 	message->bytes_read += dataread;
 
-	if (message->bytes_read < sizeof(message->message.header))
+	if (message->bytes_read < (int)sizeof(message->message.header))
 	{
 	    return dataread;
 	}
@@ -560,7 +560,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 	 */
 	assert(message->contentLength == sizeof(message->message.beginrequestbody));
 
-	int copylen = min(sizeof(message->message.beginrequestbody), len);
+	int copylen = min((int)sizeof(message->message.beginrequestbody), len);
 	if (copylen > 0)
 	{
 	    memcpy(&message->message.beginrequestbody, data, copylen);
@@ -745,7 +745,7 @@ int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *messa
     case FCGI_STDOUT:	// fall through
     case FCGI_STDERR:	// fall through
     case FCGI_DATA:
-	if (written <= sizeof(message->message.header))
+	if (written <= (int)sizeof(message->message.header))
 	{
 	    memcpy(buffer, &message->message.header, written);
 	}
@@ -1283,7 +1283,6 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
 {
     assert(requestId>0);
     assert(parameter);
-    assert(len>=0);
 
     struct fcgi_message_s *message = calloc(1, sizeof(*message));
     assert(message);

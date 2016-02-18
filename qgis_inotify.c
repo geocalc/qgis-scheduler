@@ -137,7 +137,7 @@ static void *inotify_thread_watch(void *arg)
 	    debug(1, "inotify read %d bytes, sizeof event %lu, len %u", size_read, sizeof(*tmp_in_event), tmp_in_event->len);
 	    int inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
 
-	    while (size_read >= sizeof(*tmp_in_event) + tmp_in_event->len)
+	    while (size_read >= (int)(sizeof(*tmp_in_event) + tmp_in_event->len))
 	    {
 		switch(tmp_in_event->mask)
 		{
@@ -182,7 +182,7 @@ static void *inotify_thread_watch(void *arg)
 		    break;
 		}
 
-		if (size_read > sizeof(*tmp_in_event) + tmp_in_event->len)
+		if (size_read > (int)(sizeof(*tmp_in_event) + tmp_in_event->len))
 		{
 		    /* try to set the pointer to the next event location */
 		    tmp_in_event = (struct inotify_event *)(((unsigned char *)tmp_in_event) + inotifyeventlen);
