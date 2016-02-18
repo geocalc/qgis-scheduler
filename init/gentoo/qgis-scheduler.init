@@ -1,0 +1,23 @@
+#!/sbin/runscript
+# Copyright 1999-2014 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License, v2 or later
+# $Id$
+
+#extra_started_commands="reload"
+
+pidfile="/var/run/qgis-scheduler.pid"
+command="/usr/sbin/qgis-scheduler"
+command_args="-x ${pidfile} ${QGISSCHEDULER_OPTS}"
+start_stop_daemon_args="--retry TERM/3/TERM/5"
+
+depend() {
+	after bootmisc
+	use logger net
+}
+
+
+#reload() {
+#	ebegin "Reloading ${RC_SVCNAME}"
+#	kill -HUP $(cat "${pidfile}")
+#	eend $?
+#}
