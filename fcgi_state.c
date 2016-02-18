@@ -72,7 +72,7 @@
 
 #define MAX_MESSAGE_PRINT_LEN	20
 
-
+#define UNUSED_PARAMETER(x)	((void)(x))
 
 
 struct fcgi_param_s
@@ -977,7 +977,7 @@ struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_li
 
 void fcgi_message_list_return_iterator(struct fcgi_message_list_s *list)
 {
-
+    UNUSED_PARAMETER(list);
 }
 
 

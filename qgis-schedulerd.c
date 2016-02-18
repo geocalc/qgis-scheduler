@@ -158,6 +158,8 @@
 # define DEFAULT_CONFIG_PATH	"/etc/qgis-scheduler/qgis-scheduler.conf"
 #endif
 
+#define UNUSED_PARAMETER(x)	((void)(x))
+
 
 struct thread_connection_handler_args
 {
@@ -1054,6 +1056,8 @@ struct signal_data_s
 int signalpipe_wr = -1;
 void signalaction(int sig, siginfo_t *info, void *ucontext)
 {
+    UNUSED_PARAMETER(ucontext);
+
     int retval;
     struct signal_data_s sigdata;
     sigdata.signal = sig;

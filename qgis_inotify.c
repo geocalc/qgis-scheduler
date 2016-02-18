@@ -49,6 +49,7 @@
 #include "qgis_config.h"
 #include "logger.h"
 
+#define UNUSED_PARAMETER(x)	((void)(x))
 
 struct inotify_watch
 {
@@ -94,7 +95,7 @@ static void *inotify_thread_watch(void *arg)
 //    struct thread_watch_config_args *tinfo = arg;
 //    struct qgis_project_s *project = tinfo->project;
 //    assert(project);
-
+    UNUSED_PARAMETER(arg);
 
 //    const char *projname = project->name;
     debug(1, "started inotify watcher thread");

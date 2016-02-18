@@ -41,6 +41,7 @@
 #include "logger.h"
 #include "timer.h"
 
+#define UNUSED_PARAMETER(x)	((void)(x))
 
 
 static struct qgis_process_list_s *shutdownlist = NULL;	// list pf processes to be killed and removed
@@ -55,6 +56,8 @@ static int has_list_change = 0;
 
 static void *qgis_shutdown_thread(void *arg)
 {
+    UNUSED_PARAMETER(arg);
+
     /* Algorithm:
      *
      * Normal operation:
