@@ -229,6 +229,7 @@ struct fcgi_param_list_s *fcgi_param_list_new(void)
 	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
+    TAILQ_INIT(&list->head);
 
     return list;
 }
@@ -871,6 +872,7 @@ struct fcgi_message_list_s *fcgi_message_list_new(void)
 	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
+    TAILQ_INIT(&messlist->head);
 
     return messlist;
 }

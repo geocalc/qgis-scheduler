@@ -71,6 +71,7 @@ struct fcgi_data_list_s *fcgi_data_list_new(void)
 	logerror("could not allocate memory");
 	exit(EXIT_FAILURE);
     }
+    TAILQ_INIT(&list->head);
 
     return list;
 }
