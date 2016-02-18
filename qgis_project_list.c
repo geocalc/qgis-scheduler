@@ -68,10 +68,10 @@ void qgis_proj_list_delete(struct qgis_project_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
 
-	while (list->head.lh_first != NULL)
+	while ( !LIST_EMPTY(&list->head) )
 	{
-	    struct qgis_project_iterator *entry = list->head.lh_first;
-	    LIST_REMOVE(list->head.lh_first, entries);
+	    struct qgis_project_iterator *entry = LIST_FIRST(&list->head);
+	    LIST_REMOVE(LIST_FIRST(&list->head), entries);
 	    qgis_project_delete(entry->proj);
 	    free(entry);
 	}
@@ -155,7 +155,7 @@ void qgis_proj_list_remove_project(struct qgis_project_list_s *list, struct qgis
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	    LIST_FOREACH(np, &list->head, entries)
 	    {
 		if (proj == np->proj)
 		{
@@ -194,7 +194,7 @@ struct qgis_project_s *find_project_by_name(struct qgis_project_list_s *list, co
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    const char *projname = qgis_project_get_name(np->proj);
 	    retval = strcmp(name, projname);
@@ -235,7 +235,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
 	    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(myproj);
@@ -280,7 +280,7 @@ struct qgis_project_iterator *qgis_proj_list_get_iterator(struct qgis_project_li
 	    exit(EXIT_FAILURE);
 	}
 
-	return list->head.lh_first;
+	return LIST_FIRST(&list->head);
     }
 
     return NULL;
@@ -295,7 +295,7 @@ struct qgis_project_s *qgis_proj_list_get_next_project(struct qgis_project_itera
 	if (*iterator)
 	{
 	    struct qgis_project_s *proj = (*iterator)->proj;
-	    *iterator = (*iterator)->entries.le_next;
+	    *iterator = LIST_NEXT(*iterator, entries);
 	    return proj;
 	}
     }
@@ -339,7 +339,7 @@ void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
 
@@ -387,10 +387,9 @@ void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
-
 	    qgis_project_check_inotify_config_changed(myproj, wd);
 	}
 
@@ -423,7 +422,7 @@ void qgis_proj_list_shutdown(struct qgis_project_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
 	    qgis_project_shutdown(myproj);

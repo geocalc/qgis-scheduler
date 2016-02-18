@@ -240,11 +240,11 @@ void fcgi_param_list_delete(struct fcgi_param_list_s *paramlist)
 {
     if (paramlist)
     {
-	while (paramlist->head.tqh_first != NULL)
+	while ( !TAILQ_EMPTY(&paramlist->head) )
 	{
-	    struct fcgi_param_list_iterator_s *entry = paramlist->head.tqh_first;
+	    struct fcgi_param_list_iterator_s *entry = TAILQ_FIRST(&paramlist->head);
 
-	    TAILQ_REMOVE(&paramlist->head, paramlist->head.tqh_first, entries);
+	    TAILQ_REMOVE(&paramlist->head, TAILQ_FIRST(&paramlist->head), entries);
 	    free(entry->param.name);
 	    free(entry->param.value);
 	    free(entry);
@@ -272,7 +272,7 @@ void fcgi_param_list_add_param(struct fcgi_param_list_s *paramlist, struct fcgi_
 	/* if list is empty we have to insert at beginning,
 	 * else insert at the end.
 	 */
-	if (paramlist->head.tqh_first)
+	if ( !TAILQ_EMPTY(&paramlist->head) )
 	    TAILQ_INSERT_TAIL(&paramlist->head, entry, entries);      /* Insert at the end. */
 	else
 	    TAILQ_INSERT_HEAD(&paramlist->head, entry, entries);
@@ -322,8 +322,8 @@ int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
     assert(paramlist);
     if (paramlist)
     {
-	struct fcgi_param_list_iterator_s *it = paramlist->head.tqh_first;
-	for (it = paramlist->head.tqh_first; it != NULL; it = it->entries.tqe_next)
+	struct fcgi_param_list_iterator_s *it;
+	TAILQ_FOREACH(it, &paramlist->head, entries)
 	{
 	    int retval = debug(1, "%s=%s", it->param.name, it->param.value);
 	    if (-1 == retval)
@@ -347,8 +347,8 @@ const char *fcgi_param_list_find(struct fcgi_param_list_s *paramlist, const char
     assert(name);
     if (paramlist && name)
     {
-	struct fcgi_param_list_iterator_s *it = paramlist->head.tqh_first;
-	for (it = paramlist->head.tqh_first; it != NULL; it = it->entries.tqe_next)
+	struct fcgi_param_list_iterator_s *it;
+	TAILQ_FOREACH(it, &paramlist->head, entries)
 	{
 
 	    int retval = strcmp(name, it->param.name);
@@ -884,11 +884,11 @@ void fcgi_message_list_delete(struct fcgi_message_list_s *messlist)
 {
     if (messlist)
     {
-	while (messlist->head.tqh_first != NULL)
+	while ( !TAILQ_EMPTY(&messlist->head) )
 	{
-	    struct fcgi_message_list_iterator_s *entry = messlist->head.tqh_first;
+	    struct fcgi_message_list_iterator_s *entry = TAILQ_FIRST(&messlist->head);
 
-	    TAILQ_REMOVE(&messlist->head, messlist->head.tqh_first, entries);
+	    TAILQ_REMOVE(&messlist->head, TAILQ_FIRST(&messlist->head), entries);
 	    fcgi_message_delete(entry->mess);
 	    free(entry);
 	}
@@ -918,7 +918,7 @@ void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct 
 	/* if list is empty we have to insert at beginning,
 	 * else insert at the end.
 	 */
-	if (messlist->head.tqh_first)
+	if ( !TAILQ_EMPTY(&messlist->head) )
 	    TAILQ_INSERT_TAIL(&messlist->head, entry, entries);      /* Insert at the end. */
 	else
 	    TAILQ_INSERT_HEAD(&messlist->head, entry, entries);
@@ -932,9 +932,9 @@ struct fcgi_message_s *fcgi_message_list_get_last_message(struct fcgi_message_li
     assert(messlist);
     if(messlist)
     {
-	if (messlist->head.tqh_last)
+	if (!TAILQ_EMPTY(&messlist->head))
 	{
-	    struct fcgi_message_list_iterator_s *np = *messlist->head.tqh_last;
+	    struct fcgi_message_list_iterator_s *np = TAILQ_LAST(&messlist->head, message_listhead_s);
 
 	    assert(np);
 	    if (np)
@@ -951,7 +951,7 @@ struct fcgi_message_list_iterator_s *fcgi_message_list_get_iterator(struct fcgi_
     assert(list);
     if (list)
     {
-	return list->head.tqh_first;
+	return TAILQ_FIRST(&list->head);
     }
 
     return NULL;
@@ -966,7 +966,7 @@ struct fcgi_message_s *fcgi_message_list_get_next_message(struct fcgi_message_li
 	if (*iterator)
 	{
 	    struct fcgi_message_s *proc = (*iterator)->mess;
-	    *iterator = (*iterator)->entries.tqe_next;
+	    *iterator = TAILQ_NEXT(*iterator, entries);
 	    return proc;
 	}
     }

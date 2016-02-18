@@ -88,10 +88,10 @@ void qgis_process_list_delete(struct qgis_process_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
 
-	while (list->head.lh_first != NULL)
+	while ( !LIST_EMPTY(&list->head) )
 	{
-	    struct qgis_process_iterator *entry = list->head.lh_first;
-	    LIST_REMOVE(list->head.lh_first, entries);
+	    struct qgis_process_iterator *entry = LIST_FIRST(&list->head);
+	    LIST_REMOVE(LIST_FIRST(&list->head), entries);
 	    qgis_process_delete(entry->proc);
 	    free(entry);
 	}
@@ -172,7 +172,7 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	    LIST_FOREACH(np, &list->head, entries)
 	    {
 		if (proc == np->proc)
 		{
@@ -223,9 +223,13 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = fromlist->head.lh_first; np != NULL; )
+	    /* Note: this could be faster if we use a tail queue (TAILQ) or a
+	     * single pointer tail queue (STAILQ) and the *_CONCAT() macro
+	     */
+	    np = LIST_FIRST(&fromlist->head);
+	    while ( np != NULL )
 	    {
-		struct qgis_process_iterator *next = np->entries.le_next;
+		struct qgis_process_iterator *next = LIST_NEXT(np, entries);
 		if (qgis_process_get_state(np->proc) == state)
 		{
 		    LIST_REMOVE(np, entries);
@@ -281,7 +285,9 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 		exit(EXIT_FAILURE);
 	    }
 
-	    for (np = fromlist->head.lh_first; np != NULL; np = fromlist->head.lh_first)
+	    /* note: this could be faster if we just concatenate the two lists
+	     */
+	    for (np = LIST_FIRST(&fromlist->head); np != NULL; np = LIST_FIRST(&fromlist->head))
 	    {
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
@@ -345,7 +351,8 @@ struct qgis_process_s *qgis_process_list_find_idle_return_busy(struct qgis_proce
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    pthread_mutex_t *mutex = qgis_process_get_mutex(np->proc);
 	    retval = pthread_mutex_lock(mutex);
@@ -425,7 +432,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_status(struct qgis_proc
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
 	    if (state == mystate)
@@ -464,7 +471,7 @@ struct qgis_process_s *qgis_process_list_mutex_find_process_by_status(struct qgi
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    pthread_mutex_t *mutex = qgis_process_get_mutex(np->proc);
 	    retval = pthread_mutex_lock(mutex);
@@ -538,7 +545,7 @@ struct qgis_process_s *qgis_process_list_find_process_by_pid(struct qgis_process
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    pid_t mypid = qgis_process_get_pid(np->proc);
 	    if (pid == mypid)
@@ -576,9 +583,9 @@ struct qgis_process_s *qgis_process_list_get_first_process(struct qgis_process_l
 	    exit(EXIT_FAILURE);
 	}
 
-	if (list->head.lh_first)
+	if ( !LIST_EMPTY(&list->head) )
 	{
-	    proc = list->head.lh_first->proc;
+	    proc = LIST_FIRST(&list->head)->proc;
 	}
 
 	retval = pthread_rwlock_unlock(&list->rwlock);
@@ -607,7 +614,7 @@ struct qgis_process_iterator *qgis_process_list_get_iterator(struct qgis_process
 	    exit(EXIT_FAILURE);
 	}
 
-	return list->head.lh_first;
+	return LIST_FIRST(&list->head);
     }
 
     return NULL;
@@ -621,7 +628,7 @@ struct qgis_process_s *qgis_process_list_get_next_process(struct qgis_process_it
 	if (*iterator)
 	{
 	    struct qgis_process_s *proc = (*iterator)->proc;
-	    *iterator = (*iterator)->entries.le_next;
+	    *iterator = LIST_NEXT(*iterator, entries);
 	    return proc;
 	}
     }
@@ -663,7 +670,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    count++;
 	}
@@ -677,7 +684,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	}
 
 	int i = 0;
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    pidp[i++] = qgis_process_get_pid(np->proc);
 	}
@@ -717,7 +724,7 @@ int qgis_process_list_get_num_process(struct qgis_process_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    count++;
 	}
@@ -751,7 +758,7 @@ int qgis_process_list_get_num_process_by_status(struct qgis_process_list_s *list
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    enum qgis_process_state_e mystate = qgis_process_get_state(np->proc);
 	    if (state == mystate)
@@ -792,12 +799,12 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; )
+	for (np = LIST_FIRST(&list->head); np != NULL; )
 	{
 	    /* get the next entry in advance. because maybe the list order
 	     * is changed in the loop
 	     */
-	    struct qgis_process_iterator *next = np->entries.le_next;
+	    struct qgis_process_iterator *next = LIST_NEXT(np, entries);
 
 	    struct qgis_process_s *myproc = np->proc;
 	    pid_t pid = qgis_process_get_pid(myproc);
@@ -856,7 +863,7 @@ void qgis_process_list_signal_shutdown(struct qgis_process_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    qgis_process_signal_shutdown(np->proc);
 	}
@@ -891,7 +898,7 @@ void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, str
 	    exit(EXIT_FAILURE);
 	}
 
-	for (np = list->head.lh_first; np != NULL; np = np->entries.le_next)
+	LIST_FOREACH(np, &list->head, entries)
 	{
 	    const struct timespec *ts = qgis_process_get_signaltime(np->proc);
 
