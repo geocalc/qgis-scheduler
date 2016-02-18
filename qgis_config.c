@@ -503,7 +503,7 @@ int config_get_min_idle_processes(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    int ret;
+    int ret = INT32_MIN;
 
     assert(config_opts);
 
@@ -547,7 +547,7 @@ int config_get_max_idle_processes(const char *project)
     /* if project != NULL we first test the project section, then the
      * global section.
      * if project == NULL we take the global section */
-    int ret;
+    int ret = INT32_MIN;
 
     assert(config_opts);
 
