@@ -261,6 +261,7 @@ void qgis_shutdown_add_process(struct qgis_process_s *proc)
     assert(busylist);
 
     qgis_process_list_add_process( busylist, proc );
+    debug(1, "add one process to shutdown list");
 
     int retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
@@ -293,9 +294,10 @@ void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
     assert(busylist);
     assert(!do_shutdown_thread);
 
-    qgis_process_list_transfer_all_process( busylist, list );
+    int retval = qgis_process_list_transfer_all_process( busylist, list );
+    debug(1, "moved %d processes to shutdown list", retval);
 
-    int retval = pthread_mutex_lock(&shutdownmutex);
+    retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
