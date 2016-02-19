@@ -67,13 +67,11 @@ struct qgis_project_s
 {
     struct qgis_process_list_s *initproclist;	// list of processes which are initialized and can not be used for requests
     struct qgis_process_list_s *activeproclist;	// list of processes which handle fcgi requests
-    struct qgis_process_list_s *shutdownproclist; // list of processes which are shut down
     const char *name;
     const char *configpath;		// full path to qgis config file watched for updates. note: no watch if configpath is NULL
     const char *configbasename;		// only config file name without path
     pthread_t config_watch_threadid;
     pthread_rwlock_t rwlock;
-//    int inotifyfd;
     int inotifywatchfd;
 };
 
@@ -167,7 +165,6 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     }
     proj->initproclist = qgis_process_list_new();
     proj->activeproclist = qgis_process_list_new();
-    proj->shutdownproclist = qgis_process_list_new();
     proj->name = name;
 
     int retval = pthread_rwlock_init(&proj->rwlock, NULL);
@@ -239,7 +236,6 @@ void qgis_project_delete(struct qgis_project_s *proj)
 
 	qgis_process_list_delete(proj->initproclist);
 	qgis_process_list_delete(proj->activeproclist);
-	qgis_process_list_delete(proj->shutdownproclist);
 	free(proj);
     }
 }
@@ -956,25 +952,6 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    qgis_project_start_new_process_detached(1, proj, 0);
 		}
 	    }
-	    else
-
-	    {
-		proclist = proj->shutdownproclist;
-		if (proclist)
-		{
-		    proc = qgis_process_list_find_process_by_pid(proclist, pid);
-		    if (proc)
-		    {
-			ret++;
-			/* that process belongs to our list of deleted processes.
-			 * just remove it from this list.
-			 * move the process entry to the shutdown list to care for.
-			 */
-			qgis_process_list_remove_process(proclist, proc);
-			qgis_shutdown_add_process(proc);
-		    }
-		}
-	    }
 	}
     }
 
@@ -991,7 +968,6 @@ void qgis_project_shutdown(struct qgis_project_s *proj)
     {
 	qgis_shutdown_add_process_list(proj->initproclist);
 	qgis_shutdown_add_process_list(proj->activeproclist);
-	qgis_shutdown_add_process_list(proj->shutdownproclist);
     }
 }
 
