@@ -100,19 +100,8 @@ static void *qgis_shutdown_thread(void *arg)
 	debug(1, "got %d processes in shutdown list", retval);
 
 	/* clean the list from exited processes */
-	int count = qgis_process_list_get_num_process_by_status(shutdownlist, PROC_EXIT);
-	debug(1, "found %d processes with status EXIT in shutdown list", count);
-	if ( count )
-	{
-	    /* TODO: Bad bad workaround. do this more efficiently in
-	     * qgis_process_list
-	     */
-	    struct qgis_process_list_s *exitlist = qgis_process_list_new();
-	    retval = qgis_process_list_transfer_all_process_with_state(exitlist, shutdownlist, PROC_EXIT);
-	    debug(1, "transferred %d %s programs from shutdownlist to exitlist", retval, get_state_str(PROC_EXIT));
-	    qgis_process_list_delete(exitlist);
-	}
-
+	retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
+	debug(1, "deleted %d processes with status EXIT from shutdown list", retval);
 
 	/* get the timeout of the next signalling round.
 	 * if no process is in the list "ts_sig" may be {0,0}
