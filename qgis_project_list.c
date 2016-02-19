@@ -352,9 +352,9 @@ void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
 		// found process, no need to look further
 		break;
 	}
-	if (!retval)
-	    // did not find any matching process
-	    printlog("Process %d died, but did not find any matching project?", pid);
+	/* Note: if retval==0 then the process item could already live in the
+	 * separate shutdown list.
+	 */
 
 	retval = pthread_rwlock_unlock(&list->rwlock);
 	if (retval)
