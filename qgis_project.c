@@ -762,8 +762,19 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
 
 
     /* move the processes from the initialization list to the active process
-     * list
+     * list.
+     * If we got the option to exchange the processes then first move all
+     * existing processes from the active list to the shutdown queue.
      */
+    if (do_exchange_processes)
+    {
+	qgis_shutdown_add_process_list(project->activeproclist);
+//	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
+//	debug(1, "project '%s' moved %d processes from active list to shutdown list", project->name, retval);
+//	retval = qgis_process_list_send_signal(project->shutdownproclist, SIGTERM);
+//	debug(1, "project '%s' send %d processes the TERM signal", project->name, retval);
+    }
+
     retval = pthread_rwlock_wrlock(&project->rwlock);
     if (retval)
     {
@@ -772,13 +783,6 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
 	exit(EXIT_FAILURE);
     }
 
-    if (do_exchange_processes)
-    {
-	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
-	debug(1, "project '%s' moved %d processes from active list to shutdown list", project->name, retval);
-	retval = qgis_process_list_send_signal(project->shutdownproclist, SIGTERM);
-	debug(1, "project '%s' send %d processes the TERM signal", project->name, retval);
-    }
     retval = qgis_process_list_transfer_all_process_with_state(project->activeproclist, project->initproclist, PROC_IDLE);
     debug(1, "project '%s' moved %d processes from init list to active list", project->name, retval);
 
