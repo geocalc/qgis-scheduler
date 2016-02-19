@@ -30,8 +30,6 @@ PIDFILE=/var/run/$NAME.pid
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
 
-#DAEMON_ARGS="-c /usr/lib/cgi-bin/qgis_mapserv.fcgi -p ${QGIS_APPSERVER_PORT} -N ${QGIS_APPSERVER_NUMBER_OF_PROCESSES}"
-
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
 
