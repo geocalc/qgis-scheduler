@@ -44,6 +44,7 @@ void qgis_process_list_delete(struct qgis_process_list_s *list);
 
 void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis_process_s *proc);
 void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct qgis_process_s *proc);
+int qgis_process_list_delete_all_process_with_state(struct qgis_process_list_s *list, enum qgis_process_state_e state);
 void qgis_process_list_transfer_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, const struct qgis_process_s *proc);
 int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist);
 int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, enum qgis_process_state_e state);

@@ -194,7 +194,59 @@ void qgis_process_list_remove_process(struct qgis_process_list_s *list, struct q
 }
 
 
-//void qgis_process_list_transfer_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, const struct qgis_process_s *proc);
+/* removes all process entries with specifice "state" from the list and calls
+ * delete() on this process entries
+ */
+int qgis_process_list_delete_all_process_with_state(struct qgis_process_list_s *list, enum qgis_process_state_e state)
+{
+    int ret = 0;
+
+    assert(list);
+    if (list)
+    {
+	    struct qgis_process_iterator *np;
+	    int retval = pthread_rwlock_wrlock(&list->rwlock);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error acquire read-write lock");
+		exit(EXIT_FAILURE);
+	    }
+
+	    /* Note: we can not use LIST_FOREACH() because the list structure
+	     * will be modified during the loop.
+	     * TODO: get the source of LIST_FOREACH_SAFE() which can do this
+	     */
+	    np = LIST_FIRST(&list->head);
+	    while ( np != NULL )
+	    {
+		struct qgis_process_iterator *next = LIST_NEXT(np, entries);
+		struct qgis_process_s *proc = np->proc;
+		assert(proc);
+
+		enum qgis_process_state_e mystate = qgis_process_get_state(proc);
+		if (mystate == state)
+		{
+		    qgis_process_delete(proc);
+		    LIST_REMOVE(np, entries);
+		    free(np);
+		    ret++;
+		}
+
+		np = next;
+	    }
+
+	    retval = pthread_rwlock_unlock(&list->rwlock);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error unlock read-write lock");
+		exit(EXIT_FAILURE);
+	    }
+    }
+
+    return ret;
+}
 
 
 /* moves all processes with a specific state from one list to another */
