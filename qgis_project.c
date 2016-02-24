@@ -55,6 +55,7 @@
 #include "logger.h"
 #include "timer.h"
 #include "qgis_shutdown_queue.h"
+#include "statistic.h"
 
 
 //#define DISABLED_INIT
@@ -764,6 +765,8 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
      */
     if (do_exchange_processes)
     {
+	int shutdownnum = qgis_process_list_get_num_process(project->activeproclist);
+	statistic_add_process_shutdown(shutdownnum);
 	qgis_shutdown_add_process_list(project->activeproclist);
 //	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
 //	debug(1, "project '%s' moved %d processes from active list to shutdown list", project->name, retval);
@@ -790,6 +793,7 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
 	exit(EXIT_FAILURE);
     }
 
+    statistic_add_process_start(num);
 
 }
 

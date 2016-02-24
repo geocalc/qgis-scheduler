@@ -135,6 +135,7 @@
 #include "logger.h"
 #include "timer.h"
 #include "qgis_shutdown_queue.h"
+#include "statistic.h"
 
 
 //#include <sys/types.h>	// für open()
@@ -1022,6 +1023,7 @@ void *thread_handle_connection(void *arg)
 	exit(EXIT_FAILURE);
     }
     printlog("[%lu] done connection, %ld.%03ld sec", thread_id, ts.tv_sec, ts.tv_nsec/(1000*1000));
+    statistic_add_connection(&ts);
 
 
     /* clean up */
@@ -1072,6 +1074,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	qgis_shutdown_process_died(info->si_pid);
 	// no break
 
+    case SIGUSR1:	// fall through
     case SIGTERM:	// fall through
     case SIGINT:	// fall through
     case SIGQUIT:
@@ -1176,6 +1179,9 @@ int main(int argc, char **argv)
     }
 
 
+    test_set_valid_clock_id();
+    statistic_init();
+
 
     int retval = config_load(config_path);
     if (retval)
@@ -1189,7 +1195,6 @@ int main(int argc, char **argv)
     printlog("starting %s version %s with pid %d", basename(argv[0]), version, getpid());
     debug(1, "started main thread");
 
-    test_set_valid_clock_id();
     check_ressource_limits();
 
     /* prepare inet socket connection for application server process (this)
@@ -1392,9 +1397,16 @@ int main(int argc, char **argv)
 	action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
 	sigemptyset(&action.sa_mask);
 	sigaddset(&action.sa_mask, SIGCHLD);
+	sigaddset(&action.sa_mask, SIGUSR1);
 	sigaddset(&action.sa_mask, SIGTERM);
 	sigaddset(&action.sa_mask, SIGINT);
 	sigaddset(&action.sa_mask, SIGQUIT);
+	retval = sigaction(SIGUSR1, &action, NULL);
+	if (retval)
+	{
+	    logerror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
 	retval = sigaction(SIGTERM, &action, NULL);
 	if (retval)
 	{
@@ -1583,6 +1595,10 @@ int main(int argc, char **argv)
 			qgis_proj_list_process_died(projectlist, sigdata.pid);
 			break;
 		    }
+		    case SIGUSR1:
+			statistic_printlog();
+			break;
+
 		    case SIGTERM:	// fall through
 		    case SIGINT:
 		    case SIGQUIT:
