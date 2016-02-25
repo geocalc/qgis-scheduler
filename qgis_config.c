@@ -102,7 +102,7 @@ static clockid_t system_clk_id = 0;
 /* Copy content of s1 and s2 into a new allocated string.
  * You have to free() the resulting string yourself.
  */
-char *astrcat(const char *s1, const char *s2)
+static char *astrcat(const char *s1, const char *s2)
 {
     assert(s1);
     assert(s2);
