@@ -721,16 +721,16 @@ const char *config_get_project_config_path(const char *project)
 
     assert(config_opts);
 
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
     if (project)
     {
+	int retval = pthread_mutex_lock(&config_lock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire mutex lock");
+	    exit(EXIT_FAILURE);
+	}
+
 	/* NOTE: this could be faster if we use a local char array instead of
 	 * dynamic memory. However this buffer maybe too small, to circumvent
 	 * this we need to know the string sizes before. I think it is too much
@@ -739,14 +739,14 @@ const char *config_get_project_config_path(const char *project)
 	char *key = astrcat(project, CONFIG_PROJ_CONFIG_PATH);
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_CONFIG_PATH);
 	free (key);
-    }
 
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error unlock mutex lock");
-	exit(EXIT_FAILURE);
+	retval = pthread_mutex_unlock(&config_lock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock mutex lock");
+	    exit(EXIT_FAILURE);
+	}
     }
 
     return ret;
