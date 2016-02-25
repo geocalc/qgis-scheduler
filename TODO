@@ -20,8 +20,6 @@
 
 + be able to select file logging or syslog logging in config file
 
-+ write statistics to logfile if sigusr1 is received
-
 + write a man page
 
 + check startup time for a process and kill it (move proc item to shutdown module) if the startup time exceeds a value.
