@@ -52,7 +52,7 @@ AC_TYPE_UINT32_T
 # Checks for library functions.
 AC_FUNC_FORK
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([clock_getres clock_gettime dup2 dup3 getopt getpid getrlimit getsockname getsockopt localtime_r memset poll regcomp setenv setrlimit sigaction socket strdup strftime strrchr syncfs unlink vdprintf], [], AC_MSG_ERROR([can not find function needed]))
+AC_CHECK_FUNCS([asprintf clock_getres clock_gettime dup2 dup3 getopt getpid getrlimit getsockname getsockopt localtime_r memset poll regcomp setenv setrlimit sigaction socket strdup strftime strrchr syncfs unlink vdprintf], [], AC_MSG_ERROR([can not find function needed]))
 AC_CHECK_FUNCS([basename])
 
 AC_CONFIG_FILES([Makefile])
