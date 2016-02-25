@@ -877,7 +877,17 @@ const char *config_get_env_key(const char *project, int num)
     }
 
     if (INVALID_STRING == ret)
-	ret = iniparser_getstring(config_opts, CONFIG_PROJ_ENVVAR, DEFAULT_CONFIG_PROJ_ENVVAR);
+    {
+	char *key;
+	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVVAR, num);
+	if (-1 == retval)
+	{
+	    logerror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVVAR);
+	free (key);
+    }
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
@@ -925,7 +935,17 @@ const char *config_get_env_value(const char *project, int num)
     }
 
     if (INVALID_STRING == ret)
-	ret = iniparser_getstring(config_opts, CONFIG_PROJ_ENVDATA, DEFAULT_CONFIG_PROJ_ENVDATA);
+    {
+	char *key;
+	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVDATA, num);
+	if (-1 == retval)
+	{
+	    logerror("asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVDATA);
+	free (key);
+    }
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
