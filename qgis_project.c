@@ -62,6 +62,10 @@
 #define MIN_PROCESS_RUNTIME_SEC		5
 #define MIN_PROCESS_RUNTIME_NANOSEC	0
 
+#define max(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
 
 
 struct qgis_project_s
@@ -74,6 +78,7 @@ struct qgis_project_s
     pthread_t config_watch_threadid;
     pthread_rwlock_t rwlock;
     int inotifywatchfd;
+    int nr_crashes;		// number of program crashes (i.e. process ends within warning time)
 };
 
 
@@ -98,7 +103,7 @@ struct thread_start_new_child_args
 
 /* constants */
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
-
+static const int max_nr_process_crashes = 5;
 
 
 /* This global number is counted upwards, overflow included.
@@ -126,7 +131,10 @@ static void qgis_project_restart_processes(struct qgis_project_s *project)
     assert(project);
     if (project)
     {
-	int numproc = qgis_process_list_get_num_process(project->activeproclist);
+	const char *proj_name = project->name;
+	int minproc = config_get_min_idle_processes(proj_name);
+	int activeproc = qgis_process_list_get_num_process(project->activeproclist);
+	int numproc = max(minproc, activeproc);
 	qgis_project_start_new_process_detached(numproc, project, 1);
     }
 }
@@ -675,6 +683,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     else if (0 < pid)
     {
 	/* parent */
+	debug(1, "project '%s' started new child process '%s', pid %d", project_name, command, pid);
 	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
 	qgis_project_add_process(project, childproc);
 
@@ -778,16 +787,21 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
      * list.
      * If we got the option to exchange the processes then first move all
      * existing processes from the active list to the shutdown queue.
+     *
+     * Note: The option to exchange the processes is usually set if a new
+     * configuration file has been copied to the processes.
+     * If a new configuration file arrives the number of crashed processes is
+     * reset. But if we do this during a crashing process, the number becomes
+     * invalid. So we can not reset the number in
+     * qgis_project_check_inotify_config_changed(), because it is not
+     * protected. We have the reset the number over here.
      */
     if (do_exchange_processes)
     {
 	int shutdownnum = qgis_process_list_get_num_process(project->activeproclist);
 	statistic_add_process_shutdown(shutdownnum);
 	qgis_shutdown_add_process_list(project->activeproclist);
-//	retval = qgis_process_list_transfer_all_process(project->shutdownproclist, project->activeproclist);
-//	debug(1, "project '%s' moved %d processes from active list to shutdown list", project->name, retval);
-//	retval = qgis_process_list_send_signal(project->shutdownproclist, SIGTERM);
-//	debug(1, "project '%s' send %d processes the TERM signal", project->name, retval);
+	project->nr_crashes = 0;	// reset number of crashes after configuration change
     }
 
     retval = pthread_rwlock_wrlock(&project->rwlock);
@@ -918,21 +932,31 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		exit(EXIT_FAILURE);
 	    }
 	    if ( MIN_PROCESS_RUNTIME_SEC > ts.tv_sec || (MIN_PROCESS_RUNTIME_SEC == ts.tv_sec && MIN_PROCESS_RUNTIME_NANOSEC >= ts.tv_nsec) )
+	    {
 		printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
+		proj->nr_crashes++;
+	    }
 
 	    qgis_process_list_remove_process(proclist, proc);
 	    qgis_shutdown_add_process(proc);
 
 	    if ( !get_program_shutdown() )
 	    {
-		debug(1, "project '%s' restarting process", proj->name);
-		printlog("Project '%s', process %d died, restarting process", proj->name, pid);
+		if (max_nr_process_crashes > proj->nr_crashes)
+		{
+		    debug(1, "project '%s' restarting process", proj->name);
+		    printlog("Project '%s', process %d died, restarting process", proj->name, pid);
 
-		/* child process terminated, restart anew */
-		/* TODO: react on child processes exiting immediately.
-		 * maybe store the creation time and calculate the execution time?
-		 */
-		qgis_project_start_new_process_detached(1, proj, 0);
+		    /* child process terminated, restart anew */
+		    /* TODO: react on child processes exiting immediately.
+		     * maybe store the creation time and calculate the execution time?
+		     */
+		    qgis_project_start_new_process_detached(1, proj, 0);
+		}
+		else
+		{
+		    printlog("Project '%s', process crashed more than %d times. No more new process started", proj->name, max_nr_process_crashes);
+		}
 	    }
 	}
 	else
