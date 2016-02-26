@@ -468,7 +468,23 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 //    close(debugfd);
     debug(1, "init child process for project '%s' done. waiting for input..", projname);
 
+    pthread_mutex_t *mutex = qgis_process_get_mutex(childproc);
+    retval = pthread_mutex_lock(mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex");
+	exit(EXIT_FAILURE);
+    }
     qgis_process_set_state_idle(childproc);
+    retval = pthread_mutex_unlock(mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex");
+	exit(EXIT_FAILURE);
+    }
+
     free(buffer);
 }
 

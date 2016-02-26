@@ -61,19 +61,67 @@ void statistic_add_connection(const struct timespec *timeradd)
 
 //void add_process_crash(int num)
 //{
+//    int retval = pthread_mutex_lock(&mutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error lock mutex");
+//	exit(EXIT_FAILURE);
+//    }
+//
 //    process_crashed += num;
+//
+//    retval = pthread_mutex_unlock(&mutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error unlock mutex");
+//	exit(EXIT_FAILURE);
+//    }
 //}
 
 
 void statistic_add_process_shutdown(int num)
 {
+    int retval = pthread_mutex_lock(&mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error lock mutex");
+	exit(EXIT_FAILURE);
+    }
+
     process_shutdown += num;
+
+    retval = pthread_mutex_unlock(&mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
 void statistic_add_process_start(int num)
 {
+    int retval = pthread_mutex_lock(&mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error lock mutex");
+	exit(EXIT_FAILURE);
+    }
+
     process_started += num;
+
+    retval = pthread_mutex_unlock(&mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex");
+	exit(EXIT_FAILURE);
+    }
 }
 
 

@@ -1011,7 +1011,23 @@ void *thread_handle_connection(void *arg)
 	retval = close (childunixsocketfd);
 	debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
 	free(buffer);
+
+	pthread_mutex_t *mutex = qgis_process_get_mutex(proc);
+	retval = pthread_mutex_lock(mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire mutex");
+	    exit(EXIT_FAILURE);
+	}
 	qgis_process_set_state_idle(proc);
+	retval = pthread_mutex_unlock(mutex);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock mutex");
+	    exit(EXIT_FAILURE);
+	}
     }
 //    close(debugfd);
 

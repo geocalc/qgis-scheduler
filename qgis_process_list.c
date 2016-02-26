@@ -282,12 +282,31 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 	    while ( np != NULL )
 	    {
 		struct qgis_process_iterator *next = LIST_NEXT(np, entries);
+
+		pthread_mutex_t *mutex = qgis_process_get_mutex(np->proc);
+		retval = pthread_mutex_lock(mutex);
+		if (retval)
+		{
+		    errno = retval;
+		    logerror("error acquire mutex");
+		    exit(EXIT_FAILURE);
+		}
+
 		if (qgis_process_get_state(np->proc) == state)
 		{
 		    LIST_REMOVE(np, entries);
 		    LIST_INSERT_HEAD(&tolist->head, np, entries);
 		    ret++;
 		}
+
+		retval = pthread_mutex_unlock(mutex);
+		if (retval)
+		{
+		    errno = retval;
+		    logerror("error unlock mutex");
+		    exit(EXIT_FAILURE);
+		}
+
 		np = next;
 	    }
 
