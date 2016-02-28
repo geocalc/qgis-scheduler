@@ -39,7 +39,7 @@ CC="$PTHREAD_CC"
 
 # Checks for header files.
 AC_HEADER_ASSERT
-AC_CHECK_HEADERS([assert.h errno.h fcntl.h getopt.h iniparser.h libgen.h limits.h netdb.h poll.h pwd.h regex.h stddef.h stdint.h stdlib.h string.h sys/inotify.h sys/queue.h sys/resource.h sys/socket.h sys/stat.h sys/time.h sys/types.h sys/un.h unistd.h], [], AC_MSG_ERROR([can not find header needed]))
+AC_CHECK_HEADERS([assert.h errno.h fcntl.h getopt.h glob.h iniparser.h libgen.h limits.h netdb.h poll.h pwd.h regex.h stddef.h stdint.h stdlib.h string.h sys/inotify.h sys/queue.h sys/resource.h sys/socket.h sys/stat.h sys/time.h sys/types.h sys/un.h unistd.h], [], AC_MSG_ERROR([can not find header needed]))
 AC_CHECK_HEADERS([fastcgi.h], [], AC_MSG_ERROR([can not find fast cgi header needed. Did you install http://www.fastcgi.com/ ?]))
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -52,8 +52,8 @@ AC_TYPE_UINT32_T
 # Checks for library functions.
 AC_FUNC_FORK
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([asprintf clock_getres clock_gettime dup2 dup3 getopt getpid getrlimit getsockname getsockopt localtime_r memset poll regcomp setenv setrlimit sigaction socket strdup strftime strrchr syncfs unlink vdprintf], [], AC_MSG_ERROR([can not find function needed]))
-AC_CHECK_FUNCS([basename])
+AC_CHECK_FUNCS([asprintf clock_getres clock_gettime dup2 dup3 getopt getpid getrlimit getsockname getsockopt glob localtime_r memset poll regcomp setenv setrlimit sigaction socket strdup strftime strrchr syncfs unlink vdprintf], [], AC_MSG_ERROR([can not find function needed]))
+AC_CHECK_FUNCS([basename glob64])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

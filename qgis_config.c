@@ -38,6 +38,10 @@
 #include <iniparser.h>
 #include <errno.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <glob.h>
 
 #include "logger.h"
 
@@ -80,6 +84,8 @@
 #define DEFAULT_CONFIG_LOGFILE		NULL
 #define CONFIG_DEBUGLEVEL		":debuglevel"
 #define DEFAULT_CONFIG_DEBUGLEVEL	0
+#define CONFIG_INCLUDE			":include"
+#define DEFAULT_CONFIG_INCLUDE		NULL
 
 
 #if __WORDSIZE == 64
@@ -94,10 +100,17 @@
 
 
 
+
+
+
+
 static dictionary *config_opts = NULL;
 static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 static int does_program_shutdown = 0;
 static clockid_t system_clk_id = 0;
+
+
+
 
 /* Copy content of s1 and s2 into a new allocated string.
  * You have to free() the resulting string yourself.
@@ -117,6 +130,244 @@ static char *astrcat(const char *s1, const char *s2)
 }
 
 
+/* load an include file and append its section data to the temporary file "f"
+ *
+ */
+static int load_include_file(FILE *f, const char *configpath)
+{
+    /* if "configpath" points to a directory iniparser_load() nevertheless
+     * returns a value. BUT the dictionary remains empty. So if "configpath"
+     * refers to a directory the file f does not grow further.
+     */
+    struct stat statbuff;
+    int retval = stat(configpath, &statbuff);
+    if (-1 == retval)
+    {
+	logerror("error calling stat() on '%s'", configpath);
+	exit(EXIT_FAILURE);
+    }
+
+    if ((statbuff.st_mode & S_IFMT) == S_IFREG) {
+	/* Handle regular file */
+
+	dictionary *myconfig = iniparser_load(configpath);
+	if (myconfig)
+	{
+	    iniparser_dump_ini(myconfig, f);
+	    iniparser_freedict(myconfig);
+	}
+	else
+	{
+	    return -1;
+	}
+    }
+    else
+    {
+	printlog("WARNING: included path '%s' does not refer to a regular file", configpath);
+	errno = EINVAL;
+	return -1;
+    }
+
+    return 0;
+}
+
+
+static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpfilename)
+{
+    int retval;
+
+    FILE *configfile = fopen(configpath, "r");
+    if (NULL == configfile)
+    {
+	logerror("error: can not open configuration file '%s'", configpath);
+	exit(EXIT_FAILURE);
+    }
+
+    static const int bufferlen = 4096;
+    unsigned char buffer[bufferlen];
+    while (!feof(configfile))
+    {
+	size_t len = fread(buffer, 1, bufferlen, configfile);
+	if (ferror(configfile))
+	{
+	    logerror("error: reading from '%s'", configpath);
+	    exit(EXIT_FAILURE);
+	}
+
+	fwrite(buffer, 1, len, tmpf);
+	if (ferror(tmpf))
+	{
+	    logerror("error: writing to temporary file '%s'", tmpfilename);
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    retval = fclose(configfile);
+    if (EOF == retval)
+    {
+	logerror("error: closing file '%s'", configpath);
+	exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+
+static int glob_find_err(const char *epath, int eerrno)
+{
+    errno = eerrno;
+    logerror("error: glob testing path '%s'", epath);
+
+    return 0;	// continue finding in glob(): return 0
+}
+
+
+static int glob_find_file(FILE *tmpf, const char *includepattern)
+{
+    int retval;
+
+    glob_t globvec;
+    retval = glob(includepattern, GLOB_NOSORT|GLOB_BRACE|GLOB_TILDE, glob_find_err, &globvec);
+//    printlog("glob returned %d", retval);
+    switch (retval)
+    {
+    case GLOB_ABORTED:
+	printlog("WARNING: file globbing aborted for include '%s'", includepattern);
+	break;
+
+    case GLOB_NOMATCH:
+	printlog("WARNING: no file found for include '%s'", includepattern);
+	break;
+
+    case GLOB_NOSPACE:
+	printlog("error: glob can not allocate memory");
+	exit(EXIT_FAILURE);
+
+    case 0:
+    {
+	/* no errors */
+//	printlog("glob no errors");
+
+	size_t i;
+	for (i=0; i<globvec.gl_pathc; i++)
+	{
+	    retval = load_include_file(tmpf, globvec.gl_pathv[i]);
+	    if (-1 == retval)
+	    {
+		logerror("WARNING: can not load included configuration file '%s'", globvec.gl_pathv[i]);
+	    }
+	}
+	break;
+    }
+
+    default:
+	printlog("error: glob returned unknown error code %d", retval);
+	exit(EXIT_FAILURE);
+    }
+
+    globfree(&globvec);
+
+    return 0;
+}
+
+
+static int iniparser_load_with_include(const char *configpath)
+{
+    int retval;
+
+    assert(configpath);
+    /* read in config file */
+    config_opts = iniparser_load(configpath);
+    if (config_opts)
+    {
+	/* test configuration for include setting */
+	const char *includepathpattern = iniparser_getstring(config_opts, CONFIG_INCLUDE, DEFAULT_CONFIG_INCLUDE);
+	if (DEFAULT_CONFIG_INCLUDE != includepathpattern)
+	{
+	    /* got include setting.
+	     * copy all configurations into one temporary file
+	     * and again read this into memory.
+	     * check for multiple paths with globbing
+	     */
+	    const char *tmpfilename = tmpnam(NULL);
+	    if ( !tmpfilename )
+	    {
+		printlog("error: tmpnam() returned no temporary file name");
+		exit(EXIT_FAILURE);
+	    }
+
+	    int tmpfd = open(tmpfilename, O_CREAT|O_WRONLY|O_EXCL|O_CLOEXEC, S_IRUSR|S_IWUSR);
+	    if (-1 == tmpfd)
+	    {
+		logerror("error: can not open temporary file %s", tmpfilename);
+		exit(EXIT_FAILURE);
+	    }
+
+	    /* note: fdopen() argument "mode" have to reflect the settings in open() */
+	    FILE *tmpf = fdopen(tmpfd, "w");
+	    if (NULL == tmpf)
+	    {
+		logerror("error: can not open file descriptor on temporary file %s", tmpfilename);
+		exit(EXIT_FAILURE);
+	    }
+
+	    /* copy first configuration file "as is" including global
+	     * configuration section to the temporary file.
+	     */
+	    retval = copy_config_file(tmpf, configpath, tmpfilename);
+
+	    /* copy included configuration files sections only to the temporary
+	     * file.
+	     */
+	    retval = glob_find_file(tmpf, includepathpattern);
+
+	    retval = fclose(tmpf);
+	    if (EOF == retval)
+	    {
+		logerror("error: can not close temporary file %s", tmpfilename);
+		exit(EXIT_FAILURE);
+	    }
+
+	    config_opts = iniparser_load(tmpfilename);
+	    if (config_opts)
+	    {
+		retval = unlink(tmpfilename);
+		if (-1 == retval)
+		{
+		    logerror("error: can not remove temporary file %s", tmpfilename);
+		    exit(EXIT_FAILURE);
+		}
+	    }
+	}
+    }
+
+
+    if (!config_opts)
+    {
+	logerror("can not load configuration from '%s'", configpath);
+	return -1;
+    }
+
+    return 0;
+}
+
+
+/* =======================================================
+ * public API
+ */
+
+/* Read the configuration files with one include value.
+ * If the first configuration file has an entry "include" in the global section
+ * (section without a name, i.e. key ":include") it reads the given
+ * configuration file(s), too.
+ * The include may contain wildcards (like "/etc/config/ *.conf" or even
+ * "/etc/ *qgis/ *.conf".
+ * The included file may contain a global section, which is being ignored. This
+ * includes any further include values as well. So there can only one include
+ * value be set.
+ * The included configuration sections are written to a temporary file, which
+ * in turn is read in a final pass from the "iniparser" library.
+ */
 int config_load(const char *path)
 {
     /* load the config file into the dictionary
@@ -132,7 +383,11 @@ int config_load(const char *path)
 	exit(EXIT_FAILURE);
     }
 
-    config_opts = iniparser_load(path);
+    retval = iniparser_load_with_include(path);
+    if (-1 == retval)
+    {
+	logerror("WARNING could no load configuration file");
+    }
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
