@@ -289,7 +289,7 @@ static int iniparser_load_with_include(const char *configpath)
 	     * and again read this into memory.
 	     * check for multiple paths with globbing
 	     */
-	    const char *tmpfilename = tmpnam(NULL);
+	    const char *tmpfilename = tempnam(NULL, "qgis-schedulerd");
 	    if ( !tmpfilename )
 	    {
 		printlog("error: tmpnam() returned no temporary file name");
@@ -338,6 +338,8 @@ static int iniparser_load_with_include(const char *configpath)
 		    exit(EXIT_FAILURE);
 		}
 	    }
+
+	    free(tmpfilename);
 	}
     }
 
