@@ -72,5 +72,7 @@ const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc);
 const struct timespec *qgis_process_get_signaltime(struct qgis_process_s *proc);
 void qgis_process_signal_shutdown(struct qgis_process_s *proc);
 
+void qgis_process_print(struct qgis_process_s *proc);
+
 
 #endif /* QGIS_PROCESS_H_ */

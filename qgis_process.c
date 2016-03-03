@@ -438,4 +438,13 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 }
 
 
+void qgis_process_print(struct qgis_process_s *proc)
+{
+    assert(proc);
+    if (proc)
+    {
+	debug(1, "process pid:%d, state:%s, process_socket:%d, workerthread:%lu", proc->pid, get_state_str(proc->state), proc->process_socket_fd, proc->threadid);
+    }
+}
+
 
