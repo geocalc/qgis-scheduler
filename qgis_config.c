@@ -331,6 +331,7 @@ static int iniparser_load_with_include(const char *configpath)
 		exit(EXIT_FAILURE);
 	    }
 
+	    iniparser_freedict(config_opts);
 	    config_opts = iniparser_load(tmpfilename);
 	    if (config_opts)
 	    {
