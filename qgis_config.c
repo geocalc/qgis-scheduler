@@ -108,7 +108,7 @@ static dictionary *config_opts = NULL;
 static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 static int does_program_shutdown = 0;
 static clockid_t system_clk_id = 0;
-
+static int debuglevel = DEFAULT_CONFIG_DEBUGLEVEL; // cache debuglevel, so we dont need mutex to read the level value (used to debug this module itself)
 
 
 
@@ -228,7 +228,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
 
     glob_t globvec;
     retval = glob(includepattern, GLOB_NOSORT|GLOB_BRACE|GLOB_TILDE, glob_find_err, &globvec);
-//    printlog("glob returned %d", retval);
+    debug(1, "glob returned %d", retval);
     switch (retval)
     {
     case GLOB_ABORTED:
@@ -246,7 +246,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
     case 0:
     {
 	/* no errors */
-//	printlog("glob no errors");
+	debug(1, "glob no errors");
 
 	size_t i;
 	for (i=0; i<globvec.gl_pathc; i++)
@@ -280,6 +280,9 @@ static int iniparser_load_with_include(const char *configpath)
     config_opts = iniparser_load(configpath);
     if (config_opts)
     {
+	/* make a first attempt to get the configured debug level, second is in config_load() */
+	debuglevel = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
+
 	/* test configuration for include setting */
 	const char *includepathpattern = iniparser_getstring(config_opts, CONFIG_INCLUDE, DEFAULT_CONFIG_INCLUDE);
 	if (DEFAULT_CONFIG_INCLUDE != includepathpattern)
@@ -328,6 +331,7 @@ static int iniparser_load_with_include(const char *configpath)
 		exit(EXIT_FAILURE);
 	    }
 
+	    iniparser_freedict(config_opts);
 	    config_opts = iniparser_load(tmpfilename);
 	    if (config_opts)
 	    {
@@ -390,6 +394,9 @@ int config_load(const char *path)
     {
 	logerror("WARNING could no load configuration file");
     }
+
+    /* make a second attempt to get the configured debug level, first is in iniparser_load_with_include() */
+    debuglevel = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
@@ -642,27 +649,8 @@ const char *config_get_logfile(void)
 
 int config_get_debuglevel(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    int ret = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    return ret;
+    // return cached entry read during config_load()
+    return debuglevel;
 }
 
 
