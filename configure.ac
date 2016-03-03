@@ -13,6 +13,7 @@ AC_PROG_CC
 
 # Checks for libraries.
 AC_CHECK_LIB([iniparser], [iniparser_load], [], AC_MSG_ERROR([can not find lib iniparser from https://github.com/ndevilla/iniparser]))
+AC_CHECK_LIB([sqlite3], [sqlite3_initialize], [], AC_MSG_ERROR([can not find sqlite3 from http://www.sqlite.org/]))
 
 # check for glibc version >= 2.21.
 # check for presence of glibc version >= 2.21. Previous versions cause this
@@ -41,6 +42,7 @@ CC="$PTHREAD_CC"
 AC_HEADER_ASSERT
 AC_CHECK_HEADERS([assert.h errno.h fcntl.h getopt.h glob.h iniparser.h libgen.h limits.h netdb.h poll.h pwd.h regex.h stddef.h stdint.h stdlib.h string.h sys/inotify.h sys/queue.h sys/resource.h sys/socket.h sys/stat.h sys/time.h sys/types.h sys/un.h unistd.h], [], AC_MSG_ERROR([can not find header needed]))
 AC_CHECK_HEADERS([fastcgi.h], [], AC_MSG_ERROR([can not find fast cgi header needed. Did you install http://www.fastcgi.com/ ?]))
+AC_CHECK_HEADERS([sqlite3.h], [], AC_MSG_ERROR([sqlite3 header not found. Did you install http://www.sqlite.org/ ?]))
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_PID_T
