@@ -1044,3 +1044,16 @@ const char *qgis_project_get_name(struct qgis_project_s *proj)
 }
 
 
+void qgis_project_print(struct qgis_project_s *proj)
+{
+    assert(proj);
+    if (proj)
+    {
+	debug(1, "project %s, init process list", proj->name);
+	qgis_process_list_print(proj->initproclist);
+	debug(1, "project %s, active process list", proj->name);
+	qgis_process_list_print(proj->activeproclist);
+    }
+}
+
+

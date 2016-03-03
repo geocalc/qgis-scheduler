@@ -60,5 +60,7 @@ void qgis_project_start_new_process_detached(int num, struct qgis_project_s *pro
 void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes);
 int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd);
 
+void qgis_project_print(struct qgis_project_s *proj);
+
 
 #endif /* QGIS_PROJECT_H_ */
