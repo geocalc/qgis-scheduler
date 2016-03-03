@@ -439,3 +439,35 @@ void qgis_proj_list_shutdown(struct qgis_project_list_s *list)
 }
 
 
+void qgis_proj_list_print(struct qgis_project_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &list->head, entries)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+	    qgis_project_print(myproj);
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
+
+
