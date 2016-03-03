@@ -65,5 +65,8 @@ int qgis_process_list_send_signal(struct qgis_process_list_s *list, int signal);
 void qgis_process_list_signal_shutdown(struct qgis_process_list_s *list);
 void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, struct timespec *maxtimeval);
 
+void qgis_process_list_print(struct qgis_process_list_s *list);
+
+
 #endif /* QGIS_PROCESS_LIST_H_ */
 

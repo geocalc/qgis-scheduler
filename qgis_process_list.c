@@ -991,4 +991,34 @@ void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, str
 }
 
 
+void qgis_process_list_print(struct qgis_process_list_s *list)
+{
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &list->head, entries)
+	{
+	    struct qgis_process_s *proc = np->proc;
+	    qgis_process_print(proc);
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+}
+
 
