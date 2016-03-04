@@ -137,6 +137,7 @@
 #include "qgis_shutdown_queue.h"
 #include "statistic.h"
 #include "database.h"
+#include "process_manager.h"
 
 
 //#include <sys/types.h>	// für open()
@@ -1608,7 +1609,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-			db_remove_process(sigdata.pid);
+			process_manager_process_died(sigdata.pid);
 			break;
 		    }
 		    case SIGUSR1:
