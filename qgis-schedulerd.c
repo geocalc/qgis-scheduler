@@ -319,7 +319,6 @@ int change_file_mode_blocking(int fd, int is_blocking)
 }
 
 
-struct qgis_project_list_s *projectlist = NULL;
 
 void *thread_handle_connection(void *arg)
 {
@@ -563,7 +562,7 @@ void *thread_handle_connection(void *arg)
 
 	/* find the relevant project by name */
 	if (request_project_name)
-	    project = find_project_by_name(projectlist, request_project_name);
+	    project = find_project_by_name(db_get_project_list(), request_project_name);
 
     }
 
@@ -1147,14 +1146,13 @@ void *thread_start_project_processes(void *arg)
 
     assert(project);
     assert(num >= 0);
-    assert(projectlist);
 
     /* start "num" processes for this project and wait for them to finish
      * its initialization.
      * Then add this project to the global list
      */
     qgis_project_start_new_process_wait(num, project, 0);
-    qgis_proj_list_add_project(projectlist, project);
+    qgis_proj_list_add_project(db_get_project_list(), project);
 
 
     free(arg);
@@ -1459,10 +1457,9 @@ int main(int argc, char **argv)
     }
 
 
-    projectlist = qgis_proj_list_new();
 
     /* start the inotify watch module */
-    qgis_inotify_init(projectlist);
+    qgis_inotify_init(db_get_project_list());
 
     /* start the process shutdown module */
     qgis_shutdown_init();
@@ -1611,7 +1608,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-			qgis_proj_list_process_died(projectlist, sigdata.pid);
+			qgis_proj_list_process_died(db_get_project_list(), sigdata.pid);
 			break;
 		    }
 		    case SIGUSR1:
@@ -1767,11 +1764,8 @@ int main(int argc, char **argv)
     qgis_inotify_delete();
 
     /* move the processes from the working lists to the shutdown module */
-    qgis_proj_list_shutdown(projectlist);
+    qgis_proj_list_shutdown(db_get_project_list());
 
-
-    /* remove the projects */
-    qgis_proj_list_delete(projectlist);
 
     /* wait for the shutdown module so it has closed all its processes
      * Then clean up the module */
