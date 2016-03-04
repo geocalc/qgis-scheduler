@@ -41,7 +41,7 @@ void db_delete(void);
 void db_create_project(const char *projname);
 void db_create_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
-void db_process_died(pid_t pid);
+void db_remove_process(pid_t pid);
 
 
 /* transitional interfaces. these are deleted after the api change */

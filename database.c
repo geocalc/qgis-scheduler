@@ -140,7 +140,7 @@ void db_delete(void)
 void db_create_project(const char *projname);
 void db_create_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
-void db_process_died(pid_t pid)
+void db_remove_process(pid_t pid)
 {
     /* child process died, rearrange the project list */
     qgis_proj_list_process_died(projectlist, pid);

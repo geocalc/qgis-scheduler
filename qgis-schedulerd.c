@@ -1608,7 +1608,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-			db_process_died(sigdata.pid);
+			db_remove_process(sigdata.pid);
 			break;
 		    }
 		    case SIGUSR1:
