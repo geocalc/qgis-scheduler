@@ -33,6 +33,8 @@
 #ifndef CONNECTION_MANAGER_H_
 #define CONNECTION_MANAGER_H_
 
+struct sockaddr;
+void connection_manager_handle_connection_request(int netfd, const struct sockaddr *addr, unsigned int length);
 
 
 #endif /* CONNECTION_MANAGER_H_ */

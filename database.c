@@ -39,6 +39,16 @@
 #include "logger.h"
 
 
+/* process data:
+ * process id, list state, process state, worker thread id, socket fd
+ *
+ * project data:
+ * project name, number of crashes during init phase
+ */
+
+
+
+
 static sqlite3 *dbhandler = NULL;
 
 /* transitional data. this will be deleted after the code change */

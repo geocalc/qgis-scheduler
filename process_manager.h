@@ -36,6 +36,7 @@
 
 
 void process_manager_process_died(pid_t pid);
+void process_manager_new_connection(int netfd);
 
 
 #endif /* PROCESS_MANAGER_H_ */
