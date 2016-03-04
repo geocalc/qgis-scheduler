@@ -34,6 +34,34 @@
 
 #include <sys/types.h>
 
+/* The livecycle of a process runs through these three lists.
+ * First the process gets initialized. In this list the process can not do
+ * useful work, so the processes in that list are not taken to answer web
+ * requests. The process may exit this list after the initialization phase with
+ * the state idle or by crashing. All existing (i.e. idle) processes exit this
+ * list to the active list.
+ *
+ * The second list (active list) is the work list. Processes in here answer
+ * requests from the web server, or they idle around. The process in here may
+ * exit this list with a request to shut down or by crashing. All existing
+ * (i.e. idle) processes exit this list to the shutdown list.
+ *
+ * The third list is the shutdown list. In this list the processes wont accept
+ * further work from the webserver, but the may end their current work if it is
+ * a long running task. As soon as the processes in this list get idle, they
+ * receive a shutdown signal (SIGTERM or SIGKILL).
+ *
+ * This enumeration describes the lists.
+ */
+enum process_list_e
+{
+    LIST_INIT,
+    LIST_ACTIVE,
+    LIST_SHUTDOWN
+};
+
+
+
 void db_init(void);
 void db_delete(void);
 
