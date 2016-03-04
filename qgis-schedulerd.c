@@ -136,6 +136,7 @@
 #include "timer.h"
 #include "qgis_shutdown_queue.h"
 #include "statistic.h"
+#include "database.h"
 
 
 //#include <sys/types.h>	// für open()
@@ -1213,6 +1214,8 @@ int main(int argc, char **argv)
 
     check_ressource_limits();
 
+    db_init();
+
     /* prepare inet socket connection for application server process (this)
      */
     {
@@ -1782,6 +1785,7 @@ int main(int argc, char **argv)
 	    remove_pid_file(pidfile);
 	}
     }
+    db_delete();
     config_shutdown();
     printlog("shut down %s", basename(argv[0]));
 
