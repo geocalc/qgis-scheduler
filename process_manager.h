@@ -32,6 +32,10 @@
 #ifndef PROCESS_MANAGER_H_
 #define PROCESS_MANAGER_H_
 
+#include <sys/types.h>
+
+
+void process_manager_process_died(pid_t pid);
 
 
 #endif /* PROCESS_MANAGER_H_ */

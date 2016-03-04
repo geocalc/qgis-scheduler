@@ -31,3 +31,21 @@
 
 
 #include "process_manager.h"
+
+#include "database.h"
+
+
+
+/* a child process died.
+ * this may happen because we cancelled its operation or
+ * the process died because of a bug or low memory or something else.
+ * Get the project this process was tasked for. If there is no project then the
+ * process was already scheduled to shut down or the process id did not belong
+ * to us. Either way in this case we don't need to take action.
+ * Else look for the number of idle processes and restart a new process if
+ * needed.
+ */
+void process_manager_process_died(pid_t pid)
+{
+    db_remove_process(pid);
+}
