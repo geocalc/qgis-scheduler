@@ -137,8 +137,8 @@ void db_delete(void)
 }
 
 
-void db_create_project(const char *projname);
-void db_create_process(const char *projname, pid_t pid);
+void db_add_project(const char *projname);
+void db_add_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
 
 
