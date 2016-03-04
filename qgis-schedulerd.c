@@ -563,7 +563,7 @@ void *thread_handle_connection(void *arg)
 
 	/* find the relevant project by name */
 	if (request_project_name)
-	    project = find_project_by_name(db_get_project_list(), request_project_name);
+	    project = find_project_by_name(db_get_active_project_list(), request_project_name);
 
     }
 
@@ -1153,7 +1153,7 @@ void *thread_start_project_processes(void *arg)
      * Then add this project to the global list
      */
     qgis_project_start_new_process_wait(num, project, 0);
-    qgis_proj_list_add_project(db_get_project_list(), project);
+    qgis_proj_list_add_project(db_get_active_project_list(), project);
 
 
     free(arg);
@@ -1460,7 +1460,7 @@ int main(int argc, char **argv)
 
 
     /* start the inotify watch module */
-    qgis_inotify_init(db_get_project_list());
+    qgis_inotify_init(db_get_active_project_list());
 
     /* start the process shutdown module */
     qgis_shutdown_init();
@@ -1765,7 +1765,7 @@ int main(int argc, char **argv)
     qgis_inotify_delete();
 
     /* move the processes from the working lists to the shutdown module */
-    qgis_proj_list_shutdown(db_get_project_list());
+    qgis_proj_list_shutdown(db_get_active_project_list());
 
 
     /* wait for the shutdown module so it has closed all its processes

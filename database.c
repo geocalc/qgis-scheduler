@@ -162,7 +162,7 @@ void db_remove_process(pid_t pid)
 }
 
 
-struct qgis_project_list_s *db_get_project_list(void)
+struct qgis_project_list_s *db_get_active_project_list(void)
 {
     return projectlist;
 }

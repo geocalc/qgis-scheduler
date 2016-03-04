@@ -76,7 +76,7 @@ void db_remove_process(pid_t pid);
 /* transitional interfaces. these are deleted after the api change */
 struct qgis_project_list_s;
 
-struct qgis_project_list_s *db_get_project_list(void);
+struct qgis_project_list_s *db_get_active_project_list(void);
 
 
 
