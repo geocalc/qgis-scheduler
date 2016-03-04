@@ -57,7 +57,9 @@ enum process_list_e
 {
     LIST_INIT,
     LIST_ACTIVE,
-    LIST_SHUTDOWN
+    LIST_SHUTDOWN,
+
+    LIST_SELECTOR_MAX	// last entry. do not use
 };
 
 
