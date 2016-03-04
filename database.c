@@ -140,6 +140,21 @@ void db_delete(void)
 void db_create_project(const char *projname);
 void db_create_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
+
+
+const char *db_get_project_for_this_process(pid_t pid)
+{
+    const char *ret = NULL;
+
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+
+    if (project)
+	ret = qgis_project_get_name(project);
+
+    return ret;
+}
+
+
 void db_remove_process(pid_t pid)
 {
     /* child process died, rearrange the project list */
