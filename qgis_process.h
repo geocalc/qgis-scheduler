@@ -49,7 +49,9 @@ enum qgis_process_state_e
     PROC_BUSY,		// process is busy with an fcgi request
     PROC_TERM,		// process received the term signal
     PROC_KILL,		// process received the kill signal
-    PROC_EXIT		// process is not existend anymore
+    PROC_EXIT,		// process is not existend anymore
+
+    PROC_STATE_MAX	// last entry. do not use
 };
 
 extern const struct timespec default_signal_timeout;
