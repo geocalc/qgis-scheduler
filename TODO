@@ -24,3 +24,5 @@
 
 + check startup time for a process and kill it (move proc item to shutdown module) if the startup time exceeds a value.
 
++ log if a process crashes during init phase, not during a time measure. If the process crashes too often during initialization it wont be started again until a new
+  process configuration (qgis config file) is stored.
