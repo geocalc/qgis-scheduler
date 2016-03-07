@@ -43,15 +43,17 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <fastcgi.h>
+#include <regex.h>
+#include <pthread.h>
 
 #include "database.h"
-#include "qgis_project_list.h"
 #include "logger.h"
 #include "timer.h"
 #include "fcgi_data.h"
 #include "fcgi_state.h"
 #include "qgis_config.h"
 #include "statistic.h"
+#include "project_manager.h"
 
 
 #define min(a,b) \
@@ -113,7 +115,6 @@ static void *thread_handle_connection(void *arg)
     assert(arg);
     struct thread_connection_handler_args *tinfo = arg;
     int inetsocketfd = tinfo->new_accepted_inet_fd;
-    struct qgis_process_s *proc = NULL;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
     const pthread_t thread_id = pthread_self();
@@ -172,12 +173,11 @@ static void *thread_handle_connection(void *arg)
      *       FCGI_CANT_MPX_CONN.
      */
     struct fcgi_data_list_s *datalist = fcgi_data_list_new();
-    struct qgis_project_s *project = NULL;
 
     /* here we do point 1, 2, 3, 4 */
+	const char *request_project_name = NULL;
     {
 
-	const char *request_project_name = NULL;
 
 	/* get the maximum read write socket buffer size */
 	int maxbufsize = default_max_transfer_buffer_size;
@@ -341,21 +341,12 @@ static void *thread_handle_connection(void *arg)
 //	fcgi_session_print(fcgi_session);
 	fcgi_session_delete(fcgi_session);
 
-
-	/* find the relevant project by name */
-	if (request_project_name)
-	    project = find_project_by_name(db_get_active_project_list(), request_project_name);
-
     }
 
 
-
-    struct qgis_process_list_s *proclist = NULL;
-
     /* here we do point 5 */
-    if (project)
+    if (request_project_name)
     {
-	proclist = qgis_project_get_process_list(project);
 
 	/* get the number of new started processes which then become idle
 	 * processes.
@@ -379,19 +370,19 @@ static void *thread_handle_connection(void *arg)
 	 * We get the correct number if we first count PROC_INIT and then
 	 * PROC_START, not the other way around.
 	 */
-	const char *projname = qgis_project_get_name(project);
+	const char *projname = request_project_name;
 	int min_free_processes = config_get_min_idle_processes(projname);
 
-	int proc_state_idle = qgis_process_list_get_num_process_by_status(proclist, PROC_IDLE);
-	int proc_state_init = qgis_process_list_get_num_process_by_status(proclist, PROC_INIT);
-	int proc_state_start = qgis_process_list_get_num_process_by_status(proclist, PROC_START);
+	int proc_state_idle = db_get_num_process_by_status(projname, PROC_STATE_IDLE);
+	int proc_state_init = db_get_num_process_by_status(projname, PROC_STATE_INIT);
+	int proc_state_start = db_get_num_process_by_status(projname, PROC_STATE_START);
 
 	int missing_processes = min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones and add them to the existing processes */
 	    debug(1, "not enough processes for project %s, start %d new process", projname, missing_processes);
-	    qgis_project_start_new_process_detached(missing_processes, project, 0);
+	    project_manager_start_new_process_detached(missing_processes, projname, 0);
 	}
     }
     else
@@ -402,20 +393,20 @@ static void *thread_handle_connection(void *arg)
     /* find the next idling process, set its state to BUSY and attach a thread to it.
      * try at most 5 seconds long to find an idle process */
     /* TODO: better use pthread_condition_signal with timeout */
-    if (proclist)
+    pid_t mypid;
     {
 	int i;
 	for (i=0; i<=max_wait_for_idle_process; i++)
 	{
-	    proc = qgis_process_list_find_idle_return_busy(proclist);
-	    if (proc || i>=max_wait_for_idle_process)
+	    mypid = db_get_next_idle_process_for_work(request_project_name);
+	    if (mypid>=0 || i>=max_wait_for_idle_process)
 		break;
 	    else
 		sleep(1);
 	}
     }
 
-    if ( !proc )
+    if ( mypid<0 )
     {
 	/* Found no idle processes.
 	 * What now?
@@ -485,8 +476,8 @@ static void *thread_handle_connection(void *arg)
     {
 
 	{
-	    pid_t pid = qgis_process_get_pid(proc);
-	    const char *projname = qgis_project_get_name(project);
+	    pid_t pid = mypid;
+	    const char *projname = request_project_name;
 	    printlog("[%lu] Use process %d to handle request for %s, project %s", thread_id, pid, tinfo->hostname, projname );
 	}
 
@@ -545,7 +536,7 @@ static void *thread_handle_connection(void *arg)
 	/* get the address of the socket transferred to the child process,
 	 * then connect to it.
 	 */
-	childunixsocketfd = qgis_process_get_socketfd(proc);	// refers to the socket the child process accept()s from
+	childunixsocketfd = db_get_process_socket(mypid);//qgis_process_get_socketfd(proc);	// refers to the socket the child process accept()s from
 	retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
@@ -794,22 +785,8 @@ static void *thread_handle_connection(void *arg)
 	debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
 	free(buffer);
 
-	pthread_mutex_t *mutex = qgis_process_get_mutex(proc);
-	retval = pthread_mutex_lock(mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire mutex");
-	    exit(EXIT_FAILURE);
-	}
-	qgis_process_set_state_idle(proc);
-	retval = pthread_mutex_unlock(mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock mutex");
-	    exit(EXIT_FAILURE);
-	}
+	db_process_set_state_idle(mypid);
+
     }
 //    close(debugfd);
 
