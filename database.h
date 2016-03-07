@@ -34,6 +34,20 @@
 
 #include <sys/types.h>
 
+
+enum db_process_state_e
+{
+    PROC_STATE_START = 0,	// process has started and needs to be initialized
+    PROC_STATE_INIT,		// process gets initialized
+    PROC_STATE_IDLE,		// process is initialized and ready to work
+    PROC_STATE_BUSY,		// process is busy with an fcgi request
+    PROC_STATE_TERM,		// process received the term signal
+    PROC_STATE_KILL,		// process received the kill signal
+    PROC_STATE_EXIT,		// process is not existend anymore
+
+    PROCESS_STATE_MAX	// last entry. do not use
+};
+
 /* The livecycle of a process runs through these three lists.
  * First the process gets initialized. In this list the process can not do
  * useful work, so the processes in that list are not taken to answer web
@@ -44,7 +58,7 @@
  * The second list (active list) is the work list. Processes in here answer
  * requests from the web server, or they idle around. The process in here may
  * exit this list with a request to shut down or by crashing. All existing
- * (i.e. idle) processes exit this list to the shutdown list.
+ * (i.e. not killed) processes exit this list to the shutdown list.
  *
  * The third list is the shutdown list. In this list the processes wont accept
  * further work from the webserver, but the may end their current work if it is
@@ -53,7 +67,7 @@
  *
  * This enumeration describes the lists.
  */
-enum process_list_e
+enum db_process_list_e
 {
     LIST_INIT,
     LIST_ACTIVE,
@@ -73,7 +87,11 @@ void db_add_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
 const char *db_get_project_for_this_process(pid_t pid);
 void db_remove_process(pid_t pid);
-
+pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state);
+pid_t db_get_next_idle_process_for_work(const char *projname);
+int db_get_process_socket(pid_t pid);
+int db_process_set_state_idle(pid_t pid);
+int db_get_num_process_by_status(const char *projname, enum db_process_state_e state);
 
 /* transitional interfaces. these are deleted after the api change */
 struct qgis_project_list_s;

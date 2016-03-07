@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <sqlite3.h>
 #include <pthread.h>
+#include <assert.h>
 
 #include "logger.h"
 
@@ -58,6 +59,16 @@ struct qgis_project_list_s *projectlist = NULL;
 
 
 
+
+enum qgis_process_state_e db_state_to_qgis_state(enum db_process_state_e state)
+{
+    return (enum qgis_process_state_e)state;
+}
+
+enum db_process_state_e qgis_state_to_db_state(enum qgis_process_state_e state)
+{
+    return (enum db_process_state_e)state;
+}
 
 
 /* called by sqlite3 function sqlite3_log()
@@ -169,6 +180,109 @@ void db_remove_process(pid_t pid)
 {
     /* child process died, rearrange the project list */
     qgis_proj_list_process_died(projectlist, pid);
+}
+
+
+/* find a process in a certain list with a distinct state
+ * Note:
+ * Using the pid as key index value may create problems, if a process dies
+ * and another process gets the same pid.
+ * This should be handled by the manager which evaluates the SIGCHLD signal.
+ */
+pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
+{
+    pid_t ret = -1;
+
+    assert(state < PROCESS_STATE_MAX);
+    assert(list < LIST_SELECTOR_MAX);
+
+    struct qgis_project_list_s *projlist = NULL;
+    switch (list)
+    {
+    case LIST_INIT:
+    case LIST_ACTIVE:
+    {
+	projlist = projectlist;
+	assert(projname);
+	struct qgis_project_s *project = find_project_by_name(projlist, projname);
+	if (project)
+	{
+	    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+	    struct qgis_process_s *proc = qgis_process_list_mutex_find_process_by_status(proclist, state);
+	    if (proc)
+		ret = qgis_process_get_pid(proc);
+	}
+	break;
+    }
+    case LIST_SHUTDOWN:
+#warning need to move shutdown list from shutdown module
+	break;
+
+    default:
+	printlog("error: wrong list entry found %d", list);
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+pid_t db_get_next_idle_process_for_work(const char *projname)
+{
+    pid_t ret = -1;
+
+    assert(projname);
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    if (project)
+    {
+	struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+	struct qgis_process_s *proc = qgis_process_list_find_idle_return_busy(proclist);
+	if (proc)
+	    ret = qgis_process_get_pid(proc);
+    }
+
+    return ret;
+}
+
+
+int db_get_process_socket(pid_t pid)
+{
+    int ret = -1;
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+    if (proc)
+	ret = qgis_process_get_socketfd(proc);
+
+    return ret;
+}
+
+
+int db_process_set_state_idle(pid_t pid)
+{
+    int ret = -1;
+
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+    if (proc)
+	ret = qgis_process_set_state_idle(proc);
+
+    return ret;
+}
+
+
+int db_get_num_process_by_status(const char *projname, enum db_process_state_e state)
+{
+    assert(projname);
+    assert(state < PROCESS_STATE_MAX);
+
+    int ret = -1;
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+    ret = qgis_process_list_get_num_process_by_status(proc_list, state);
+
+    return ret;
 }
 
 
