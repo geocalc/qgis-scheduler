@@ -31,3 +31,14 @@
 
 #include "project_manager.h"
 
+#include "database.h"
+#include "qgis_project_list.h"
+
+
+void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes)
+{
+    struct qgis_project_s *project = find_project_by_name(db_get_active_project_list(), projectname);
+
+    qgis_project_start_new_process_detached(num, project, do_exchange_processes);
+
+}
