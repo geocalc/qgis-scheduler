@@ -32,6 +32,7 @@
 #ifndef PROJECT_MANAGER_H_
 #define PROJECT_MANAGER_H_
 
+void project_manager_startup_projects(void);
 
 void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes);
 

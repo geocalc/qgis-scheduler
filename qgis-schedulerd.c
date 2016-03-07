@@ -124,7 +124,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#include "qgis_project_list.h"
+//#include "qgis_project_list.h"
 //#include "qgis_project.h"
 //#include "qgis_process.h"
 //#include "qgis_process_list.h"
@@ -138,6 +138,7 @@
 #include "statistic.h"
 #include "database.h"
 #include "process_manager.h"
+#include "project_manager.h"
 #include "connection_manager.h"
 
 
@@ -358,34 +359,6 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     }
 }
 
-
-struct thread_start_project_processes_args
-{
-    struct qgis_project_s *project;
-    int num;
-};
-
-void *thread_start_project_processes(void *arg)
-{
-    assert(arg);
-    struct thread_start_project_processes_args *targ = arg;
-    struct qgis_project_s *project = targ->project;
-    int num = targ->num;
-
-    assert(project);
-    assert(num >= 0);
-
-    /* start "num" processes for this project and wait for them to finish
-     * its initialization.
-     * Then add this project to the global list
-     */
-    qgis_project_start_new_process_wait(num, project, 0);
-    qgis_proj_list_add_project(db_get_active_project_list(), project);
-
-
-    free(arg);
-    return NULL;
-}
 
 
 
@@ -693,61 +666,7 @@ int main(int argc, char **argv)
     qgis_shutdown_init();
 
     /* start the child processes */
-    {
-	/* do for every project:
-	 * (TODO) check every project for correct configured settings.
-	 * Start a thread for every project, which in turn starts multiple
-	 *  child processes in parallel.
-	 * Wait for the project threads to finish.
-	 * After that we accept network connections.
-	 */
-
-	int num_proj = config_get_num_projects();
-	{
-	    pthread_t threads[num_proj];
-	    int i;
-	    for (i=0; i<num_proj; i++)
-	    {
-		const char *projname = config_get_name_project(i);
-		debug(1, "found project '%s'. Startup child processes", projname);
-
-		const char *configpath = config_get_project_config_path(projname);
-		struct qgis_project_s *project = qgis_project_new(projname, configpath);
-
-		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
-
-
-		struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
-		assert(targs);
-		if ( !targs )
-		{
-		    logerror("could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-		targs->project = project;
-		targs->num = nr_of_childs_during_startup;
-
-		retval = pthread_create(&threads[i], NULL, thread_start_project_processes, targs);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error creating thread");
-		    exit(EXIT_FAILURE);
-		}
-	    }
-
-	    for (i=0; i<num_proj; i++)
-	    {
-		retval = pthread_join(threads[i], NULL);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error joining thread");
-		    exit(EXIT_FAILURE);
-		}
-	    }
-	}
-    }
+    project_manager_startup_projects();
 
 
 
