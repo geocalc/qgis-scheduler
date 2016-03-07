@@ -135,6 +135,13 @@ void db_init(void)
 }
 
 
+void db_shutdown(void)
+{
+    /* move the processes from the working lists to the shutdown module */
+    qgis_proj_list_shutdown(db_get_active_project_list());
+}
+
+
 void db_delete(void)
 {
     /* remove the projects */

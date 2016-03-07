@@ -866,9 +866,7 @@ int main(int argc, char **argv)
      */
     qgis_inotify_delete();
 
-    /* move the processes from the working lists to the shutdown module */
-    qgis_proj_list_shutdown(db_get_active_project_list());
-
+    db_shutdown();
 
     /* wait for the shutdown module so it has closed all its processes
      * Then clean up the module */
