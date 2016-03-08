@@ -311,8 +311,12 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     case SIGCHLD:
 	/* got a child signal. Additionally
 	 * call the shutdown handler, maybe it knows what to do with this
+	 * TODO: doing a 2 channel approach is no good design. Try to get this
+	 *       solved using the pipe until the very end.
 	 */
-	qgis_shutdown_process_died(info->si_pid);
+//	if ( get_program_shutdown() )
+//	    qgis_shutdown_process_died(info->si_pid);
+	process_manager_process_died(info->si_pid);
 	// no break
 
     case SIGUSR1:	// fall through
@@ -751,7 +755,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-			process_manager_process_died(sigdata.pid);
+//			process_manager_process_died(sigdata.pid);
 			break;
 		    }
 		    case SIGUSR1:
