@@ -124,10 +124,6 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-//#include "qgis_project_list.h"
-//#include "qgis_project.h"
-//#include "qgis_process.h"
-//#include "qgis_process_list.h"
 #include "fcgi_state.h"
 #include "fcgi_data.h"
 #include "qgis_config.h"
