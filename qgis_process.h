@@ -54,7 +54,6 @@ enum qgis_process_state_e
     PROC_STATE_MAX	// last entry. do not use
 };
 
-extern const struct timespec default_signal_timeout;
 
 const char *get_state_str(enum qgis_process_state_e state);
 

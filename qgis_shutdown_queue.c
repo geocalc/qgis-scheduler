@@ -40,6 +40,7 @@
 #include "qgis_process_list.h"
 #include "logger.h"
 #include "timer.h"
+#include "qgis_config.h"
 
 #define UNUSED_PARAMETER(x)	((void)(x))
 

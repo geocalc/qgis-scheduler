@@ -33,6 +33,8 @@
 
 #include <time.h>
 
+extern const struct timespec default_signal_timeout;
+
 int config_load(const char *path);
 void config_shutdown(void);
 int config_get_num_projects(void);

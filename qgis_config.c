@@ -98,9 +98,18 @@
 
 #define INVALID_STRING	((char *)-1)
 
+/* Default time to wait between sending SIGTERM and SIGKILL */
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
 
 
 
+
+const struct timespec default_signal_timeout =
+{
+	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
+	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
+};
 
 
 

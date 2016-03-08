@@ -43,11 +43,7 @@
 
 #include "logger.h"
 #include "timer.h"
-
-
-/* Default time to wait between sending SIGTERM and SIGKILL */
-#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
-#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
+#include "qgis_config.h"
 
 
 
@@ -63,12 +59,6 @@ struct qgis_process_s
     struct timespec signaltime;	// stored time of last signal send to this process
 };
 
-
-const struct timespec default_signal_timeout =
-{
-	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
-	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
-};
 
 
 
