@@ -258,6 +258,27 @@ pid_t db_get_next_idle_process_for_work(const char *projname)
 }
 
 
+/* return 0 if the pid is not in any of the process lists, 1 otherwise */
+int db_has_process(pid_t pid)
+{
+    int ret = 0;
+
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    if (project)
+    {
+	ret = 1;
+    }
+    else
+    {
+	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
+	if (proc)
+	    ret = 1;
+    }
+
+    return ret;
+}
+
+
 int db_get_process_socket(pid_t pid)
 {
     int ret = -1;
@@ -438,6 +459,40 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 }
 
 
+enum db_process_list_e db_get_process_list(pid_t pid)
+{
+    enum db_process_list_e ret = LIST_SELECTOR_MAX;
+    struct qgis_process_s *proc = NULL;
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    if (project)
+    {
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
+	assert(proc_list);
+	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	if (proc)
+	{
+	    ret = LIST_ACTIVE;
+	}
+	else
+	{
+	    proc_list = qgis_project_get_init_process_list(project);
+	    assert(proc_list);
+	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	    if (proc)
+		ret = LIST_INIT;
+	}
+    }
+    else
+    {
+	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
+	if (proc)
+	    ret = LIST_SHUTDOWN;
+    }
+
+    return ret;
+}
+
+
 /* returns the next process (pid) which needs to be worked on.
  * This could be
  * (1) a process which is transferred from busy to idle state and needs a TERM signal
@@ -499,6 +554,33 @@ int db_remove_process_with_state_exit(void)
     int retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
 
     return retval;
+}
+
+
+void db_inc_startup_failures(const char *projname)
+{
+    assert(projname);
+
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    if (project)
+    {
+	qgis_project_inc_nr_crashes(project);
+    }
+}
+
+
+int db_get_startup_failures(const char *projname)
+{
+    assert(projname);
+
+    int ret = -1;
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    if (project)
+    {
+	ret = qgis_project_get_nr_crashes(project);
+    }
+
+    return ret;
 }
 
 
