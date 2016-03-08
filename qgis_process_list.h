@@ -67,6 +67,7 @@ void qgis_process_list_get_min_signaltimer(struct qgis_process_list_s *list, str
 
 void qgis_process_list_print(struct qgis_process_list_s *list);
 
+struct qgis_process_s *get_next_shutdown_proc(struct qgis_process_list_s *list);
 
 #endif /* QGIS_PROCESS_LIST_H_ */
 

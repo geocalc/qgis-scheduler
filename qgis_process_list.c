@@ -331,6 +331,59 @@ int qgis_process_list_transfer_all_process_with_state(struct qgis_process_list_s
 }
 
 
+void qgis_process_list_transfer_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist, const struct qgis_process_s *proc)
+{
+    assert(tolist);
+    assert(fromlist);
+    if (fromlist && tolist)
+    {
+	struct qgis_process_iterator *np;
+
+	int retval = pthread_rwlock_wrlock(&fromlist->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+	retval = pthread_rwlock_wrlock(&tolist->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &fromlist->head, entries)
+	{
+	    const struct qgis_process_s *myproc = np->proc;
+	    if (proc == myproc)
+	    {
+		LIST_REMOVE(np, entries);
+		LIST_INSERT_HEAD(&tolist->head, np, entries);
+		break;
+	    }
+	}
+
+	retval = pthread_rwlock_unlock(&tolist->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+	retval = pthread_rwlock_unlock(&fromlist->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+    }
+}
+
+
 int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, struct qgis_process_list_s *fromlist)
 {
     int ret = 0;
@@ -1019,6 +1072,85 @@ void qgis_process_list_print(struct qgis_process_list_s *list)
 	    exit(EXIT_FAILURE);
 	}
     }
+}
+
+
+/* returns the next process which had received a signal some "timeout" ago
+ * or never received a signal
+ */
+struct qgis_process_s *get_next_shutdown_proc(struct qgis_process_list_s *list)
+{
+    struct qgis_process_s *ret = NULL;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_process_iterator *np;
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &list->head, entries)
+	{
+	    struct qgis_process_s *proc = np->proc;
+	    enum qgis_process_state_e state = qgis_process_get_state(proc);
+	    switch (state)
+	    {
+	    case PROC_IDLE:
+	    //case PROC_EXIT:
+	    {
+		    ret = proc;
+		    goto list_end;
+	    }
+	    case PROC_TERM:
+	    case PROC_KILL:
+	    {
+		const struct timespec *tm = qgis_process_get_signaltime(proc);
+		if (qgis_timer_is_empty(tm))
+		{
+		    /* this process never received a signal?? return this process */
+		    ret = proc;
+		    goto list_end;
+		}
+		struct timespec tmsub;
+		retval = qgis_timer_sub(tm, &tmsub);
+		if (-1 == retval)
+		{
+		    logerror("error getting time");
+		    exit(EXIT_FAILURE);
+		}
+		    static const struct timespec ts_timeout = {
+			    tv_sec: 10,
+			    tv_nsec: 0
+		    };
+		retval = qgis_timer_isgreaterthan(&tmsub, &ts_timeout);
+		if (retval)
+		{
+		    ret = proc;
+		    goto list_end;
+		}
+		break;
+	    }
+	    default:
+		break;
+	    }
+	}
+	list_end:
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return ret;
 }
 
 
