@@ -40,6 +40,8 @@ enum db_process_state_e
     PROC_STATE_START = 0,	// process has started and needs to be initialized
     PROC_STATE_INIT,		// process gets initialized
     PROC_STATE_IDLE,		// process is initialized and ready to work
+    PROC_STATE_OPEN_IDLE,// deprecated! do not use. TODO: remove this item
+
     PROC_STATE_BUSY,		// process is busy with an fcgi request
     PROC_STATE_TERM,		// process received the term signal
     PROC_STATE_KILL,		// process received the kill signal
