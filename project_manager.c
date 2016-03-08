@@ -62,8 +62,8 @@ void *thread_start_project_processes(void *arg)
      * its initialization.
      * Then add this project to the global list
      */
-    qgis_project_start_new_process_wait(num, project, 0);
     qgis_proj_list_add_project(db_get_active_project_list(), project);
+    qgis_project_start_new_process_wait(num, project, 0);
 
 
     free(arg);
