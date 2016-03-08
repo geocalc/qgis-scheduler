@@ -40,7 +40,7 @@ struct qgis_process_list_s;
 
 void qgis_shutdown_init(void);
 void qgis_shutdown_delete(void);
-void qgis_shutdown_add_process(struct qgis_process_s *proc);
+void qgis_shutdown_add_process(pid_t pid);
 void qgis_shutdown_add_process_list(struct qgis_process_list_s *list);
 void qgis_shutdown_wait_empty(void);
 void qgis_shutdown_process_died(pid_t pid);
