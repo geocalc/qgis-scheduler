@@ -1016,6 +1016,20 @@ void qgis_project_shutdown(struct qgis_project_s *proj)
 }
 
 
+struct qgis_process_list_s *qgis_project_get_init_process_list(struct qgis_project_s *proj)
+{
+    struct qgis_process_list_s *list = NULL;
+
+    assert(proj);
+    if (proj)
+    {
+	list = proj->initproclist;
+    }
+
+    return list;
+}
+
+
 struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj)
 {
     struct qgis_process_list_s *list = NULL;
@@ -1054,6 +1068,30 @@ void qgis_project_print(struct qgis_project_s *proj)
 	debug(1, "project %s, active process list", proj->name);
 	qgis_process_list_print(proj->activeproclist);
     }
+}
+
+
+void qgis_project_inc_nr_crashes(struct qgis_project_s *proj)
+{
+    assert(proj);
+    if (proj)
+    {
+	proj->nr_crashes++;
+    }
+}
+
+
+int qgis_project_get_nr_crashes(struct qgis_project_s *proj)
+{
+    int ret = -1;
+
+    assert(proj);
+    if (proj)
+    {
+	ret = proj->nr_crashes;
+    }
+
+    return ret;
 }
 
 

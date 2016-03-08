@@ -48,6 +48,7 @@ void qgis_project_delete(struct qgis_project_s *proj);
 
 
 regex_t *qgis_project_get_regex(struct qgis_project_s *proj);
+struct qgis_process_list_s *qgis_project_get_init_process_list(struct qgis_project_s *proj);
 struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj);
 const char *qgis_project_get_name(struct qgis_project_s *proj);
 int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
@@ -62,5 +63,7 @@ int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, in
 
 void qgis_project_print(struct qgis_project_s *proj);
 
+void qgis_project_inc_nr_crashes(struct qgis_project_s *proj);
+int qgis_project_get_nr_crashes(struct qgis_project_s *proj);
 
 #endif /* QGIS_PROJECT_H_ */
