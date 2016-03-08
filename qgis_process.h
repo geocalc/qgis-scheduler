@@ -65,13 +65,16 @@ int qgis_process_set_state_idle(struct qgis_process_s *proc);
 int qgis_process_set_state_busy(struct qgis_process_s *proc, pthread_t thread_id);
 //int qgis_process_set_state_idle_open(struct qgis_process_s *proc);
 int qgis_process_set_state_init(struct qgis_process_s *proc, pthread_t thread_id);
+int qgis_process_set_state_exit(struct qgis_process_s *proc);
 enum qgis_process_state_e qgis_process_get_state(struct qgis_process_s *proc);
+int qgis_process_set_state(struct qgis_process_s *proc, enum qgis_process_state_e);
 
 int qgis_process_get_socketfd(struct qgis_process_s *proc);
 pthread_mutex_t *qgis_process_get_mutex(struct qgis_process_s *proc);
 pid_t qgis_process_get_pid(struct qgis_process_s *proc);
 const struct timespec *qgis_process_get_starttime(struct qgis_process_s *proc);
 const struct timespec *qgis_process_get_signaltime(struct qgis_process_s *proc);
+int qgis_process_reset_signaltime(struct qgis_process_s *proc);
 void qgis_process_signal_shutdown(struct qgis_process_s *proc);
 
 void qgis_process_print(struct qgis_process_s *proc);
