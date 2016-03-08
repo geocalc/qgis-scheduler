@@ -78,7 +78,7 @@ enum db_process_list_e
     LIST_SELECTOR_MAX	// last entry. do not use
 };
 
-
+struct timespec;
 
 void db_init(void);
 void db_shutdown(void);
@@ -93,13 +93,25 @@ void db_remove_process(pid_t pid);
 pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state);
 pid_t db_get_next_idle_process_for_work(const char *projname);
 int db_get_process_socket(pid_t pid);
+enum db_process_state_e db_get_process_state(pid_t pid);
 int db_process_set_state_idle(pid_t pid);
+int db_process_set_state_exit(pid_t pid);
+int db_process_set_state(pid_t pid, enum db_process_state_e state);
 int db_get_num_process_by_status(const char *projname, enum db_process_state_e state);
+void db_move_process_to_list(enum db_process_list_e list, pid_t pid);
+pid_t db_get_shutdown_process_in_timeout(void);
+int db_reset_signal_timer(pid_t pid);
+void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval);
+int db_get_num_shutdown_processes(void);
+int db_remove_process_with_state_exit(void);
+
 
 /* transitional interfaces. these are deleted after the api change */
 struct qgis_project_list_s;
+struct qgis_process_list_s;
 
 struct qgis_project_list_s *db_get_active_project_list(void);
+int db_move_list_to_shutdown(struct qgis_process_list_s *list);
 
 
 
