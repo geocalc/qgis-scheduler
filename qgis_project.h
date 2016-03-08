@@ -48,7 +48,7 @@ void qgis_project_delete(struct qgis_project_s *proj);
 
 
 regex_t *qgis_project_get_regex(struct qgis_project_s *proj);
-struct qgis_process_list_s *qgis_project_get_process_list(struct qgis_project_s *proj);
+struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj);
 const char *qgis_project_get_name(struct qgis_project_s *proj);
 int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
 //int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc);

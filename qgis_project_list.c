@@ -238,7 +238,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
-	    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(myproj);
+	    struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(myproj);
 	    if (proc_list)
 	    {
 		// iterate through the list to find the relevant process

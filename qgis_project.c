@@ -1016,7 +1016,7 @@ void qgis_project_shutdown(struct qgis_project_s *proj)
 }
 
 
-struct qgis_process_list_s *qgis_project_get_process_list(struct qgis_project_s *proj)
+struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj)
 {
     struct qgis_process_list_s *list = NULL;
 
