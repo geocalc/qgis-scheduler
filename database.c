@@ -218,7 +218,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 	struct qgis_project_s *project = find_project_by_name(projlist, projname);
 	if (project)
 	{
-	    struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+	    struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
 	    assert(proclist);
 	    struct qgis_process_s *proc = qgis_process_list_mutex_find_process_by_status(proclist, state);
 	    if (proc)
@@ -247,7 +247,7 @@ pid_t db_get_next_idle_process_for_work(const char *projname)
     struct qgis_project_s *project = find_project_by_name(projectlist, projname);
     if (project)
     {
-	struct qgis_process_list_s *proclist = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
 	assert(proclist);
 	struct qgis_process_s *proc = qgis_process_list_find_idle_return_busy(proclist);
 	if (proc)
@@ -264,7 +264,7 @@ int db_get_process_socket(pid_t pid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
 	if (proc)
@@ -282,7 +282,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
     }
@@ -304,7 +304,7 @@ int db_process_set_state_idle(pid_t pid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
     }
@@ -326,7 +326,7 @@ int db_process_set_state_exit(pid_t pid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
     }
@@ -348,7 +348,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
     }
@@ -372,7 +372,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     struct qgis_project_s *project = find_project_by_name(projectlist, projname);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	ret = qgis_process_list_get_num_process_by_status(proc_list, state);
     }
@@ -414,7 +414,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 	struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
 	if (project)
 	{
-	    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	    struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
 	    if (!proc)
 	    {
@@ -465,7 +465,7 @@ int db_reset_signal_timer(pid_t pid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
     {
-	struct qgis_process_list_s *proc_list = qgis_project_get_process_list(project);
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
     }
