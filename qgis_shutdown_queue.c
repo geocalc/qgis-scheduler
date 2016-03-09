@@ -315,13 +315,19 @@ void qgis_shutdown_delete()
  */
 void qgis_shutdown_add_process(pid_t pid)
 {
-    assert(!do_shutdown_thread);
+    /* during shutdown sequence there may arrive a signal SIGCHLD from the
+     * signal handler after we successfully did shut down this module.
+     * Be a bit more relaxed during shutdown sequence.
+     */
+    int retval = get_program_shutdown();
+    if (!retval)
+	assert(!do_shutdown_thread);
 
     db_move_process_to_list(LIST_SHUTDOWN, pid);
 
     debug(1, "add one process to shutdown list");
 
-    int retval = pthread_mutex_lock(&shutdownmutex);
+    retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
