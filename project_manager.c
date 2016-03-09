@@ -50,26 +50,26 @@
 
 struct thread_start_project_processes_args
 {
-    struct qgis_project_s *project;
+    const char *project_name;
     int num;
 };
 
 
-void *project_manager_thread_start_project_processes(void *arg)
+static void *project_manager_thread_start_project_processes(void *arg)
 {
     assert(arg);
     struct thread_start_project_processes_args *targ = arg;
-    struct qgis_project_s *project = targ->project;
+    const char *projname = targ->project_name;
     int num = targ->num;
 
-    assert(project);
+    assert(projname);
     assert(num >= 0);
 
     /* start "num" processes for this project and wait for them to finish
      * its initialization.
      * Then add this project to the global list
      */
-    qgis_proj_list_add_project(db_get_active_project_list(), project);
+    struct qgis_project_s *project = db_get_project(projname);
     process_manager_start_new_process_wait(num, project, 0);
 
 
@@ -81,59 +81,59 @@ void *project_manager_thread_start_project_processes(void *arg)
 void project_manager_startup_projects(void)
 {
     int retval;
-	/* do for every project:
-	 * (TODO) check every project for correct configured settings.
-	 * Start a thread for every project, which in turn starts multiple
-	 *  child processes in parallel.
-	 * Wait for the project threads to finish.
-	 * After that we accept network connections.
-	 */
+    /* do for every project:
+     * (TODO) check every project for correct configured settings.
+     * Start a thread for every project, which in turn starts multiple
+     *  child processes in parallel.
+     * Wait for the project threads to finish.
+     * After that we accept network connections.
+     */
 
-	int num_proj = config_get_num_projects();
+    int num_proj = config_get_num_projects();
+    {
+	pthread_t threads[num_proj];
+	int i;
+	for (i=0; i<num_proj; i++)
 	{
-	    pthread_t threads[num_proj];
-	    int i;
-	    for (i=0; i<num_proj; i++)
+	    const char *projname = config_get_name_project(i);
+	    debug(1, "found project '%s'. Startup child processes", projname);
+
+	    const char *configpath = config_get_project_config_path(projname);
+	    db_add_project(projname, configpath);
+
+	    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
+
+
+	    struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
+	    assert(targs);
+	    if ( !targs )
 	    {
-		const char *projname = config_get_name_project(i);
-		debug(1, "found project '%s'. Startup child processes", projname);
-
-		const char *configpath = config_get_project_config_path(projname);
-		struct qgis_project_s *project = qgis_project_new(projname, configpath);
-
-		int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
-
-
-		struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
-		assert(targs);
-		if ( !targs )
-		{
-		    logerror("could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-		targs->project = project;
-		targs->num = nr_of_childs_during_startup;
-
-		retval = pthread_create(&threads[i], NULL, project_manager_thread_start_project_processes, targs);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error creating thread");
-		    exit(EXIT_FAILURE);
-		}
+		logerror("could not allocate memory");
+		exit(EXIT_FAILURE);
 	    }
+	    targs->project_name = projname;
+	    targs->num = nr_of_childs_during_startup;
 
-	    for (i=0; i<num_proj; i++)
+	    retval = pthread_create(&threads[i], NULL, project_manager_thread_start_project_processes, targs);
+	    if (retval)
 	    {
-		retval = pthread_join(threads[i], NULL);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("error joining thread");
-		    exit(EXIT_FAILURE);
-		}
+		errno = retval;
+		logerror("error creating thread");
+		exit(EXIT_FAILURE);
 	    }
 	}
+
+	for (i=0; i<num_proj; i++)
+	{
+	    retval = pthread_join(threads[i], NULL);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error joining thread");
+		exit(EXIT_FAILURE);
+	    }
+	}
+    }
 }
 
 
