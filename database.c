@@ -312,7 +312,19 @@ int db_get_process_socket(pid_t pid)
 	assert(proc_list);
 	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
 	if (proc)
+	{
 	    ret = qgis_process_get_socketfd(proc);
+	}
+	else
+	{
+	    proc_list = qgis_project_get_init_process_list(project);
+	    assert(proc_list);
+	    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	    if (proc)
+	    {
+		ret = qgis_process_get_socketfd(proc);
+	    }
+	}
     }
 
     return ret;
