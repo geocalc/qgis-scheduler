@@ -307,6 +307,15 @@ void qgis_shutdown_init()
 
 void qgis_shutdown_delete()
 {
+    assert(shutdownthread);
+    int retval = pthread_join(shutdownthread, NULL);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error joining thread");
+	exit(EXIT_FAILURE);
+    }
+    shutdownthread = 0;
 }
 
 
@@ -417,17 +426,6 @@ void qgis_shutdown_wait_empty(void)
 	logerror("error: can not unlock mutex");
 	exit(EXIT_FAILURE);
     }
-
-
-    assert(shutdownthread);
-    retval = pthread_join(shutdownthread, NULL);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error joining thread");
-	exit(EXIT_FAILURE);
-    }
-    shutdownthread = 0;
 }
 
 
