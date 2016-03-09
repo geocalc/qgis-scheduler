@@ -241,10 +241,6 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	{
 	    struct qgis_project_s *myproj = np->proj;
 	    struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(myproj);
-	    if (!proc_list)
-	    {
-		proc_list = qgis_project_get_init_process_list(myproj);
-	    }
 	    if (proc_list)
 	    {
 		// iterate through the list to find the relevant process
@@ -256,6 +252,24 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 		     */
 		    proj = myproj;
 		    break;
+		}
+	    }
+	    if (!proj)
+	    {
+		/* not found in active list, try the init list */
+		proc_list = qgis_project_get_init_process_list(myproj);
+		if (proc_list)
+		{
+		    // iterate through the list to find the relevant process
+		    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+		    if (proc)
+		    {
+			/* proc is not NULL, we found the process item.
+			 * return the project which owns this process
+			 */
+			proj = myproj;
+			break;
+		    }
 		}
 	    }
 	}
