@@ -169,7 +169,16 @@ void db_delete(void)
 }
 
 
-//void db_add_project(const char *projname);
+void db_add_project(const char *projname, const char *configpath)
+{
+    assert(projname);
+    assert(configpath);
+
+    struct qgis_project_s *project = qgis_project_new(projname, configpath);
+    qgis_proj_list_add_project(db_get_active_project_list(), project);
+
+}
+
 //void db_add_process(const char *projname, pid_t pid);
 //int db_get_num_idle_process(const char *projname);
 
@@ -595,6 +604,17 @@ int db_move_list_to_shutdown(struct qgis_process_list_s *list)
     assert(list);
 
     int ret = qgis_process_list_transfer_all_process( shutdownlist, list );
+
+    return ret;
+}
+
+
+struct qgis_project_s *db_get_project(const char *project_name)
+{
+    assert(project_name);
+    assert(projectlist);
+
+    struct qgis_project_s *ret = find_project_by_name(projectlist, project_name);
 
     return ret;
 }

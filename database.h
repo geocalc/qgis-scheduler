@@ -85,7 +85,7 @@ void db_shutdown(void);
 void db_delete(void);
 
 
-void db_add_project(const char *projname);
+void db_add_project(const char *projname, const char *configpath);
 void db_add_process(const char *projname, pid_t pid);
 int db_get_num_idle_process(const char *projname);
 const char *db_get_project_for_this_process(pid_t pid);
@@ -112,10 +112,11 @@ int db_get_startup_failures(const char *projname);
 /* transitional interfaces. these are deleted after the api change */
 struct qgis_project_list_s;
 struct qgis_process_list_s;
+struct qgis_project_s;
 
 struct qgis_project_list_s *db_get_active_project_list(void);
 int db_move_list_to_shutdown(struct qgis_process_list_s *list);
-
+struct qgis_project_s *db_get_project(const char *project_name);
 
 
 #endif /* DATABASE_H_ */
