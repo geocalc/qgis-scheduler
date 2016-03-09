@@ -91,7 +91,7 @@ static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 
-static void qgis_project_thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
+static void process_manager_thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
 {
     assert(tinfo);
     struct qgis_process_s *childproc = tinfo->proc;
@@ -353,7 +353,7 @@ static void qgis_project_thread_function_init_new_child(struct thread_init_new_c
 
 
 
-static struct qgis_process_s *qgis_project_thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
+static struct qgis_process_s *process_manager_thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
 {
     assert(tinfo);
     struct qgis_project_s *project = tinfo->project;
@@ -554,7 +554,7 @@ static struct qgis_process_s *qgis_project_thread_function_start_new_child(struc
     return NULL;
 }
 
-static void *qgis_project_thread_start_new_child(void *arg)
+static void *process_manager_thread_start_new_child(void *arg)
 {
     assert(arg);
     struct thread_start_new_child_args *tinfo = arg;
@@ -562,7 +562,7 @@ static void *qgis_project_thread_start_new_child(void *arg)
     struct timespec ts;
 
     qgis_timer_start(&ts);
-    initargs.proc = qgis_project_thread_function_start_new_child(arg);
+    initargs.proc = process_manager_thread_function_start_new_child(arg);
 #ifdef DISABLED_INIT
 #warning disabled init phase
     qgis_process_set_state_idle(initargs.proc);
@@ -570,7 +570,7 @@ static void *qgis_project_thread_start_new_child(void *arg)
     if (initargs.proc)
     {
 	initargs.project_name = qgis_project_get_name(tinfo->project);
-	qgis_project_thread_function_init_new_child(&initargs);
+	process_manager_thread_function_init_new_child(&initargs);
     }
 #endif
     qgis_timer_stop(&ts);
@@ -587,7 +587,7 @@ static void *qgis_project_thread_start_new_child(void *arg)
  * param do_exchange_processes: if true removes all active processes and replaces them with the new created ones.
  *                              else integrate them in the list of active processes.
  */
-void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
+void process_manager_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     assert(project);
     assert(num > 0);
@@ -616,7 +616,7 @@ void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project
 	}
 	targs->project = project;
 
-	retval = pthread_create(&threads[i], NULL, qgis_project_thread_start_new_child, targs);
+	retval = pthread_create(&threads[i], NULL, process_manager_thread_start_new_child, targs);
 	if (retval)
 	{
 	    errno = retval;
@@ -694,7 +694,7 @@ struct thread_start_process_detached_args
 };
 
 
-static void *qgis_project_thread_start_process_detached(void *arg)
+static void *process_manager_thread_start_process_detached(void *arg)
 {
     assert(arg);
     struct thread_start_process_detached_args *tinfo = arg;
@@ -711,7 +711,7 @@ static void *qgis_project_thread_start_process_detached(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    qgis_project_start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
+    process_manager_start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
 
     free(arg);
 
@@ -720,7 +720,7 @@ static void *qgis_project_thread_start_process_detached(void *arg)
 
 
 /* starts a new thread in detached state, which in turn calls start_new_process_wait() */
-void qgis_project_start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
+void process_manager_start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
 {
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
@@ -745,7 +745,7 @@ void qgis_project_start_new_process_detached(int num, struct qgis_project_s *pro
     targs->do_exchange_processes = do_exchange_processes;
 
     pthread_t thread;
-    int retval = pthread_create(&thread, NULL, qgis_project_thread_start_process_detached, targs);
+    int retval = pthread_create(&thread, NULL, process_manager_thread_start_process_detached, targs);
     if (retval)
     {
 	errno = retval;
@@ -762,7 +762,7 @@ void qgis_project_start_new_process_detached(int num, struct qgis_project_s *pro
  * test and remove the old entry and maybe restart anew.
  * test all three lists initproclist, activeproclist and shutdownproclist.
  */
-int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
+int process_manager_check_process_died(struct qgis_project_s *proj, pid_t pid)
 {
     assert(proj);
     assert(pid>0);
@@ -811,7 +811,7 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    /* TODO: react on child processes exiting immediately.
 		     * maybe store the creation time and calculate the execution time?
 		     */
-		    qgis_project_start_new_process_detached(1, proj, 0);
+		    process_manager_start_new_process_detached(1, proj, 0);
 		}
 		else
 		{
@@ -853,7 +853,7 @@ int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid)
 		    /* TODO: react on child processes exiting immediately.
 		     * maybe store the creation time and calculate the execution time?
 		     */
-		    qgis_project_start_new_process_detached(1, proj, 0);
+		    process_manager_start_new_process_detached(1, proj, 0);
 		}
 	    }
 	}

@@ -109,7 +109,7 @@ static void qgis_project_restart_processes(struct qgis_project_s *project)
 	int minproc = config_get_min_idle_processes(proj_name);
 	int activeproc = qgis_process_list_get_num_process(project->activeproclist);
 	int numproc = max(minproc, activeproc);
-	qgis_project_start_new_process_detached(numproc, project, 1);
+	process_manager_start_new_process_detached(numproc, project, 1);
     }
 }
 

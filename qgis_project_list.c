@@ -351,7 +351,7 @@ void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
 	     * matches an entry.
 	     * remove the entry and in case restart the process
 	     */
-	    retval = qgis_project_process_died(myproj, pid);
+	    retval = process_manager_check_process_died(myproj, pid);
 	    if (retval)
 		// found process, no need to look further
 		break;

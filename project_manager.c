@@ -39,6 +39,7 @@
 #include "qgis_config.h"
 #include "logger.h"
 #include "qgis_project_list.h"
+#include "process_manager.h"
 
 
 struct thread_start_project_processes_args
@@ -63,7 +64,7 @@ void *thread_start_project_processes(void *arg)
      * Then add this project to the global list
      */
     qgis_proj_list_add_project(db_get_active_project_list(), project);
-    qgis_project_start_new_process_wait(num, project, 0);
+    process_manager_start_new_process_wait(num, project, 0);
 
 
     free(arg);
@@ -134,6 +135,6 @@ void project_manager_start_new_process_detached(int num, const char *projectname
 {
     struct qgis_project_s *project = find_project_by_name(db_get_active_project_list(), projectname);
 
-    qgis_project_start_new_process_detached(num, project, do_exchange_processes);
+    process_manager_start_new_process_detached(num, project, do_exchange_processes);
 
 }
