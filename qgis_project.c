@@ -1095,3 +1095,13 @@ int qgis_project_get_nr_crashes(struct qgis_project_s *proj)
 }
 
 
+void qgis_project_reset_nr_crashes(struct qgis_project_s *proj)
+{
+    assert(proj);
+    if (proj)
+    {
+	proj->nr_crashes = 0;
+    }
+}
+
+
