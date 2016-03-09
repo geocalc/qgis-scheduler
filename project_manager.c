@@ -55,7 +55,7 @@ struct thread_start_project_processes_args
 };
 
 
-void *thread_start_project_processes(void *arg)
+void *project_manager_thread_start_project_processes(void *arg)
 {
     assert(arg);
     struct thread_start_project_processes_args *targ = arg;
@@ -114,7 +114,7 @@ void project_manager_startup_projects(void)
 		targs->project = project;
 		targs->num = nr_of_childs_during_startup;
 
-		retval = pthread_create(&threads[i], NULL, thread_start_project_processes, targs);
+		retval = pthread_create(&threads[i], NULL, project_manager_thread_start_project_processes, targs);
 		if (retval)
 		{
 		    errno = retval;
@@ -154,7 +154,7 @@ void project_manager_start_new_process_detached(int num, const char *projectname
  * and new processes to active list,
  * and kill all old processes from shutdown list.
  */
-static void qgis_project_restart_processes(struct qgis_project_s *project)
+static void project_manager_restart_processes(struct qgis_project_s *project)
 {
     assert(project);
     if (project)
@@ -172,7 +172,7 @@ static void qgis_project_restart_processes(struct qgis_project_s *project)
 /* checks if the file name and watch descriptor belong to this project
  * initiate a process restart if the config did change.
  */
-int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd)
+int project_manager_check_inotify_config_changed(struct qgis_project_s *project, int wd)
 {
     int ret = 0;
 
@@ -184,7 +184,7 @@ int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, in
 
 	/* match, start new processes and then move them to idle list */
 	printlog("Project '%s' config change. Restart processes", proj_name);
-	qgis_project_restart_processes(project);
+	project_manager_restart_processes(project);
     }
 
     return ret;

@@ -396,7 +396,7 @@ void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
 	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
-	    qgis_project_check_inotify_config_changed(myproj, wd);
+	    project_manager_check_inotify_config_changed(myproj, wd);
 	}
 
 	retval = pthread_rwlock_unlock(&list->rwlock);
