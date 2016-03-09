@@ -38,6 +38,8 @@
 #include <assert.h>
 
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
+#include "statistic.h"
 
 
 /* process data:
@@ -179,7 +181,19 @@ void db_add_project(const char *projname, const char *configpath)
 
 }
 
-//void db_add_process(const char *projname, pid_t pid);
+
+void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
+{
+    assert(projname);
+    assert(pid > 0);
+    assert(process_socket_fd >= 0);
+
+    struct qgis_process_s *childproc = qgis_process_new(pid, process_socket_fd);
+    struct qgis_project_s *project = db_get_project(projname);
+    qgis_project_add_process(project, childproc);
+}
+
+
 //int db_get_num_idle_process(const char *projname);
 
 
@@ -324,6 +338,32 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 	ret = qgis_process_get_state(proc);
 
     return ret;
+}
+
+
+int db_process_set_state_init(pid_t pid, pthread_t thread_id)
+{
+    int ret = -1;
+    struct qgis_process_s *proc = NULL;
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    if (project)
+    {
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
+	assert(proc_list);
+	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+    }
+    /* no need to test the shutdown list, processes in there won't get the
+     * state "init".
+     */
+//    else
+//    {
+//	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
+//    }
+    if (proc)
+	ret = qgis_process_set_state_init(proc, thread_id);
+
+    return ret;
+
 }
 
 
@@ -502,6 +542,33 @@ enum db_process_list_e db_get_process_list(pid_t pid)
 }
 
 
+/* processes in the init list with state idle are done with the initialization.
+ * move these processes to the active list to be picked up for net responses.
+ */
+void db_move_all_idle_process_from_init_to_active_list(const char *projname)
+{
+    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
+    struct qgis_process_list_s *initproclist = qgis_project_get_init_process_list(project);
+
+    int retval = qgis_process_list_transfer_all_process_with_state(activeproclist, initproclist, PROC_IDLE);
+    debug(1, "project '%s' moved %d processes from init list to active list", projname, retval);
+
+}
+
+
+/* move all processes from the active list to the shutdown list to be deleted
+ */
+void db_move_all_process_from_active_to_shutdown_list(const char *projname)
+{
+    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
+    int shutdownnum = qgis_process_list_get_num_process(activeproclist);
+    statistic_add_process_shutdown(shutdownnum);
+    qgis_shutdown_add_process_list(activeproclist);	// TODO create a notifier for the shutdown module, instead of moving data around
+}
+
+
 /* returns the next process (pid) which needs to be worked on.
  * This could be
  * (1) a process which is transferred from busy to idle state and needs a TERM signal
@@ -590,6 +657,19 @@ int db_get_startup_failures(const char *projname)
     }
 
     return ret;
+}
+
+
+void db_reset_startup_failures(const char *projname)
+{
+    assert(projname);
+
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    if (project)
+    {
+	qgis_project_reset_nr_crashes(project);	// reset number of crashes after configuration change
+    }
+
 }
 
 
