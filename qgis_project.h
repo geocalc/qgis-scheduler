@@ -56,7 +56,6 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 void qgis_project_shutdown(struct qgis_project_s *proj);
 int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum);
 
-int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd);
 
 void qgis_project_print(struct qgis_project_s *proj);
 

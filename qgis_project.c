@@ -91,49 +91,6 @@ struct thread_watch_config_args
 
 
 
-
-
-/* restarts all processes.
- * I.e. evaluate current number of processes for this project,
- * start num processes, init them,
- * atomically move the old processes to shutdown list
- * and new processes to active list,
- * and kill all old processes from shutdown list.
- */
-static void qgis_project_restart_processes(struct qgis_project_s *project)
-{
-    assert(project);
-    if (project)
-    {
-	const char *proj_name = project->name;
-	int minproc = config_get_min_idle_processes(proj_name);
-	int activeproc = qgis_process_list_get_num_process(project->activeproclist);
-	int numproc = max(minproc, activeproc);
-	process_manager_start_new_process_detached(numproc, project, 1);
-    }
-}
-
-
-/* checks if the file name and watch descriptor belong to this project
- * initiate a process restart if the config did change.
- */
-int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd)
-{
-    int ret = 0;
-
-    if (wd == project->inotifywatchfd)
-    {
-	ret = 1;
-
-	/* match, start new processes and then move them to idle list */
-	printlog("Project '%s' config change. Restart processes", project->name);
-	qgis_project_restart_processes(project);
-    }
-
-    return ret;
-}
-
-
 struct qgis_project_s *qgis_project_new(const char *name, const char *configpath)
 {
     assert(name);
