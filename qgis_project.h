@@ -63,5 +63,6 @@ void qgis_project_print(struct qgis_project_s *proj);
 void qgis_project_inc_nr_crashes(struct qgis_project_s *proj);
 int qgis_project_get_nr_crashes(struct qgis_project_s *proj);
 void qgis_project_reset_nr_crashes(struct qgis_project_s *proj);
+int qgis_project_get_inotify_fd(struct qgis_project_s *proj);
 
 #endif /* QGIS_PROJECT_H_ */

@@ -344,3 +344,17 @@ void qgis_project_reset_nr_crashes(struct qgis_project_s *proj)
 }
 
 
+int qgis_project_get_inotify_fd(struct qgis_project_s *proj)
+{
+    int ret = -1;
+
+    assert(proj);
+    if (proj)
+    {
+	ret = proj->inotifywatchfd;
+    }
+
+    return ret;
+}
+
+
