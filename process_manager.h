@@ -36,6 +36,7 @@
 
 
 void process_manager_process_died(pid_t pid);
+void process_manager_process_died_during_init(pid_t pid, const char *projname);
 
 
 #endif /* PROCESS_MANAGER_H_ */
