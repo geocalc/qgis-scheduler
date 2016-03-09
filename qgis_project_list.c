@@ -17,6 +17,8 @@
 #include <string.h>
 
 #include "logger.h"
+#include "process_manager.h"
+#include "project_manager.h"
 
 
 struct qgis_project_iterator
