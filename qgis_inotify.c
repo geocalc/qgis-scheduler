@@ -45,13 +45,13 @@
 #include <string.h>
 #include <libgen.h>	// used for dirname(), we need glibc >= 2.2.1 !!
 
-#include "qgis_project_list.h"
 #include "qgis_config.h"
 #include "logger.h"
 #include "project_manager.h"
 
 
 #define UNUSED_PARAMETER(x)	((void)(x))
+
 
 struct inotify_watch
 {
@@ -60,12 +60,12 @@ struct inotify_watch
 };
 
 
+
 static int inotifyfd = -1;
 static struct inotify_watch *watchlist = NULL;
 static int watchlistlen = 0;
 static int lastusedwatch = 0;
 static pthread_rwlock_t inotifyrwlock = PTHREAD_RWLOCK_INITIALIZER;
-static struct qgis_project_list_s *inotifyprojectlist = NULL;
 static pthread_t inotifythread = -1;
 
 
@@ -93,13 +93,8 @@ static void inotify_check_watchlist_for_watch(struct inotify_event *inotifyevent
  */
 static void *inotify_thread_watch(void *arg)
 {
-//    assert(arg);
-//    struct thread_watch_config_args *tinfo = arg;
-//    struct qgis_project_s *project = tinfo->project;
-//    assert(project);
     UNUSED_PARAMETER(arg);
 
-//    const char *projname = project->name;
     debug(1, "started inotify watcher thread");
 
 
@@ -215,14 +210,13 @@ static void *inotify_thread_watch(void *arg)
 
     debug(1, "shutdown watcher thread");
     free(inotifyevent);
-//    free(arg);
+
     return NULL;
 }
 
 
-void qgis_inotify_init(struct qgis_project_list_s *projectlist)
+void qgis_inotify_init(void)
 {
-    assert(projectlist);
     /* NOTE: if we handle configuration reload without restarting this program
      * we need to care for this allocation as well!
      */
@@ -241,8 +235,6 @@ void qgis_inotify_init(struct qgis_project_list_s *projectlist)
 	exit(EXIT_FAILURE);
     }
     inotifyfd = retval;
-
-    inotifyprojectlist = projectlist;
 
     retval = pthread_create(&inotifythread, NULL, inotify_thread_watch, NULL);
     if (retval)

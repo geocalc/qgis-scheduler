@@ -660,7 +660,7 @@ int main(int argc, char **argv)
 
 
     /* start the inotify watch module */
-    qgis_inotify_init(db_get_active_project_list());
+    qgis_inotify_init();
 
     /* start the process shutdown module */
     qgis_shutdown_init();
