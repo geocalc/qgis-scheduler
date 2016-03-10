@@ -48,6 +48,8 @@
 #include "qgis_project_list.h"
 #include "qgis_config.h"
 #include "logger.h"
+#include "project_manager.h"
+
 
 #define UNUSED_PARAMETER(x)	((void)(x))
 
@@ -78,7 +80,7 @@ static void inotify_check_watchlist_for_watch(struct inotify_event *inotifyevent
 	    int retval = strcmp(inotifyevent->name, watchlist[i].filename);
 	    if (0 == retval)
 	    {
-		qgis_proj_list_config_change(inotifyprojectlist, i);
+		project_manager_inotify_configfile_changed(i);
 	    }
 	}
     }

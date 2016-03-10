@@ -34,11 +34,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
+#include <pthread.h>
 
 #include "database.h"
 #include "qgis_config.h"
 #include "logger.h"
-#include "qgis_project_list.h"
 #include "process_manager.h"
 
 
@@ -150,40 +150,37 @@ void project_manager_start_new_process_detached(int num, const char *projectname
  * and new processes to active list,
  * and kill all old processes from shutdown list.
  */
-static void project_manager_restart_processes(struct qgis_project_s *project)
+static void project_manager_restart_processes(const char *proj_name)
 {
-    assert(project);
-    if (project)
+    assert(proj_name);
+    if (proj_name)
     {
-	const char *proj_name = qgis_project_get_name(project);
 	int minproc = config_get_min_idle_processes(proj_name);
-	struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
-	int activeproc = qgis_process_list_get_num_process(activeproclist);
+	int activeproc = db_get_num_active_process(proj_name);
 	int numproc = max(minproc, activeproc);
 	process_manager_start_new_process_detached(numproc, proj_name, 1);
     }
 }
 
 
-/* checks if the file name and watch descriptor belong to this project
- * initiate a process restart if the config did change.
+/* A configuration with this watch descriptor has changed. Get the project
+ * belonging to this descriptor and restart the project.
  */
-int project_manager_check_inotify_config_changed(struct qgis_project_s *project, int wd)
+void project_manager_inotify_configfile_changed(int wd)
 {
-    int ret = 0;
+    assert(wd >= 0);
 
-    int inotifyfd = qgis_project_get_inotify_fd(project);
-    if (wd == inotifyfd)
+    const char *projname = db_get_project_for_watchid(wd);
+    if (projname)
     {
-	ret = 1;
-	const char *proj_name = qgis_project_get_name(project);
-
-	/* match, start new processes and then move them to idle list */
-	printlog("Project '%s' config change. Restart processes", proj_name);
-	project_manager_restart_processes(project);
+	printlog("Project '%s' config change. Restart processes", projname);
+	project_manager_restart_processes(projname);
     }
-
-    return ret;
+    else
+    {
+	printlog("error: got config change request for watch id %d but no project responsible?", wd);
+	exit(EXIT_FAILURE);
+    }
 }
 
 

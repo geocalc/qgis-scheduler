@@ -32,13 +32,12 @@
 #ifndef PROJECT_MANAGER_H_
 #define PROJECT_MANAGER_H_
 
-struct qgis_project_s;
 
 
 void project_manager_startup_projects(void);
 
 void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes);
-int project_manager_check_inotify_config_changed(struct qgis_project_s *project, int wd);
+void project_manager_inotify_configfile_changed(int wd);
 
 
 #endif /* PROJECT_MANAGER_H_ */
