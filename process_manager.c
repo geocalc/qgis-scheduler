@@ -750,10 +750,17 @@ void process_manager_process_died(pid_t pid)
 //		 */
 //		db_inc_startup_failures(projname);
 //	    }
-	    retval = db_get_startup_failures(projname);
-	    if (max_nr_process_crashes > retval)
+	    if (projname)
 	    {
-		project_manager_start_new_process_detached(1, projname, 0);
+		retval = db_get_startup_failures(projname);
+		if (max_nr_process_crashes > retval)
+		{
+		    project_manager_start_new_process_detached(1, projname, 0);
+		}
+	    }
+	    else
+	    {
+		printlog("warning: no project found for pid %d", pid);
 	    }
 	}
 
