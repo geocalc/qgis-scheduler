@@ -471,6 +471,25 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     return ret;
 }
 
+
+/* return the number of processes being in the active list of this project */
+int db_get_num_active_process(const char *projname)
+{
+    assert(projname);
+
+    int ret = -1;
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
+    if (project)
+    {
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
+	assert(proc_list);
+	ret = qgis_process_list_get_num_process(proc_list);
+    }
+
+    return ret;
+}
+
+
 void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 {
     struct qgis_process_s *proc;
@@ -687,6 +706,20 @@ void db_reset_startup_failures(const char *projname)
 	qgis_project_reset_nr_crashes(project);	// reset number of crashes after configuration change
     }
 
+}
+
+
+const char *db_get_project_for_watchid(int watchid)
+{
+    assert(watchid >= 0);
+
+    const char *ret = NULL;
+
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_inotifyid(projectlist, watchid);
+    if (project)
+	ret = qgis_project_get_name(project);
+
+    return ret;
 }
 
 

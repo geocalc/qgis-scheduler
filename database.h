@@ -99,6 +99,7 @@ int db_process_set_state_idle(pid_t pid);
 int db_process_set_state_exit(pid_t pid);
 int db_process_set_state(pid_t pid, enum db_process_state_e state);
 int db_get_num_process_by_status(const char *projname, enum db_process_state_e state);
+int db_get_num_active_process(const char *projname);
 
 void db_move_process_to_list(enum db_process_list_e list, pid_t pid);
 enum db_process_list_e db_get_process_list(pid_t pid);
@@ -113,6 +114,8 @@ int db_remove_process_with_state_exit(void);
 void db_inc_startup_failures(const char *projname);
 int db_get_startup_failures(const char *projname);
 void db_reset_startup_failures(const char *projname);
+
+const char *db_get_project_for_watchid(int watchid);
 
 /* transitional interfaces. these are deleted after the api change */
 struct qgis_project_list_s;
