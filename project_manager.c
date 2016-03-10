@@ -138,10 +138,7 @@ void project_manager_startup_projects(void)
 
 void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes)
 {
-    struct qgis_project_s *project = find_project_by_name(db_get_active_project_list(), projectname);
-
-    process_manager_start_new_process_detached(num, project, do_exchange_processes);
-
+    process_manager_start_new_process_detached(num, projectname, do_exchange_processes);
 }
 
 
@@ -163,7 +160,7 @@ static void project_manager_restart_processes(struct qgis_project_s *project)
 	struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
 	int activeproc = qgis_process_list_get_num_process(activeproclist);
 	int numproc = max(minproc, activeproc);
-	process_manager_start_new_process_detached(numproc, project, 1);
+	process_manager_start_new_process_detached(numproc, proj_name, 1);
     }
 }
 

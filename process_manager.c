@@ -48,7 +48,6 @@
 #include "fcgi_state.h"
 #include "logger.h"
 #include "qgis_config.h"
-#include "qgis_project.h"
 #include "qgis_shutdown_queue.h"
 #include "project_manager.h"
 #include "statistic.h"
@@ -680,7 +679,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
 
 
 /* starts a new thread in detached state, which in turn calls start_new_process_wait() */
-void process_manager_start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes)
+void process_manager_start_new_process_detached(int num, const char *projname, int do_exchange_processes)
 {
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
@@ -701,7 +700,7 @@ void process_manager_start_new_process_detached(int num, struct qgis_project_s *
 	exit(EXIT_FAILURE);
     }
     targs->num = num;
-    targs->project_name = qgis_project_get_name(project);
+    targs->project_name = projname;
     targs->do_exchange_processes = do_exchange_processes;
 
     pthread_t thread;
@@ -714,114 +713,6 @@ void process_manager_start_new_process_detached(int num, struct qgis_project_s *
     }
 
 }
-
-
-
-/* some process died and sent its pid via SIGCHLD.
- * maybe it was listed in this project?
- * test and remove the old entry and maybe restart anew.
- * test all three lists initproclist, activeproclist and shutdownproclist.
- */
-int process_manager_check_process_died(struct qgis_project_s *proj, pid_t pid)
-{
-    assert(proj);
-    assert(pid>0);
-
-    int ret = 0;
-
-    if (proj)
-    {
-	const char *projname = qgis_project_get_name(proj);
-	/* Erase the old entry. The process does not exist anymore */
-	struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(proj);
-	assert(proclist);
-	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proclist, pid);
-	if (proc)
-	{
-	    ret++;
-	    /* that process belongs to our active list.
-	     * move the process entry to the shutdown list to care for.
-	     * restart the process if not during shutdown.
-	     */
-	    struct timespec ts = *qgis_process_get_starttime(proc);
-	    int retval = qgis_timer_stop(&ts);
-	    if (-1 == retval)
-	    {
-		logerror("clock_gettime(%d,..)", get_valid_clock_id());
-		exit(EXIT_FAILURE);
-	    }
-	    if ( MIN_PROCESS_RUNTIME_SEC > ts.tv_sec || (MIN_PROCESS_RUNTIME_SEC == ts.tv_sec && MIN_PROCESS_RUNTIME_NANOSEC >= ts.tv_nsec) )
-	    {
-		printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
-		qgis_project_inc_nr_crashes(proj);
-	    }
-
-	    qgis_process_list_remove_process(proclist, proc);
-	    qgis_shutdown_add_process(pid);
-
-	    if ( !get_program_shutdown() )
-	    {
-		const int nr_crashes = qgis_project_get_nr_crashes(proj);
-		if (max_nr_process_crashes > nr_crashes)
-		{
-		    debug(1, "project '%s' restarting process", projname);
-		    printlog("Project '%s', process %d died, restarting process", projname, pid);
-
-		    /* child process terminated, restart anew */
-		    /* TODO: react on child processes exiting immediately.
-		     * maybe store the creation time and calculate the execution time?
-		     */
-		    process_manager_start_new_process_detached(1, proj, 0);
-		}
-		else
-		{
-		    printlog("Project '%s', process crashed more than %d times. No more new process started", projname, max_nr_process_crashes);
-		}
-	    }
-	}
-	else
-	{
-	    proclist = qgis_project_get_init_process_list(proj);
-	    assert(proclist);
-	    proc = qgis_process_list_find_process_by_pid(proclist, pid);
-	    if (proc)
-	    {
-		ret++;
-		/* that process belongs to our active list.
-		 * move the process entry to the shutdown list to care for.
-		 * restart the process if not during shutdown.
-		 */
-		struct timespec ts = *qgis_process_get_starttime(proc);
-		int retval = qgis_timer_stop(&ts);
-		if (-1 == retval)
-		{
-		    logerror("clock_gettime(%d,..)", get_valid_clock_id());
-		    exit(EXIT_FAILURE);
-		}
-		if ( MIN_PROCESS_RUNTIME_SEC > ts.tv_sec || (MIN_PROCESS_RUNTIME_SEC == ts.tv_sec && MIN_PROCESS_RUNTIME_NANOSEC >= ts.tv_nsec) )
-		    printlog("WARNING: Process %d died within %ld.%03ld sec", pid, ts.tv_sec, ts.tv_nsec/(1000*1000));
-
-		qgis_process_list_remove_process(proclist, proc);
-		qgis_shutdown_add_process(pid);
-
-		if ( !get_program_shutdown() )
-		{
-		    debug(1, "project '%s' restarting process", projname);
-		    printlog("Project '%s', process %d died, restarting process", projname, pid);
-
-		    /* child process terminated, restart anew */
-		    /* TODO: react on child processes exiting immediately.
-		     * maybe store the creation time and calculate the execution time?
-		     */
-		    process_manager_start_new_process_detached(1, proj, 0);
-		}
-	    }
-	}
-    }
-
-    return ret;
-}
-
 
 
 

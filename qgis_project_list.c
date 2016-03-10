@@ -340,54 +340,6 @@ void qgis_proj_list_return_iterator(struct qgis_project_list_s *list)
 }
 
 
-/* signals a dying process. The signal has been received by the signal trap.
- * now every project has to look, if the process is in its own process list.
- */
-void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
-{
-    assert(pid>0);
-    assert(list);
-    if (list)
-    {
-	struct qgis_project_iterator *np;
-
-	int retval = pthread_rwlock_rdlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-
-	LIST_FOREACH(np, &list->head, entries)
-	{
-	    struct qgis_project_s *myproj = np->proj;
-
-	    /* every project has to look in its process lists if the pid
-	     * matches an entry.
-	     * remove the entry and in case restart the process
-	     */
-	    retval = process_manager_check_process_died(myproj, pid);
-	    if (retval)
-		// found process, no need to look further
-		break;
-	}
-	/* Note: if retval==0 then the process item could already live in the
-	 * separate shutdown list.
-	 */
-
-	retval = pthread_rwlock_unlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-    }
-
-}
-
-
 /* notification from the inotify thread: some file has changed.
  * Go through all projects, check the watch descriptor (wd) and the file name.
  *

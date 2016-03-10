@@ -210,13 +210,6 @@ const char *db_get_project_for_this_process(pid_t pid)
 }
 
 
-void db_remove_process(pid_t pid)
-{
-    /* child process died, rearrange the project list */
-    qgis_proj_list_process_died(projectlist, pid);
-}
-
-
 /* find a process in a certain list with a distinct state
  * Note:
  * Using the pid as key index value may create problems, if a process dies

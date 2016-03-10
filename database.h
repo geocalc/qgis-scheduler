@@ -89,7 +89,6 @@ void db_add_project(const char *projname, const char *configpath);
 void db_add_process(const char *projname, pid_t pid, int process_socket_fd);
 int db_get_num_idle_process(const char *projname);
 const char *db_get_project_for_this_process(pid_t pid);
-void db_remove_process(pid_t pid);
 pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state);
 pid_t db_get_next_idle_process_for_work(const char *projname);
 int db_has_process(pid_t pid);
