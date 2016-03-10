@@ -34,7 +34,6 @@
 
 #include <sys/types.h>
 
-struct qgis_project_s;
 
 void process_manager_process_died(pid_t pid);
 void process_manager_process_died_during_init(pid_t pid, const char *projname);
