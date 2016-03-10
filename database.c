@@ -363,6 +363,12 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	if (!proc)
+	{
+	    proc_list = qgis_project_get_init_process_list(project);
+	    assert(proc_list);
+	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	}
     }
     /* no need to test the shutdown list, processes in there won't get the
      * state "init".
@@ -389,6 +395,12 @@ int db_process_set_state_idle(pid_t pid)
 	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
 	assert(proc_list);
 	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	if (!proc)
+	{
+	    proc_list = qgis_project_get_init_process_list(project);
+	    assert(proc_list);
+	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+	}
     }
     else
     {
