@@ -61,14 +61,22 @@
 
 struct thread_init_new_child_args
 {
-    struct qgis_process_s *proc;
+    pid_t pid;
     const char *project_name;
 };
 
 
 struct thread_start_new_child_args
 {
-    struct qgis_project_s *project;
+    const char *project_name;
+};
+
+
+struct thread_start_process_detached_args
+{
+    int num;
+    const char *project_name;
+    int do_exchange_processes;
 };
 
 
@@ -94,15 +102,15 @@ static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 static void process_manager_thread_function_init_new_child(struct thread_init_new_child_args *tinfo)
 {
     assert(tinfo);
-    struct qgis_process_s *childproc = tinfo->proc;
-    assert(childproc);
+    const pid_t pid = tinfo->pid;
+    assert(pid > 0);
     const char *projname = tinfo->project_name;
     assert(projname);
     const pthread_t thread_id = pthread_self();
     char *buffer;
     int retval;
 
-    qgis_process_set_state_init(childproc, thread_id);
+    db_process_set_state_init(pid, thread_id);
 
 
     debug(1, "init new spawned child process for project '%s'", projname);
@@ -123,7 +131,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
-    int childunixsocketfd = qgis_process_get_socketfd(childproc);
+    int childunixsocketfd = db_get_process_socket(pid);
 
     retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
     if (-1 == retval)
@@ -301,7 +309,6 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
      * there may be a race condition between the signal handler and this thread
      * so we test the existence of the child process after the read.
      */
-    pid_t pid = qgis_process_get_pid(childproc);
     retval = kill(pid, 0);
     if (-1 == retval)
     {
@@ -320,23 +327,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     }
     else
     {
-	pthread_mutex_t *mutex = qgis_process_get_mutex(childproc);
-	retval = pthread_mutex_lock(mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire mutex");
-	    exit(EXIT_FAILURE);
-	}
-	qgis_process_set_state_idle(childproc);
-	retval = pthread_mutex_unlock(mutex);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock mutex");
-	    exit(EXIT_FAILURE);
-	}
-
+	db_process_set_state_idle(pid);
     }
 
     /* ok, we did read each and every byte from child process.
@@ -352,12 +343,11 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 }
 
 
-
-static struct qgis_process_s *process_manager_thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
+/* return the child process id if successful, 0 otherwise */
+static int process_manager_thread_function_start_new_child(struct thread_start_new_child_args *tinfo)
 {
     assert(tinfo);
-    struct qgis_project_s *project = tinfo->project;
-    const char *project_name = qgis_project_get_name(project);
+    const char *project_name = tinfo->project_name;
     const char *command = config_get_process( project_name );
 
     debug(1, "project '%s' start new child process '%s'", project_name, command);
@@ -365,7 +355,7 @@ static struct qgis_process_s *process_manager_thread_function_start_new_child(st
     if (NULL == command || 0 == strlen(command))
     {
 	printlog("project '%s' error: no process path specified. Not starting any process", project_name);
-	return NULL;
+	return 0;
     }
 
     /* prepare the socket to connect to this child process only */
@@ -539,10 +529,9 @@ static struct qgis_process_s *process_manager_thread_function_start_new_child(st
     {
 	/* parent */
 	debug(1, "project '%s' started new child process '%s', pid %d", project_name, command, pid);
-	struct qgis_process_s *childproc = qgis_process_new(pid, childsocket);
-	qgis_project_add_process(project, childproc);
+	db_add_process( project_name, pid, childsocket);
 
-	return childproc;
+	return pid;
     }
     else
     {
@@ -551,8 +540,9 @@ static struct qgis_process_s *process_manager_thread_function_start_new_child(st
 	exit(EXIT_FAILURE);
     }
 
-    return NULL;
+    return 0;
 }
+
 
 static void *process_manager_thread_start_new_child(void *arg)
 {
@@ -562,24 +552,24 @@ static void *process_manager_thread_start_new_child(void *arg)
     struct timespec ts;
 
     qgis_timer_start(&ts);
-    initargs.proc = process_manager_thread_function_start_new_child(arg);
+    initargs.pid = process_manager_thread_function_start_new_child(arg);
 #ifdef DISABLED_INIT
 #warning disabled init phase
     qgis_process_set_state_idle(initargs.proc);
 #else
-    if (initargs.proc)
+    if (initargs.pid > 0)
     {
-	initargs.project_name = qgis_project_get_name(tinfo->project);
+	initargs.project_name = tinfo->project_name;
 	process_manager_thread_function_init_new_child(&initargs);
     }
 #endif
     qgis_timer_stop(&ts);
-    const char *projname = qgis_project_get_name(tinfo->project);
-    printlog("Startup time for project '%s' %ld.%03ld sec", projname, ts.tv_sec, ts.tv_nsec/(1000*1000));
+    printlog("Startup time for project '%s' %ld.%03ld sec", tinfo->project_name, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
     free(arg);
     return NULL;
 }
+
 
 /* starts "num" new child processes synchronously.
  * param num: number of processes to start (num>=0)
@@ -587,16 +577,15 @@ static void *process_manager_thread_start_new_child(void *arg)
  * param do_exchange_processes: if true removes all active processes and replaces them with the new created ones.
  *                              else integrate them in the list of active processes.
  */
-void process_manager_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes)
+void process_manager_start_new_process_wait(int num, const char *projname, int do_exchange_processes)
 {
-    assert(project);
+    assert(projname);
     assert(num > 0);
 
     pthread_t threads[num];
     int i;
     int retval;
 
-    const char *projname = qgis_project_get_name(project);
     printlog("Starting %d process%s for project '%s'", num, (num>1)?"es":"", projname);
 
     /* start all thread in parallel */
@@ -614,7 +603,7 @@ void process_manager_start_new_process_wait(int num, struct qgis_project_s *proj
 	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	targs->project = project;
+	targs->project_name = projname;
 
 	retval = pthread_create(&threads[i], NULL, process_manager_thread_start_new_child, targs);
 	if (retval)
@@ -639,8 +628,6 @@ void process_manager_start_new_process_wait(int num, struct qgis_project_s *proj
     }
 
 
-    struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
-    struct qgis_process_list_s *initproclist = qgis_project_get_init_process_list(project);
     /* move the processes from the initialization list to the active process
      * list.
      * If we got the option to exchange the processes then first move all
@@ -656,42 +643,15 @@ void process_manager_start_new_process_wait(int num, struct qgis_project_s *proj
      */
     if (do_exchange_processes)
     {
-	int shutdownnum = qgis_process_list_get_num_process(activeproclist);
-	statistic_add_process_shutdown(shutdownnum);
-	qgis_shutdown_add_process_list(activeproclist);
-	qgis_project_reset_nr_crashes(project);	// reset number of crashes after configuration change
+	db_move_all_process_from_active_to_shutdown_list(projname);
+	db_reset_startup_failures(projname);	// TODO: move this line to the config change manager
     }
 
-//    retval = pthread_rwlock_wrlock(&project->rwlock);
-//    if (retval)
-//    {
-//	errno = retval;
-//	logerror("error acquire read-write lock");
-//	exit(EXIT_FAILURE);
-//    }
-
-    retval = qgis_process_list_transfer_all_process_with_state(activeproclist, initproclist, PROC_IDLE);
-    debug(1, "project '%s' moved %d processes from init list to active list", projname, retval);
-
-//    retval = pthread_rwlock_unlock(&project->rwlock);
-//    if (retval)
-//    {
-//	errno = retval;
-//	logerror("error unlock read-write lock");
-//	exit(EXIT_FAILURE);
-//    }
+    db_move_all_idle_process_from_init_to_active_list(projname);
 
     statistic_add_process_start(num);
 
 }
-
-
-struct thread_start_process_detached_args
-{
-    int num;
-    struct qgis_project_s *project;
-    int do_exchange_processes;
-};
 
 
 static void *process_manager_thread_start_process_detached(void *arg)
@@ -711,7 +671,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
 	exit(EXIT_FAILURE);
     }
 
-    process_manager_start_new_process_wait(tinfo->num, tinfo->project, tinfo->do_exchange_processes);
+    process_manager_start_new_process_wait(tinfo->num, tinfo->project_name, tinfo->do_exchange_processes);
 
     free(arg);
 
@@ -741,7 +701,7 @@ void process_manager_start_new_process_detached(int num, struct qgis_project_s *
 	exit(EXIT_FAILURE);
     }
     targs->num = num;
-    targs->project = project;
+    targs->project_name = qgis_project_get_name(project);
     targs->do_exchange_processes = do_exchange_processes;
 
     pthread_t thread;
@@ -891,14 +851,14 @@ void process_manager_process_died(pid_t pid)
 	if (!retval)
 	{
 	    const char *projname = db_get_project_for_this_process(pid);
-	    enum db_process_list_e proclist = db_get_process_list(pid);
-	    if (LIST_INIT == proclist)
-	    {
-		/* died during initialization. if this happens every time,
-		 * we do get a startup loop. stop after some (5) tries.
-		 */
-		db_inc_startup_failures(projname);
-	    }
+//	    enum db_process_list_e proclist = db_get_process_list(pid);
+//	    if (LIST_INIT == proclist)
+//	    {
+//		/* died during initialization. if this happens every time,
+//		 * we do get a startup loop. stop after some (5) tries.
+//		 */
+//		db_inc_startup_failures(projname);
+//	    }
 	    retval = db_get_startup_failures(projname);
 	    if (max_nr_process_crashes > retval)
 	    {
@@ -916,7 +876,6 @@ void process_manager_process_died(pid_t pid)
     {
 	printlog("got signal SIGCHLD but pid %d does not belong to us", pid);
     }
-//    db_remove_process(pid);
 }
 
 
@@ -928,18 +887,18 @@ void process_manager_process_died_during_init(pid_t pid, const char *projname)
     {
 	db_inc_startup_failures(projname);
 
-	retval = db_get_startup_failures(projname);
-	if (max_nr_process_crashes > retval)
-	{
-	    project_manager_start_new_process_detached(1, projname, 0);
-	}
+//	retval = db_get_startup_failures(projname);
+//	if (max_nr_process_crashes > retval)
+//	{
+//	    project_manager_start_new_process_detached(1, projname, 0);
+//	}
     }
 
     /* change state of the process to STATE_EXIT
      * and move the entry to the shutdown list
      */
-    db_process_set_state_exit(pid);
-    qgis_shutdown_add_process(pid);
+//    db_process_set_state_exit(pid);
+//    qgis_shutdown_add_process(pid);
 }
 
 

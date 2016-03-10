@@ -69,8 +69,7 @@ static void *project_manager_thread_start_project_processes(void *arg)
      * its initialization.
      * Then add this project to the global list
      */
-    struct qgis_project_s *project = db_get_project(projname);
-    process_manager_start_new_process_wait(num, project, 0);
+    process_manager_start_new_process_wait(num, projname, 0);
 
 
     free(arg);
