@@ -287,6 +287,51 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 }
 
 
+struct qgis_project_s *qgis_proj_list_find_project_by_inotifyid(struct qgis_project_list_s *list, int inotifyid)
+{
+    struct qgis_project_s *proj = NULL;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &list->head, entries)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+	    assert(myproj);
+	    int watchfd = qgis_project_get_inotify_fd(myproj);
+	    if (watchfd == inotifyid)
+	    {
+		/* we found the inotify id.
+		 * return the project which owns this process
+		 */
+		proj = myproj;
+		break;
+	    }
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return proj;
+}
+
+
 struct qgis_project_iterator *qgis_proj_list_get_iterator(struct qgis_project_list_s *list)
 {
     assert(list);

@@ -49,6 +49,7 @@ void qgis_proj_list_remove_project(struct qgis_project_list_s *list, struct qgis
 
 struct qgis_project_s *find_project_by_name(struct qgis_project_list_s *list, const char *name);
 struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_list_s *list, pid_t pid);
+struct qgis_project_s *qgis_proj_list_find_project_by_inotifyid(struct qgis_project_list_s *list, int inotifyid);
 
 struct qgis_project_iterator *qgis_proj_list_get_iterator(struct qgis_project_list_s *list);
 struct qgis_project_s *qgis_proj_list_get_next_project(struct qgis_project_iterator **iterator);
