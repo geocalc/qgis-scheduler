@@ -118,14 +118,5 @@ void db_reset_startup_failures(const char *projname);
 
 const char *db_get_project_for_watchid(int watchid);
 
-/* transitional interfaces. these are deleted after the api change */
-struct qgis_project_list_s;
-struct qgis_process_list_s;
-struct qgis_project_s;
-
-struct qgis_project_list_s *db_get_active_project_list(void);
-int db_move_list_to_shutdown(struct qgis_process_list_s *list);
-struct qgis_project_s *db_get_project(const char *project_name);
-
 
 #endif /* DATABASE_H_ */

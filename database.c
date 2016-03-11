@@ -143,7 +143,7 @@ void db_init(void)
 void db_shutdown(void)
 {
     /* move the processes from the working lists to the shutdown module */
-    struct qgis_project_iterator *proj_iterator = qgis_proj_list_get_iterator(db_get_active_project_list());
+    struct qgis_project_iterator *proj_iterator = qgis_proj_list_get_iterator(projectlist);
 
     while (proj_iterator)
     {
@@ -156,7 +156,7 @@ void db_shutdown(void)
 	db_move_all_process_from_active_to_shutdown_list(projname);
     }
 
-    qgis_proj_list_return_iterator(db_get_active_project_list());
+    qgis_proj_list_return_iterator(projectlist);
 }
 
 
@@ -190,7 +190,7 @@ void db_add_project(const char *projname, const char *configpath)
     assert(configpath);
 
     struct qgis_project_s *project = qgis_project_new(projname, configpath);
-    qgis_proj_list_add_project(db_get_active_project_list(), project);
+    qgis_proj_list_add_project(projectlist, project);
 
 }
 
@@ -202,7 +202,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     assert(process_socket_fd >= 0);
 
     struct qgis_process_s *childproc = qgis_process_new(pid, process_socket_fd);
-    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     qgis_project_add_process(project, childproc);
 }
 
@@ -596,7 +596,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
  */
 void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 {
-    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
     struct qgis_process_list_s *initproclist = qgis_project_get_init_process_list(project);
 
@@ -610,11 +610,11 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
  */
 void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
-    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
     int shutdownnum = qgis_process_list_get_num_process(proclist);
     statistic_add_process_shutdown(shutdownnum);
-    db_move_list_to_shutdown(proclist);
+    qgis_process_list_transfer_all_process( shutdownlist, proclist );
     qgis_shutdown_notify_changes();
 }
 
@@ -623,11 +623,11 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
  */
 void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
-    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     struct qgis_process_list_s *proclist = qgis_project_get_init_process_list(project);
     int shutdownnum = qgis_process_list_get_num_process(proclist);
     statistic_add_process_shutdown(shutdownnum);
-    db_move_list_to_shutdown(proclist);
+    qgis_process_list_transfer_all_process( shutdownlist, proclist );
     qgis_shutdown_notify_changes();
 }
 
@@ -745,33 +745,6 @@ const char *db_get_project_for_watchid(int watchid)
     struct qgis_project_s *project = qgis_proj_list_find_project_by_inotifyid(projectlist, watchid);
     if (project)
 	ret = qgis_project_get_name(project);
-
-    return ret;
-}
-
-
-struct qgis_project_list_s *db_get_active_project_list(void)
-{
-    return projectlist;
-}
-
-
-int db_move_list_to_shutdown(struct qgis_process_list_s *list)
-{
-    assert(list);
-
-    int ret = qgis_process_list_transfer_all_process( shutdownlist, list );
-
-    return ret;
-}
-
-
-struct qgis_project_s *db_get_project(const char *project_name)
-{
-    assert(project_name);
-    assert(projectlist);
-
-    struct qgis_project_s *ret = find_project_by_name(projectlist, project_name);
 
     return ret;
 }
