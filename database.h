@@ -105,6 +105,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid);
 enum db_process_list_e db_get_process_list(pid_t pid);
 void db_move_all_idle_process_from_init_to_active_list(const char *projname);
 void db_move_all_process_from_active_to_shutdown_list(const char *projname);
+void db_move_all_process_from_init_to_shutdown_list(const char *projname);
 
 pid_t db_get_shutdown_process_in_timeout(void);
 int db_reset_signal_timer(pid_t pid);

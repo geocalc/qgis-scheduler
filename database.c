@@ -598,10 +598,24 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
     struct qgis_project_s *project = db_get_project(projname);
-    struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
-    int shutdownnum = qgis_process_list_get_num_process(activeproclist);
+    struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
+    int shutdownnum = qgis_process_list_get_num_process(proclist);
     statistic_add_process_shutdown(shutdownnum);
-    qgis_shutdown_add_process_list(activeproclist);	// TODO create a notifier for the shutdown module, instead of moving data around
+    db_move_list_to_shutdown(proclist);
+    qgis_shutdown_notify_changes();
+}
+
+
+/* move all processes from the init list to the shutdown list to be deleted
+ */
+void db_move_all_process_from_init_to_shutdown_list(const char *projname)
+{
+    struct qgis_project_s *project = db_get_project(projname);
+    struct qgis_process_list_s *proclist = qgis_project_get_init_process_list(project);
+    int shutdownnum = qgis_process_list_get_num_process(proclist);
+    statistic_add_process_shutdown(shutdownnum);
+    db_move_list_to_shutdown(proclist);
+    qgis_shutdown_notify_changes();
 }
 
 

@@ -361,16 +361,23 @@ void qgis_shutdown_add_process(pid_t pid)
 }
 
 
-/* moves an entire list of processes to the shutdown module */
-void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
+/* move all processes in init list and active list for this project to the
+ * shutdown list.
+ */
+void qgis_shutdown_add_all_process(const char *project_name)
 {
-//    assert(busylist);
+    db_move_all_process_from_init_to_shutdown_list(project_name);
+    db_move_all_process_from_active_to_shutdown_list(project_name);
+}
+
+
+void qgis_shutdown_notify_changes(void)
+{
     assert(!do_shutdown_thread);
 
-    int retval = db_move_list_to_shutdown( list );
-    debug(1, "moved %d processes to shutdown list", retval);
+    debug(1, "notify shutdown list about change");
 
-    retval = pthread_mutex_lock(&shutdownmutex);
+    int retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
@@ -392,6 +399,19 @@ void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
 	logerror("error: can not unlock mutex");
 	exit(EXIT_FAILURE);
     }
+}
+
+
+/* moves an entire list of processes to the shutdown module */
+void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
+{
+//    assert(busylist);
+    assert(!do_shutdown_thread);
+
+    int retval = db_move_list_to_shutdown( list );
+    debug(1, "moved %d processes to shutdown list", retval);
+
+    qgis_shutdown_notify_changes();
 }
 
 
