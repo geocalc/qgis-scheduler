@@ -123,12 +123,20 @@ void db_init(void)
     debug(1, "created memory db");
 
     /* setup all tables */
-    static const char sql[] = "CREATE TABLE projects (name TEXT)";
+    static const char sql_project_table[] = "CREATE TABLE projects (name TEXT PRIMARY KEY NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashes INTEGER)";
     char *errormsg;
-    retval = sqlite3_exec(dbhandler, sql, NULL, NULL, &errormsg);
+    retval = sqlite3_exec(dbhandler, sql_project_table, NULL, NULL, &errormsg);
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite with '%s': %s", sql, errormsg);
+	printlog("error: calling sqlite with '%s': %s", sql_project_table, errormsg);
+	exit(EXIT_FAILURE);
+    }
+
+    static const char sql_process_table[] = "CREATE TABLE processes (projectname TEXT REFERENCES projects (name), state INTEGER, threadid INTEGER, pid INTEGER, process_socket_fd INTEGER, client_socket_fd INTEGER, starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )";
+    retval = sqlite3_exec(dbhandler, sql_process_table, NULL, NULL, &errormsg);
+    if (SQLITE_OK != retval)
+    {
+	printlog("error: calling sqlite with '%s': %s", sql_process_table, errormsg);
 	exit(EXIT_FAILURE);
     }
 
