@@ -143,7 +143,20 @@ void db_init(void)
 void db_shutdown(void)
 {
     /* move the processes from the working lists to the shutdown module */
-    qgis_proj_list_shutdown(db_get_active_project_list());
+    struct qgis_project_iterator *proj_iterator = qgis_proj_list_get_iterator(db_get_active_project_list());
+
+    while (proj_iterator)
+    {
+	struct qgis_project_s *proj = qgis_proj_list_get_next_project(&proj_iterator);
+	assert(proj);
+	const char *projname = qgis_project_get_name(proj);
+	assert(projname);
+
+	db_move_all_process_from_init_to_shutdown_list(projname);
+	db_move_all_process_from_active_to_shutdown_list(projname);
+    }
+
+    qgis_proj_list_return_iterator(db_get_active_project_list());
 }
 
 
