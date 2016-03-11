@@ -52,8 +52,6 @@ struct qgis_process_list_s *qgis_project_get_init_process_list(struct qgis_proje
 struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj);
 const char *qgis_project_get_name(struct qgis_project_s *proj);
 int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
-//int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
-void qgis_project_shutdown(struct qgis_project_s *proj);
 int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum);
 
 

@@ -197,21 +197,6 @@ int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s 
 }
 
 
-
-
-/* move all processes from the lists to the shutdown module */
-void qgis_project_shutdown(struct qgis_project_s *proj)
-{
-    assert(proj);
-
-    if (proj)
-    {
-	qgis_shutdown_add_process_list(proj->initproclist);
-	qgis_shutdown_add_process_list(proj->activeproclist);
-    }
-}
-
-
 struct qgis_process_list_s *qgis_project_get_init_process_list(struct qgis_project_s *proj)
 {
     struct qgis_process_list_s *list = NULL;

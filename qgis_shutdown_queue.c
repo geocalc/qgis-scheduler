@@ -402,19 +402,6 @@ void qgis_shutdown_notify_changes(void)
 }
 
 
-/* moves an entire list of processes to the shutdown module */
-void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
-{
-//    assert(busylist);
-    assert(!do_shutdown_thread);
-
-    int retval = db_move_list_to_shutdown( list );
-    debug(1, "moved %d processes to shutdown list", retval);
-
-    qgis_shutdown_notify_changes();
-}
-
-
 /* Used during the shutdown transition of the main thread.
  * It signals the thread to end its work if all processes have been removed
  * from the lists.
