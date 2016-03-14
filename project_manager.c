@@ -184,3 +184,35 @@ void project_manager_inotify_configfile_changed(int wd)
 }
 
 
+void project_manager_shutdown_project(const char *project_name)
+{
+    db_move_all_process_from_init_to_shutdown_list(project_name);
+    db_move_all_process_from_active_to_shutdown_list(project_name);
+}
+
+
+void project_manager_shutdown(void)
+{
+    char **projlist = NULL;
+    int len = 0;
+
+    int retval = db_get_names_project(&projlist, &len);
+    if (retval)
+    {
+	printlog("error: can not get list of projects, got %d entries", len);
+	exit(EXIT_FAILURE);
+    }
+
+    int i;
+    for (i=0; i<len; i++)
+    {
+	const char *projname = projlist[i];
+	assert(projname);
+
+	project_manager_shutdown_project(projname);
+    }
+
+    db_free_names_project(projlist, len);
+}
+
+
