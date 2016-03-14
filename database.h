@@ -81,7 +81,6 @@ enum db_process_list_e
 struct timespec;
 
 void db_init(void);
-void db_shutdown(void);
 void db_delete(void);
 
 
