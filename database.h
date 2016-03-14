@@ -86,6 +86,9 @@ void db_delete(void);
 
 
 void db_add_project(const char *projname, const char *configpath);
+int db_get_names_project(char ***projname, int *len);
+void db_free_names_project(char **projname, int len);
+
 void db_add_process(const char *projname, pid_t pid, int process_socket_fd);
 int db_get_num_idle_process(const char *projname);
 const char *db_get_project_for_this_process(pid_t pid);

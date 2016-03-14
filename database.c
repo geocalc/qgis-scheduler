@@ -36,6 +36,7 @@
 #include <sqlite3.h>
 #include <pthread.h>
 #include <assert.h>
+#include <string.h>
 
 #include "logger.h"
 #include "qgis_shutdown_queue.h"
@@ -200,6 +201,90 @@ void db_add_project(const char *projname, const char *configpath)
     struct qgis_project_s *project = qgis_project_new(projname, configpath);
     qgis_proj_list_add_project(projectlist, project);
 
+}
+
+
+int db_get_names_project(char ***projname, int *len)
+{
+    assert(projname);
+    assert(len);
+
+    int retval = 0;
+    int num = 0;
+    int mylen;
+    char **array;
+    struct qgis_project_iterator *iterator;
+//    if (!*projname || !*len)
+    {
+    iterator = qgis_proj_list_get_iterator(projectlist);
+    while (iterator)
+    {
+	struct qgis_project_s *project = qgis_proj_list_get_next_project(&iterator);
+	if (project)
+	    num++;
+    }
+    qgis_proj_list_return_iterator(projectlist);
+    /* aquire the pointer array */
+    array = calloc(num, sizeof(char *));
+    mylen = num;
+    }
+//    else
+//    {
+//	array = *projname;
+//	mylen = *len;
+//    }
+
+    /* Note: inbetween these two calls the list may change.
+     * We should solve this by copying all data into this function with one
+     * call to qgis_proj_list_get_iterator() (instead of two)
+     * But this is only a temporary solution, so...
+     */
+    num = 0;
+    iterator = qgis_proj_list_get_iterator(projectlist);
+    while (iterator)
+    {
+	if (num >= mylen)
+	{
+	    /* mehr einträge als platz zum speichern?
+	     */
+	    retval = -1;
+	    break;
+	}
+
+	struct qgis_project_s *project = qgis_proj_list_get_next_project(&iterator);
+	if (project)
+	{
+	    const char *name = qgis_project_get_name(project);
+	    char *dup = strdup(name);
+	    if ( !dup )
+	    {
+		logerror("error: can not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    array[num] = dup;
+	    num++;
+	}
+    }
+    qgis_proj_list_return_iterator(projectlist);
+
+    *projname = array;
+    *len = mylen;
+
+    return retval;
+}
+
+
+void db_free_names_project(char **projname, int len)
+{
+    assert(projname);
+    assert(len >= 0);
+
+    int i;
+    for (i=0; i<len; i++)
+    {
+	free(projname[i]);
+    }
+    free(projname);
 }
 
 
