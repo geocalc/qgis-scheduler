@@ -103,8 +103,7 @@ void db_init(void)
     if (SQLITE_OK != retval)
     {
 	printlog("error: calling sqlite3_config(): %s\n"
-		"Can not set thread safe access mode\n"
-		"Did you compile sqlite3 with 'SQLITE_THREADSAFE=1'?", sqlite3_errstr(retval));
+		"Can not set db log function", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
 
@@ -124,7 +123,7 @@ void db_init(void)
     debug(1, "created memory db");
 
     /* setup all tables */
-    static const char sql_project_table[] = "CREATE TABLE projects (name TEXT PRIMARY KEY NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashes INTEGER)";
+    static const char sql_project_table[] = "CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER)";
     char *errormsg;
     retval = sqlite3_exec(dbhandler, sql_project_table, NULL, NULL, &errormsg);
     if (SQLITE_OK != retval)
@@ -133,7 +132,7 @@ void db_init(void)
 	exit(EXIT_FAILURE);
     }
 
-    static const char sql_process_table[] = "CREATE TABLE processes (projectname TEXT REFERENCES projects (name), state INTEGER, threadid INTEGER, pid INTEGER, process_socket_fd INTEGER, client_socket_fd INTEGER, starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )";
+    static const char sql_process_table[] = "CREATE TABLE processes (projectname TEXT REFERENCES projects (name), state INTEGER NOT NULL, threadid INTEGER, pid INTEGER UNIQ NOT NULL, process_socket_fd INTEGER UNIQ NOT NULL, client_socket_fd INTEGER, starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )";
     retval = sqlite3_exec(dbhandler, sql_process_table, NULL, NULL, &errormsg);
     if (SQLITE_OK != retval)
     {
@@ -156,6 +155,8 @@ void db_delete(void)
     qgis_process_list_delete(shutdownlist);
 
 
+    debug(1, "shutdown memory db");
+
     int retval = sqlite3_close(dbhandler);
     if (SQLITE_OK != retval)
     {
@@ -169,7 +170,6 @@ void db_delete(void)
 	printlog("error: calling sqlite3_shutdown(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
-    debug(1, "shutdown memory db");
 }
 
 
