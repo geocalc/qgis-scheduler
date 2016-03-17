@@ -28,15 +28,18 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-
+#define _GNU_SOURCE
 
 #include "database.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <sqlite3.h>
 #include <pthread.h>
 #include <assert.h>
 #include <string.h>
+#include <libgen.h>
+#include <sys/queue.h>
 
 #include "logger.h"
 #include "qgis_shutdown_queue.h"
@@ -50,7 +53,7 @@
  * project name, number of crashes during init phase
  */
 
-
+#define DB_MAX_RETRIES	10
 
 
 static sqlite3 *dbhandler = NULL;
@@ -64,6 +67,38 @@ static struct qgis_process_list_s *shutdownlist = NULL;	// list pf processes to 
 
 
 
+enum db_select_statement_id
+{
+    DB_SELECT_ID_NULL = 0,
+    DB_SELECT_CREATE_PROJECT_TABLE,
+    DB_SELECT_CREATE_PROCESS_TABLE,
+    // from this id on we can use prepared statements
+    DB_SELECT_GET_NAMES_FROM_PROJECT,
+
+    DB_SELECT_ID_MAX	// last entry, do not use
+};
+
+
+static const char *db_select_statement[DB_SELECT_ID_MAX] =
+{
+	// DB_SELECT_ID_NULL
+	"",
+	// DB_SELECT_CREATE_PROJECT_TABLE
+	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER)",
+	// DB_SELECT_CREATE_PROCESS_TABLE
+	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
+	    "state INTEGER NOT NULL, threadid INTEGER, pid INTEGER UNIQ NOT NULL, "
+	    "process_socket_fd INTEGER UNIQ NOT NULL, client_socket_fd INTEGER, "
+	    "starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )",
+	// DB_SELECT_GET_NAMES_FROM_PROJECT
+	"SELECT name FROM projects",
+
+
+};
+
+
+static sqlite3_stmt *db_prepared_stmt[DB_SELECT_ID_MAX] = { 0 };
+
 
 enum qgis_process_state_e db_state_to_qgis_state(enum db_process_state_e state)
 {
@@ -73,6 +108,198 @@ enum qgis_process_state_e db_state_to_qgis_state(enum db_process_state_e state)
 enum db_process_state_e qgis_state_to_db_state(enum qgis_process_state_e state)
 {
     return (enum db_process_state_e)state;
+}
+
+
+static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
+{
+    assert(sid < DB_SELECT_ID_MAX);
+
+    sqlite3_stmt *ppstmt;
+    const char *sql = db_select_statement[sid];
+    int retval = sqlite3_prepare(dbhandler, sql, -1, &ppstmt, NULL);
+    if (SQLITE_OK != retval)
+    {
+	printlog("error: preparing sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	exit(EXIT_FAILURE);
+    }
+
+    return ppstmt;
+}
+
+
+static void db_statement_finalize(sqlite3_stmt *ppstmt)
+{
+    int retval = sqlite3_finalize(ppstmt);
+    if (SQLITE_OK != retval)
+    {
+	printlog("error: finalizing sql statement: %s", sqlite3_errstr(retval));
+	exit(EXIT_FAILURE);
+    }
+
+
+}
+
+
+static int db_select_parameter_callback(enum db_select_statement_id sid, sqlite3_callback callback, void *callback_arg, ...)
+{
+    /* The life-cycle of a prepared statement object usually goes like this:
+     *
+     * 1. Create the prepared statement object using sqlite3_prepare_v2().
+     * 2. Bind values to parameters using the sqlite3_bind_*() interfaces.
+     * 3. Run the SQL by calling sqlite3_step() one or more times.
+     * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
+     * 5. Destroy the object using sqlite3_finalize().
+     */
+
+    assert(dbhandler);
+    const char *sql = db_select_statement[sid];
+    debug(1, "db selected %d:'%s'", sid, sql);
+
+    sqlite3_stmt *ppstmt;
+    if ( !db_prepared_stmt[sid] )
+	ppstmt = db_statement_prepare(sid);
+    else
+	ppstmt = db_prepared_stmt[sid];
+
+    int retval;
+    int try_num = 0;
+    do {
+	retval = sqlite3_step(ppstmt);
+	if (SQLITE_BUSY == retval)
+	    try_num++;
+	else if (SQLITE_ROW == retval)
+	{
+	    /* there is data available, fetch data and recall step() */
+	    debug(1, "data available: sql '%s'", db_select_statement[sid]);
+	    assert(callback);
+	    if ( !callback )
+	    {
+		printlog("error: data available but no callback function defined for sql '%s'", db_select_statement[sid]);
+		/* go on with the loop until no more data is available */
+	    }
+	    else
+	    {
+		/* prepare the callback data */
+		const int ncol_result = sqlite3_column_count(ppstmt);
+		char **text = calloc(ncol_result, sizeof(*text));
+		if ( !text )
+		{
+		    printlog("error: not enough memory");
+		    exit(EXIT_FAILURE);
+		}
+		char **cols = calloc(ncol_result, sizeof(*cols));
+		if ( !cols )
+		{
+		    printlog("error: not enough memory");
+		    exit(EXIT_FAILURE);
+		}
+
+		int i;
+		for (i = 0; i<ncol_result; i++)
+		{
+		    text[i] = sqlite3_column_text(ppstmt, i);
+		    cols[i] = sqlite3_column_name(ppstmt, i);
+		}
+
+		retval = callback(callback_arg, ncol_result, text, cols);
+
+		free(text);
+		free(cols);
+
+		if (retval)
+		{
+		    retval = SQLITE_ABORT;
+		    break;
+		}
+	    }
+	}
+	else
+	    break;
+    } while (try_num < DB_MAX_RETRIES);
+
+    switch(retval)
+    {
+    case SQLITE_BUSY:
+	printlog("error: db busy! Exceeded max calls (%d) to fetch data", try_num);
+	break;
+
+    case SQLITE_ROW:
+	/* error: there has been data available,
+	 * but the program broke out of the loop?
+	 */
+	assert(0);
+	break;
+
+    case SQLITE_ERROR:
+	/* there has been a data error. Print out and reset() the statement */
+    {
+	const char *sql = db_select_statement[sid];
+	printlog("error: stepping sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	retval = sqlite3_reset(ppstmt);
+	if (SQLITE_OK != retval)
+	{
+	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	}
+    }
+    break;
+
+    case SQLITE_MISUSE:
+	/* the statement has been incorrect */
+	printlog("error: misuse of prepared sql statement '%s'", db_select_statement[sid]);
+	break;
+
+    case SQLITE_ABORT:
+	printlog("error: abort in callback function during steps of sql '%s'", db_select_statement[sid]);
+	exit(EXIT_FAILURE);
+	break;
+
+    case SQLITE_OK:
+    case SQLITE_DONE:
+	/* the statement has finished successfully */
+	retval = sqlite3_reset(ppstmt);
+	if (SQLITE_OK != retval)
+	{
+	    const char *sql = db_select_statement[sid];
+	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    exit(EXIT_FAILURE);
+	}
+	break;
+    }
+
+    if ( !db_prepared_stmt[sid] )
+	db_statement_finalize(ppstmt);
+
+
+    return 0;
+}
+
+#define db_select_parameter(sid, ...)	\
+	db_select_parameter_callback(sid, NULL, NULL, # __VA_ARGS__ );
+
+/* prepare database stements for use */
+static void db_statements_prepare(void)
+{
+    enum db_select_statement_id i;
+    for (i=DB_SELECT_GET_NAMES_FROM_PROJECT; i<DB_SELECT_ID_MAX; i++)
+    {
+	sqlite3_stmt *ppstmt = db_statement_prepare(i);
+	db_prepared_stmt[i] = ppstmt;
+    }
+}
+
+
+/* delete prepared statements */
+static void db_statements_finalize(void)
+{
+    enum db_select_statement_id i;
+    for (i=DB_SELECT_ID_NULL; i<DB_SELECT_ID_MAX; i++)
+    {
+	sqlite3_stmt *ppstmt = db_prepared_stmt[i];
+	db_statement_finalize(ppstmt);
+
+	db_prepared_stmt[i] = NULL;
+    }
 }
 
 
@@ -122,23 +349,14 @@ void db_init(void)
     }
     debug(1, "created memory db");
 
-    /* setup all tables */
-    static const char sql_project_table[] = "CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER)";
-    char *errormsg;
-    retval = sqlite3_exec(dbhandler, sql_project_table, NULL, NULL, &errormsg);
-    if (SQLITE_OK != retval)
-    {
-	printlog("error: calling sqlite with '%s': %s", sql_project_table, errormsg);
-	exit(EXIT_FAILURE);
-    }
 
-    static const char sql_process_table[] = "CREATE TABLE processes (projectname TEXT REFERENCES projects (name), state INTEGER NOT NULL, threadid INTEGER, pid INTEGER UNIQ NOT NULL, process_socket_fd INTEGER UNIQ NOT NULL, client_socket_fd INTEGER, starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )";
-    retval = sqlite3_exec(dbhandler, sql_process_table, NULL, NULL, &errormsg);
-    if (SQLITE_OK != retval)
-    {
-	printlog("error: calling sqlite with '%s': %s", sql_process_table, errormsg);
-	exit(EXIT_FAILURE);
-    }
+    /* setup all tables */
+    db_select_parameter(DB_SELECT_CREATE_PROJECT_TABLE);
+
+    db_select_parameter(DB_SELECT_CREATE_PROCESS_TABLE);
+
+    /* prepare further statements */
+    db_statements_prepare();
 
 
     projectlist = qgis_proj_list_new();
@@ -156,6 +374,7 @@ void db_delete(void)
 
 
     debug(1, "shutdown memory db");
+    db_statements_finalize();
 
     int retval = sqlite3_close(dbhandler);
     if (SQLITE_OK != retval)
@@ -179,6 +398,27 @@ void db_add_project(const char *projname, const char *configpath)
     assert(projname);
     assert(configpath);
 
+    char *basenam = basename(configpath);
+
+    static const char sql_project_table[] = "INSERT INTO projects (name, configpath, configbasename) VALUES ('%s','%s','%s')";
+    char *sql;
+    int retval = asprintf(&sql, sql_project_table, projname, configpath, basenam);
+    if (0 > retval)
+    {
+	printlog("error: can not create string with asprintf()");
+	exit(EXIT_FAILURE);
+    }
+
+    char *errormsg;
+    retval = sqlite3_exec(dbhandler, sql, NULL, NULL, &errormsg);
+    if (SQLITE_OK != retval)
+    {
+	printlog("error: calling sqlite with '%s': %s", sql_project_table, errormsg);
+	exit(EXIT_FAILURE);
+    }
+
+    free(sql);
+
     struct qgis_project_s *project = qgis_project_new(projname, configpath);
     qgis_proj_list_add_project(projectlist, project);
 
@@ -192,8 +432,72 @@ int db_get_names_project(char ***projname, int *len)
 
     int retval = 0;
     int num = 0;
+    char **array = NULL;
+#if 1
+
+    struct namelist_s
+    {
+	STAILQ_HEAD(listhead, nameiterator_s) head;	/* Linked list head */
+    };
+
+    struct nameiterator_s
+    {
+        STAILQ_ENTRY(nameiterator_s) entries;          /* Linked list prev./next entry */
+        char *name;
+    };
+
+    int get_names_list(void *data, int ncol, char **text, char **cols)
+    {
+	struct namelist_s *list = data;
+
+	struct nameiterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	entry->name = strdup(text[0]);
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
+    struct namelist_s namelist;
+    STAILQ_INIT(&namelist.head);
+
+    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
+
+    struct nameiterator_s *it;
+    STAILQ_FOREACH(it, &namelist.head, entries)
+    {
+	num++;
+    }
+    debug(1, "select found %d project names", num);
+
+    /* aquire the pointer array */
+    *len = num;
+    array = calloc(num, sizeof(*array));
+    *projname = array;
+
+    num = 0;
+    while( !STAILQ_EMPTY(&namelist.head) )
+    {
+	assert(num < *len);
+	it = STAILQ_FIRST(&namelist.head);
+	array[num++] = it->name;
+
+	STAILQ_REMOVE_HEAD(&namelist.head, entries);
+	free(it);
+    }
+
+
+#else
     int mylen;
-    char **array;
     struct qgis_project_iterator *iterator;
 //    if (!*projname || !*len)
     {
@@ -251,6 +555,7 @@ int db_get_names_project(char ***projname, int *len)
 
     *projname = array;
     *len = mylen;
+#endif
 
     return retval;
 }
