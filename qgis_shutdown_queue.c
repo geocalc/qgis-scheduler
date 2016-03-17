@@ -295,7 +295,40 @@ static void *qgis_shutdown_thread(void *arg)
 
 void qgis_shutdown_init()
 {
-    int retval = pthread_create(&shutdownthread, NULL, qgis_shutdown_thread, NULL);
+    /* initialize the condition variable timeout clock attribute with the same
+     * value we use in the clock measurements. Else if we don't we have
+     * different timeout values (clock module <-> pthread condition timeout)
+     */
+    pthread_condattr_t	condattr;
+    int retval = pthread_condattr_init(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_setclock() id %d", get_valid_clock_id());
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_cond_init(&shutdowncondition, &condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_cond_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_destroy(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_destroy");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_create(&shutdownthread, NULL, qgis_shutdown_thread, NULL);
     if (retval)
     {
 	errno = retval;
