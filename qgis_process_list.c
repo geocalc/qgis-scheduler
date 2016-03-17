@@ -434,6 +434,7 @@ int qgis_process_list_transfer_all_process(struct qgis_process_list_s *tolist, s
 	    }
 
     }
+    debug(1, "transferred %d processes", ret);
 
     return ret;
 }
