@@ -186,6 +186,7 @@ void project_manager_inotify_configfile_changed(int wd)
 
 void project_manager_shutdown_project(const char *project_name)
 {
+//    debug(1, "shutdown project '%s'", project_name);
     db_move_all_process_from_init_to_shutdown_list(project_name);
     db_move_all_process_from_active_to_shutdown_list(project_name);
 }
@@ -193,6 +194,7 @@ void project_manager_shutdown_project(const char *project_name)
 
 void project_manager_shutdown(void)
 {
+    debug(1, "");
     char **projlist = NULL;
     int len = 0;
 
