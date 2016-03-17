@@ -1232,8 +1232,11 @@ int get_program_shutdown(void)
 void test_set_valid_clock_id(void)
 {
     static const clockid_t clockidarr[] = {
-	    CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC,
-	    CLOCK_REALTIME_COARSE, CLOCK_REALTIME};
+	    /* Note: we use the same clock id in pthread_condattr_setclock()
+	     * which seems to accept only CLOCK_MONOTONIC and CLOCK_REALTIME
+	     */
+	    /*CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE,*/ CLOCK_MONOTONIC,
+	    /*CLOCK_REALTIME_COARSE,*/ CLOCK_REALTIME};
     static const int numarr = sizeof(clockidarr)/sizeof(*clockidarr);
     int i;
 
