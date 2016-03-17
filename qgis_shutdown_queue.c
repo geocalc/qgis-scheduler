@@ -81,15 +81,50 @@ static void *qgis_shutdown_thread(void *arg)
     {
 	int retval;
 
-	pid_t pid = db_get_shutdown_process_in_timeout();
-	while (-1 != pid)
+	/* get a list of all processes in the shutdown list.
+	 * for each process evaluate:
+	 * - is process timeout and state kill? set state exit
+	 * - is process timeout and state term? send kill signal, set state
+	 *   kill, start timer again. if process does not exist set state exit
+	 * - is process timeout and state idle? send term signal, set state
+	 *   term, start timer. if process does not exist set state exit
+	 * - for any other process of the state term or kill do record the
+	 *   timeout and evaluate next (minimal) timeout.
+	 *
+	 * Now erase all process with state exit from list.
+	 *
+	 * Are we in shutdown mode and is no entry left? then leave
+	 *
+	 * Is a timeout value given? then wait with timeout. else wait infinite
+	 */
+
+	struct timespec current_time;
+	retval = qgis_timer_start(&current_time);
+	if (retval)
 	{
+	    logerror("error: retrieving time");
+	    exit(EXIT_FAILURE);
+	}
+
+	pid_t *pidlist;
+	int len;
+	retval = db_get_list_process_by_list(&pidlist, &len, LIST_SHUTDOWN);
+	// no need to check, retval is always 0
+
+	struct timespec min_timer = {0};
+	struct timespec proc_timer = {0};
+	int i;
+	for (i=0; i<len; i++)
+	{
+	    pid_t pid = pidlist[i];
 	    enum db_process_state_e state = db_get_process_state(pid);
+	    debug(1, "check pid %d, state %d", pid, state);
 	    switch(state)
 	    {
 	    case PROC_STATE_IDLE:
-		/* send term signal */
+		/* we have an idle process. immediately send a term signal */
 		retval = kill(pid, SIGTERM);
+		debug(1, "kill(%d, SIGTERM) returned %d, errno %d", pid, retval, errno);
 		if (-1 == retval)
 		{
 		    if (ESRCH == errno)
@@ -120,40 +155,72 @@ static void *qgis_shutdown_thread(void *arg)
 			logerror("error setting the time value");
 			exit(EXIT_FAILURE);
 		    }
+
+		    /* get the time of the last signal action to calculate the timeout
+		     * value of the pthread_cond_timedwait() call.
+		     */
+		    retval = db_get_signal_timer(&proc_timer, pid);
+		    if ( !qgis_timer_is_empty(&proc_timer) )
+		    {
+			if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
+			{
+			    min_timer = proc_timer;
+			}
+		    }
 		}
 		break;
 
 	    case PROC_STATE_TERM:
-		/* send kill signal */
-		retval = kill(pid, SIGKILL);
-		if (-1 == retval)
+		/* we have a process which has received a TERM signal.
+		 * check the remaining signal time if it exceeds the timeout value.
+		 * if it does send a kill signal
+		 */
+		retval = db_get_signal_timer(&proc_timer, pid);
+		qgis_timer_add(&proc_timer, &default_signal_timeout);
+		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
 		{
-		    if (ESRCH == errno)
+		    retval = kill(pid, SIGKILL);
+		    if (-1 == retval)
 		    {
-			db_process_set_state_exit(pid);
+			if (ESRCH == errno)
+			{
+			    db_process_set_state_exit(pid);
+			}
+			else
+			{
+			    logerror("error calling kill(%d, SIGTERM)", pid);
+			    exit(EXIT_FAILURE);
+			}
 		    }
-		    else
-		    {
-			logerror("error calling kill(%d, SIGTERM)", pid);
-			exit(EXIT_FAILURE);
+		    else {
+			/* signal has been send. reset signal time to current time
+			 * and change process state
+			 */
+			retval = db_process_set_state(pid, PROC_STATE_KILL);
+			if (-1 == retval)
+			{
+			    printlog("error: can not set state to pid %d, unknown", pid);
+			    exit(EXIT_FAILURE);
+			}
+
+			retval = db_reset_signal_timer(pid);
+			if (-1 == retval)
+			{
+			    logerror("error setting the time value");
+			    exit(EXIT_FAILURE);
+			}
 		    }
 		}
-		else {
-		    /* signal has been send. reset signal time to current time
-		     * and change process state
-		     */
-		    retval = db_process_set_state(pid, PROC_STATE_KILL);
-		    if (-1 == retval)
-		    {
-			printlog("error: can not set state to pid %d, unknown", pid);
-			exit(EXIT_FAILURE);
-		    }
 
-		    retval = db_reset_signal_timer(pid);
-		    if (-1 == retval)
+		/* get the time of the last signal action to calculate the timeout
+		 * value of the pthread_cond_timedwait() call.
+		 */
+		retval = db_get_signal_timer(&proc_timer, pid);
+		if ( !qgis_timer_is_empty(&proc_timer) )
+		{
+		    if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
 		    {
-			logerror("error setting the time value");
-			exit(EXIT_FAILURE);
+			min_timer = proc_timer;
 		    }
 		}
 		break;
@@ -162,37 +229,42 @@ static void *qgis_shutdown_thread(void *arg)
 		/* still not gone?
 		 * remove from db
 		 */
-		db_process_set_state_exit(pid);
+		retval = db_get_signal_timer(&proc_timer, pid);
+		qgis_timer_add(&proc_timer, &default_signal_timeout);
+		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
+		{
+		    db_process_set_state_exit(pid);
+		}
+
+		/* get the time of the last signal action to calculate the timeout
+		 * value of the pthread_cond_timedwait() call.
+		 */
+		retval = db_get_signal_timer(&proc_timer, pid);
+		if ( !qgis_timer_is_empty(&proc_timer) )
+		{
+		    if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
+		    {
+			min_timer = proc_timer;
+		    }
+		}
+		break;
+
+	    case PROC_STATE_EXIT:
+		/* zombi entry.
+		 * delete it later.
+		 */
 		break;
 
 	    default:
 		printlog("error: unexpected state value (%d) in shutdown list", state);
 		exit(EXIT_FAILURE);
 	    }
-
-	    /* warning: better design necessary. this could lead to infinite
-	     * loop if the current list item (i.e. process item) does not
-	     * change. TODO
-	     */
-	    pid = db_get_shutdown_process_in_timeout();
 	}
 
-	/* clean up the resources for the process entries being in state EXIT
-	 * i.e. they have no corresponding process anymore and shall be removed
+	/* we checked all processes in the shutdown list.
+	 * now wheed out the processes with state exit
 	 */
-	retval = db_remove_process_with_state_exit();
-	debug(1, "removed %d processes with state exit", retval);
-
-	/* get the timeout of the next signalling round.
-	 * if no process is in the list "ts_sig" may be {0,0}
-	 */
-	struct timespec ts_sig = {0,0};
-	db_shutdown_get_min_signaltimer(&ts_sig);
-	debug(1, "min signal timer is %ld,%03lds", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-	if ( !qgis_timer_is_empty(&ts_sig) )
-	{
-	    qgis_timer_add(&ts_sig, &default_signal_timeout);
-	}
+	db_remove_process_with_state_exit();
 
 	/* wait for signal or new process or thread cancel request */
 	retval = pthread_mutex_lock(&shutdownmutex);
@@ -210,7 +282,7 @@ static void *qgis_shutdown_thread(void *arg)
 	 */
 	if ( !has_list_change )
 	{
-	    if ( qgis_timer_is_empty(&ts_sig) )
+	    if ( qgis_timer_is_empty(&min_timer) )
 	    {
 		if (do_shutdown_thread)
 		{
@@ -222,7 +294,7 @@ static void *qgis_shutdown_thread(void *arg)
 		     * Set a small timeout of 0.2 seconds in case we do not exit
 		     * this loop immediately.
 		     */
-		    retval = qgis_timer_start(&ts_sig);
+		    retval = qgis_timer_start(&min_timer);
 		    if (retval)
 		    {
 			logerror("error: can not get clock value");
@@ -232,10 +304,12 @@ static void *qgis_shutdown_thread(void *arg)
 			    tv_sec: 0,
 			    tv_nsec: 200*1000*1000
 		    };
-		    qgis_timer_add(&ts_sig, &ts_timeout);
+		    qgis_timer_add(&min_timer, &ts_timeout);
 
-		    debug(1, "wait %ld,%03ld seconds (until %ld,%03ld) or until next condition", ts_timeout.tv_sec, (ts_timeout.tv_nsec/(1000*1000)), ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
+		    struct timespec temp_ts;
+		    qgis_timer_start(&temp_ts);
+		    debug(1, "do shutdown and not signal timer set? current time: %ld,%03lds. wait %ld,%03ld seconds (until %ld,%03ld) or until next condition", temp_ts.tv_sec, (temp_ts.tv_nsec/(1000*1000)), ts_timeout.tv_sec, (ts_timeout.tv_nsec/(1000*1000)), min_timer.tv_sec, (min_timer.tv_nsec/(1000*1000)));
+		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &min_timer);
 		}
 		else
 		{
@@ -245,8 +319,12 @@ static void *qgis_shutdown_thread(void *arg)
 	    }
 	    else
 	    {
-		debug(1, "wait until %ld,%03ld or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
+		qgis_timer_add(&min_timer, &default_signal_timeout);
+		struct timespec temp_ts;
+		qgis_timer_start(&temp_ts);
+		debug(1, "current time: %ld,%03lds. wait until %ld,%03ld or until next condition", temp_ts.tv_sec, (temp_ts.tv_nsec/(1000*1000)), min_timer.tv_sec, (min_timer.tv_nsec/(1000*1000)));
+		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &min_timer);
+		debug(1, "pthread_cond_timedwait() returned %d", retval);
 	    }
 
 	    if ( 0 != retval && ETIMEDOUT != retval )
@@ -286,7 +364,6 @@ static void *qgis_shutdown_thread(void *arg)
 		break;
 	    }
 	}
-
     }
 
     return NULL;
