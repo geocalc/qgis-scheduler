@@ -103,6 +103,9 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state);
 int db_get_num_process_by_status(const char *projname, enum db_process_state_e state);
 int db_get_num_active_process(const char *projname);
 
+int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_e list);
+void db_free_list_process(pid_t *list, int len);
+
 void db_move_process_to_list(enum db_process_list_e list, pid_t pid);
 enum db_process_list_e db_get_process_list(pid_t pid);
 void db_move_all_idle_process_from_init_to_active_list(const char *projname);
@@ -111,6 +114,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname);
 
 pid_t db_get_shutdown_process_in_timeout(void);
 int db_reset_signal_timer(pid_t pid);
+int db_get_signal_timer(struct timespec *ts, pid_t pid);
 void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval);
 int db_get_num_shutdown_processes(void);
 int db_remove_process_with_state_exit(void);

@@ -81,7 +81,7 @@ enum db_process_state_e qgis_state_to_db_state(enum qgis_process_state_e state)
 static void db_log(void *obsolete, int result, const char *msg)
 {
     (void)obsolete;
-    /* TODO doku says we have to be thread save.
+    /* TODO documentation says we have to be thread save.
      * is it sufficient to rely on printlog(...) ?
      */
     debug(1, "SQlite3: retval %d, %s", result, msg);
@@ -163,6 +163,7 @@ void db_delete(void)
 	printlog("error: calling sqlite3_close(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
+    dbhandler = NULL;
 
     retval = sqlite3_shutdown();
     if (SQLITE_OK != retval)
@@ -207,6 +208,7 @@ int db_get_names_project(char ***projname, int *len)
     /* aquire the pointer array */
     array = calloc(num, sizeof(char *));
     mylen = num;
+    debug(1, "found %d project names", num);
     }
 //    else
 //    {
@@ -427,6 +429,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
     }
     if (proc)
 	ret = qgis_process_get_state(proc);
+    debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
 }
@@ -458,6 +461,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 //    }
     if (proc)
 	ret = qgis_process_set_state_init(proc, thread_id);
+    debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
 
@@ -487,6 +491,7 @@ int db_process_set_state_idle(pid_t pid)
     }
     if (proc)
 	ret = qgis_process_set_state_idle(proc);
+    debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
 }
@@ -509,6 +514,7 @@ int db_process_set_state_exit(pid_t pid)
     }
     if (proc)
 	ret = qgis_process_set_state_exit(proc);
+    debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
 }
@@ -531,6 +537,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
     }
     if (proc)
 	ret = qgis_process_set_state(proc, state);
+    debug(1, "set state %d for process %d returned %d", state, pid, ret);
 
     return ret;
 }
@@ -573,6 +580,179 @@ int db_get_num_active_process(const char *projname)
     }
 
     return ret;
+}
+
+
+int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_e list)
+{
+    assert(pidlist);
+    assert(len);
+    assert(list < LIST_SELECTOR_MAX);
+
+    struct pidlist_s
+    {
+	STAILQ_HEAD(listhead, piditerator_s) head;	/* Linked list head */
+    };
+
+    struct piditerator_s
+    {
+        STAILQ_ENTRY(piditerator_s) entries;          /* Linked list prev./next entry */
+        pid_t pid;
+    };
+
+#if 0
+    int get_pid_list(void *data, int ncol, char **text, char **cols)
+    {
+	struct pidlist_s *list = data;
+
+	struct piditerator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	entry->pid = atol(text[0]);	// TODO: get better converter or use converter from sqlite
+		    // TODO is pid int or long int?
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
+
+    struct pidlist_s mypidlist;
+    STAILQ_INIT(&mypidlist.head);
+
+    static const char sql_get_pid[] = "SELECT name FROM projects WHERE list = %d";
+    char *sql;
+    int retval = asprintf(&sql, sql_get_pid, list);
+    if (retval < 0)
+    {
+	logerror("error: asprintf");
+	exit(EXIT_FAILURE);
+    }
+
+    char *errormsg;
+    retval = sqlite3_exec(dbhandler, sql_get_pid, get_pid_list, &pidlist, &errormsg);
+    if (SQLITE_OK != retval)
+    {
+	printlog("error: calling sqlite with '%s': %s", sql_get_pid, sqlite3_errstr(retval));
+	exit(EXIT_FAILURE);
+    }
+    free(sql);
+#else
+
+    int retval = 0;
+    struct pidlist_s mypidlist;
+    STAILQ_INIT(&mypidlist.head);
+    if (LIST_SHUTDOWN == list)
+    {
+	assert(shutdownlist);
+
+	struct qgis_process_list_s *proclist = shutdownlist;
+	struct qgis_process_iterator *process_iterator = qgis_process_list_get_iterator(proclist);
+	while (process_iterator)
+	{
+	    struct qgis_process_s *process = qgis_process_list_get_next_process(&process_iterator);
+	    pid_t pid = qgis_process_get_pid(process);
+
+	    struct piditerator_s *entry = malloc(sizeof(*entry));
+	    assert(entry);
+	    if ( !entry )
+	    {
+		logerror("could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    entry->pid = pid;
+
+	    if (STAILQ_EMPTY(&mypidlist.head))
+		STAILQ_INSERT_HEAD(&mypidlist.head, entry, entries);
+	    else
+		STAILQ_INSERT_TAIL(&mypidlist.head, entry, entries);
+
+	}
+	qgis_process_list_return_iterator(proclist);
+    }
+    else
+    {
+	struct qgis_project_iterator *project_iterator = qgis_proj_list_get_iterator(projectlist);
+
+	while (project_iterator)
+	{
+	    struct qgis_project_s *project = qgis_proj_list_get_next_project(&project_iterator);
+
+	    struct qgis_process_list_s *proclist;
+	    if (LIST_INIT == list)
+		proclist = qgis_project_get_init_process_list(project);
+	    else
+		proclist = qgis_project_get_active_process_list(project);
+
+	    struct qgis_process_iterator *process_iterator = qgis_process_list_get_iterator(proclist);
+	    while (process_iterator)
+	    {
+		struct qgis_process_s *process = qgis_process_list_get_next_process(&process_iterator);
+		pid_t pid = qgis_process_get_pid(process);
+
+		struct piditerator_s *entry = malloc(sizeof(*entry));
+		assert(entry);
+		if ( !entry )
+		{
+		    logerror("could not allocate memory");
+		    exit(EXIT_FAILURE);
+		}
+		entry->pid = pid;
+
+		if (STAILQ_EMPTY(&mypidlist.head))
+		    STAILQ_INSERT_HEAD(&mypidlist.head, entry, entries);
+		else
+		    STAILQ_INSERT_TAIL(&mypidlist.head, entry, entries);
+
+	    }
+	    qgis_process_list_return_iterator(proclist);
+
+	}
+
+	qgis_proj_list_return_iterator(projectlist);
+    }
+
+#endif
+
+    int num = 0;
+    struct piditerator_s *it;
+    STAILQ_FOREACH(it, &mypidlist.head, entries)
+    {
+	num++;
+    }
+    debug(1, "select found %d processes", num);
+
+    /* aquire the pointer array */
+    *len = num;
+    pid_t *array = calloc(num, sizeof(*array));
+    *pidlist = array;
+
+    num = 0;
+    while( !STAILQ_EMPTY(&mypidlist.head) )
+    {
+	assert(num < *len);
+	it = STAILQ_FIRST(&mypidlist.head);
+	array[num++] = it->pid;
+
+	STAILQ_REMOVE_HEAD(&mypidlist.head, entries);
+	free(it);
+    }
+
+    return retval;
+}
+
+
+void db_free_list_process(pid_t *list, int len)
+{
+//    assert(list);
+    free(list);
 }
 
 
@@ -683,6 +863,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
  */
 void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
+    debug(1, "project '%s'", projname);
     struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
     int shutdownnum = qgis_process_list_get_num_process(proclist);
@@ -696,6 +877,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
  */
 void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
+    debug(1, "project '%s'", projname);
     struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     struct qgis_process_list_s *proclist = qgis_project_get_init_process_list(project);
     int shutdownnum = qgis_process_list_get_num_process(proclist);
@@ -742,6 +924,35 @@ int db_reset_signal_timer(pid_t pid)
     }
     if (proc)
 	ret = qgis_process_reset_signaltime(proc);
+    debug(1, "for process %d returned %d", pid, ret);
+
+    return ret;
+}
+
+
+int db_get_signal_timer(struct timespec *ts, pid_t pid)
+{
+    assert(ts);
+
+    int ret = -1;
+    struct qgis_process_s *proc = NULL;
+    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
+    if (project)
+    {
+	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
+	assert(proc_list);
+	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+    }
+    else
+    {
+	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
+    }
+    if (proc)
+    {
+	*ts = *qgis_process_get_signaltime(proc);
+	ret = 0;
+    }
+    debug(1, "pid %d, value %ld,%03lds. returned %d", pid, ts->tv_sec, (ts->tv_nsec/(1000*1000)), ret);
 
     return ret;
 }
@@ -764,6 +975,7 @@ int db_get_num_shutdown_processes(void)
 int db_remove_process_with_state_exit(void)
 {
     int retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
+    debug(1, "removed %d processes from shutdown list", retval);
 
     return retval;
 }
