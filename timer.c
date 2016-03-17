@@ -86,13 +86,15 @@ int qgis_timer_sub(const struct timespec *timer, struct timespec *timersub)
     int retval = clock_gettime(get_valid_clock_id(), &newtime);
     if (-1 != retval)
     {
-	    timersub->tv_sec = newtime.tv_sec - timer->tv_sec;
-	    timersub->tv_nsec = newtime.tv_nsec - timer->tv_nsec;
-	    if (0 > timersub->tv_nsec)
-	    {
-		timersub->tv_nsec += TIMESPEC_NSEC_ONE_SECOND;
-		timersub->tv_sec--;
-	    }
+	assert(timer->tv_nsec < TIMESPEC_NSEC_ONE_SECOND);
+
+	timersub->tv_sec = newtime.tv_sec - timer->tv_sec;
+	timersub->tv_nsec = newtime.tv_nsec - timer->tv_nsec;
+	if (0 > timersub->tv_nsec)
+	{
+	    timersub->tv_nsec += TIMESPEC_NSEC_ONE_SECOND;
+	    timersub->tv_sec--;
+	}
     }
 
     return retval;
