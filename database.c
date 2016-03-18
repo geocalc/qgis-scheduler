@@ -56,6 +56,40 @@
 #define DB_MAX_RETRIES	10
 
 
+/* callback function for the common query function.
+ * First parameter is the data given by "callback_arg"
+ * from int db_select_parameter_callback(enum db_select_statement_id sid, sqlite3_callback callback, void *callback_arg, ...)
+ * Second parameter is the number of columns in the result.
+ * Third parameter is the data type of the result array, one entry for each result.
+ * Forth parameter is the array of results, which have to be converted. Do like this:
+ * switch (type[i])
+ * {
+ * case SQLITE_INTEGER:
+ * 	int value = results[i].integer;
+ * 	break;
+ * case SQLITE_FLOAT:
+ * 	double value = results[i].floating;
+ * 	break;
+ * case SQLITE_BLOB:
+ * 	const void *data = results[i].blob;
+ * 	break;
+ * case SQLITE_NULL:
+ * 	break;
+ * case SQLITE_TEXT:
+ * 	char *value = strdup(results[i].text);
+ * 	break;
+ * }
+ * Fifth parameter is the array of column names.
+ */
+union callback_result_t {
+    int integer;
+    double floating;
+    const unsigned char *text;
+    const void *blob;
+};
+typedef int (*db_callback)(void *data, int ncol, int *type, union callback_result_t *results, const char**cols);
+
+
 static sqlite3 *dbhandler = NULL;
 
 /* transitional data. this will be deleted after the code change */
@@ -141,6 +175,174 @@ static void db_statement_finalize(sqlite3_stmt *ppstmt)
 }
 
 
+static int db_select_parameter_new_callback(enum db_select_statement_id sid, db_callback callback, void *callback_arg, ...)
+{
+    /* The life-cycle of a prepared statement object usually goes like this:
+     *
+     * 1. Create the prepared statement object using sqlite3_prepare_v2().
+     * 2. Bind values to parameters using the sqlite3_bind_*() interfaces.
+     * 3. Run the SQL by calling sqlite3_step() one or more times.
+     * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
+     * 5. Destroy the object using sqlite3_finalize().
+     */
+
+    assert(dbhandler);
+    const char *sql = db_select_statement[sid];
+    debug(1, "db selected %d:'%s'", sid, sql);
+
+    sqlite3_stmt *ppstmt;
+    if ( !db_prepared_stmt[sid] )
+	ppstmt = db_statement_prepare(sid);
+    else
+	ppstmt = db_prepared_stmt[sid];
+
+    int retval;
+    int try_num = 0;
+    do {
+	retval = sqlite3_step(ppstmt);
+	if (SQLITE_BUSY == retval)
+	    try_num++;
+	else if (SQLITE_ROW == retval)
+	{
+	    /* there is data available, fetch data and recall step() */
+	    debug(1, "data available: sql '%s'", db_select_statement[sid]);
+	    assert(callback);
+	    if ( !callback )
+	    {
+		printlog("error: data available but no callback function defined for sql '%s'", db_select_statement[sid]);
+		/* go on with the loop until no more data is available */
+	    }
+	    else
+	    {
+		/* prepare the callback data */
+		const int ncol_result = sqlite3_column_count(ppstmt);
+		int *type = calloc(ncol_result, sizeof(*type));
+		if ( !type )
+		{
+		    printlog("error: not enough memory");
+		    exit(EXIT_FAILURE);
+		}
+		union callback_result_t *results = calloc(ncol_result, sizeof(*results));
+		if ( !results )
+		{
+		    printlog("error: not enough memory");
+		    exit(EXIT_FAILURE);
+		}
+		const char **cols = calloc(ncol_result, sizeof(*cols));
+		if ( !cols )
+		{
+		    printlog("error: not enough memory");
+		    exit(EXIT_FAILURE);
+		}
+
+		int i;
+		for (i = 0; i<ncol_result; i++)
+		{
+		    int mytype =
+			    type[i] = sqlite3_column_type(ppstmt, i);
+		    switch(mytype)
+		    {
+		    case SQLITE_INTEGER:
+			results[i].integer = sqlite3_column_int(ppstmt, i);
+			break;
+
+		    case SQLITE_FLOAT:
+			results[i].floating = sqlite3_column_double(ppstmt, i);
+			break;
+
+		    case SQLITE_TEXT:
+			results[i].text = sqlite3_column_text(ppstmt, i);
+			break;
+
+		    case SQLITE_BLOB:
+			results[i].blob = sqlite3_column_blob(ppstmt, i);
+			break;
+
+		    case SQLITE_NULL:
+			break;
+
+		    default:
+			printlog("error: unknown type %d", mytype);
+			exit(EXIT_FAILURE);
+		    }
+		    cols[i] = sqlite3_column_name(ppstmt, i);
+		}
+
+		retval = callback(callback_arg, ncol_result, type, results, cols);
+
+		//TODO: reuse arrays for the next row
+		free(type);
+		free(results);
+		free(cols);
+
+		if (retval)
+		{
+		    retval = SQLITE_ABORT;
+		    break;
+		}
+	    }
+	}
+	else
+	    break;
+    } while (try_num < DB_MAX_RETRIES);
+
+    switch(retval)
+    {
+    case SQLITE_BUSY:
+	printlog("error: db busy! Exceeded max calls (%d) to fetch data", try_num);
+	break;
+
+    case SQLITE_ROW:
+	/* error: there has been data available,
+	 * but the program broke out of the loop?
+	 */
+	assert(0);
+	break;
+
+    case SQLITE_ERROR:
+	/* there has been a data error. Print out and reset() the statement */
+    {
+	const char *sql = db_select_statement[sid];
+	printlog("error: stepping sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	retval = sqlite3_reset(ppstmt);
+	if (SQLITE_OK != retval)
+	{
+	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	}
+    }
+    break;
+
+    case SQLITE_MISUSE:
+	/* the statement has been incorrect */
+	printlog("error: misuse of prepared sql statement '%s'", db_select_statement[sid]);
+	break;
+
+    case SQLITE_ABORT:
+	printlog("error: abort in callback function during steps of sql '%s'", db_select_statement[sid]);
+	exit(EXIT_FAILURE);
+	break;
+
+    case SQLITE_OK:
+    case SQLITE_DONE:
+	/* the statement has finished successfully */
+	retval = sqlite3_reset(ppstmt);
+	if (SQLITE_OK != retval)
+	{
+	    const char *sql = db_select_statement[sid];
+	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    exit(EXIT_FAILURE);
+	}
+	break;
+    }
+
+    if ( !db_prepared_stmt[sid] )
+	db_statement_finalize(ppstmt);
+
+
+    return 0;
+}
+
+
 static int db_select_parameter_callback(enum db_select_statement_id sid, sqlite3_callback callback, void *callback_arg, ...)
 {
     /* The life-cycle of a prepared statement object usually goes like this:
@@ -221,7 +423,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, sqlite3
     switch(retval)
     {
     case SQLITE_BUSY:
-	printlog("error: db busy! Exceeded max calls (%d) to fetch data", try_num);
+	printlog("error: db busy! Exceeded max calls (= %d) to fetch data", try_num);
 	break;
 
     case SQLITE_ROW:
@@ -446,6 +648,29 @@ int db_get_names_project(char ***projname, int *len)
         char *name;
     };
 
+    int get_new_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct namelist_s *list = data;
+
+	struct nameiterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+	entry->name = strdup((const char *)results[0].text);
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
     int get_names_list(void *data, int ncol, char **text, char **cols)
     {
 	struct namelist_s *list = data;
@@ -470,7 +695,8 @@ int db_get_names_project(char ***projname, int *len)
     struct namelist_s namelist;
     STAILQ_INIT(&namelist.head);
 
-    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
+//    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
+    db_select_parameter_new_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_new_names_list, &namelist);
 
     struct nameiterator_s *it;
     STAILQ_FOREACH(it, &namelist.head, entries)
