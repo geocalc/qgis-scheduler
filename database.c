@@ -170,8 +170,6 @@ static void db_statement_finalize(sqlite3_stmt *ppstmt)
 	printlog("error: finalizing sql statement: %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
-
-
 }
 
 
@@ -192,7 +190,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
     sqlite3_stmt *ppstmt;
     if ( !db_prepared_stmt[sid] )
-	ppstmt = db_statement_prepare(sid);
+	db_prepared_stmt[sid] =
+		ppstmt = db_statement_prepare(sid);
     else
 	ppstmt = db_prepared_stmt[sid];
 
@@ -335,9 +334,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	break;
     }
 
-    if ( !db_prepared_stmt[sid] )
-	db_statement_finalize(ppstmt);
-
+//    if ( !db_prepared_stmt[sid] )
+//	db_statement_finalize(ppstmt);
 
     return 0;
 }
@@ -348,15 +346,15 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
 
 /* prepare database stements for use */
-static void db_statements_prepare(void)
-{
-    enum db_select_statement_id i;
-    for (i=DB_SELECT_GET_NAMES_FROM_PROJECT; i<DB_SELECT_ID_MAX; i++)
-    {
-	sqlite3_stmt *ppstmt = db_statement_prepare(i);
-	db_prepared_stmt[i] = ppstmt;
-    }
-}
+//static void db_statements_prepare(void)
+//{
+//    enum db_select_statement_id i;
+//    for (i=DB_SELECT_GET_NAMES_FROM_PROJECT; i<DB_SELECT_ID_MAX; i++)
+//    {
+//	sqlite3_stmt *ppstmt = db_statement_prepare(i);
+//	db_prepared_stmt[i] = ppstmt;
+//    }
+//}
 
 
 /* delete prepared statements */
@@ -426,7 +424,7 @@ void db_init(void)
     db_select_parameter(DB_SELECT_CREATE_PROCESS_TABLE);
 
     /* prepare further statements */
-    db_statements_prepare();
+//    db_statements_prepare();
 
 
     projectlist = qgis_proj_list_new();
