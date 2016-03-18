@@ -274,16 +274,31 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	    case 'p':
 		/* found pointer value "%p". The next argument is the
 		 * type "void *" */
-#warning todo
-		assert(0);
+	    {
+		assert(0); // TODO need to extend "%p" to "%NNNp" with NNN being decimal number describing the size of 'p'
+                const void *v = va_arg(args, void *);
+                retval = sqlite3_bind_blob(ppstmt, col++, v, -1, SQLITE_STATIC);
+                if ( SQLITE_OK != retval )
+                {
+                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    exit(EXIT_FAILURE);
+                }
 		break;
+	    }
 
 	    case 'f':
 		/* found double value "%f". The next argument is the
 		 * type "double" */
-#warning todo
-		assert(0);
+	    {
+                double d = va_arg(args, double);
+                retval = sqlite3_bind_double(ppstmt, col++, d);
+                if ( SQLITE_OK != retval )
+                {
+                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    exit(EXIT_FAILURE);
+                }
 		break;
+	    }
 
 	    case 's':
 		/* found string value "%s". The next argument is the
@@ -303,9 +318,16 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	    case 'i':
 		/* found integer value "%i". The next argument is the
 		 * type "int" */
-#warning todo
-		assert(0);
+	    {
+                int i = va_arg(args, int);
+                retval = sqlite3_bind_int(ppstmt, col++, i);
+                if ( SQLITE_OK != retval )
+                {
+                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    exit(EXIT_FAILURE);
+                }
 		break;
+	    }
 
 	    case '%':
 		/* found double percent sign "%%". just go on */
