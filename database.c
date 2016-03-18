@@ -516,7 +516,7 @@ int db_get_names_project(char ***projname, int *len)
         char *name;
     };
 
-    int get_new_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    int get_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	struct namelist_s *list = data;
 
@@ -539,32 +539,11 @@ int db_get_names_project(char ***projname, int *len)
 	return 0;
     }
 
-    int get_names_list(void *data, int ncol, char **text, char **cols)
-    {
-	struct namelist_s *list = data;
-
-	struct nameiterator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    logerror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-	entry->name = strdup(text[0]);
-
-	if (STAILQ_EMPTY(&list->head))
-	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
-	else
-	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
-
-	return 0;
-    }
 
     struct namelist_s namelist;
     STAILQ_INIT(&namelist.head);
 
-//    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
-    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_new_names_list, &namelist);
+    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
 
     struct nameiterator_s *it;
     STAILQ_FOREACH(it, &namelist.head, entries)
