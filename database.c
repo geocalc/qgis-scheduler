@@ -185,6 +185,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      */
 
     assert(dbhandler);
+    assert(sid < DB_SELECT_ID_MAX);
     const char *sql = db_select_statement[sid];
     debug(1, "db selected %d:'%s'", sid, sql);
 
