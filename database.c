@@ -109,6 +109,7 @@ enum db_select_statement_id
     DB_SELECT_CREATE_PROCESS_TABLE,
     // from this id on we can use prepared statements
     DB_SELECT_GET_NAMES_FROM_PROJECT,
+    DB_INSERT_PROJECT_DATA,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -127,7 +128,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	    "starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )",
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
-
+	// DB_INSERT_PROJECT_DATA
+	"INSERT INTO projects (name, configpath, configbasename) VALUES (%s,%s,%s)",
 
 };
 
@@ -595,24 +597,7 @@ void db_add_project(const char *projname, const char *configpath)
 
     char *basenam = basename(configpath);
 
-    static const char sql_project_table[] = "INSERT INTO projects (name, configpath, configbasename) VALUES ('%s','%s','%s')";
-    char *sql;
-    int retval = asprintf(&sql, sql_project_table, projname, configpath, basenam);
-    if (0 > retval)
-    {
-	printlog("error: can not create string with asprintf()");
-	exit(EXIT_FAILURE);
-    }
-
-    char *errormsg;
-    retval = sqlite3_exec(dbhandler, sql, NULL, NULL, &errormsg);
-    if (SQLITE_OK != retval)
-    {
-	printlog("error: calling sqlite with '%s': %s", sql_project_table, errormsg);
-	exit(EXIT_FAILURE);
-    }
-
-    free(sql);
+    db_select_parameter_callback(DB_INSERT_PROJECT_DATA, NULL, NULL, projname, configpath, basenam);
 
     struct qgis_project_s *project = qgis_project_new(projname, configpath);
     qgis_proj_list_add_project(projectlist, project);
