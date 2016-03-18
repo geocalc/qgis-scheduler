@@ -34,6 +34,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <sqlite3.h>
 #include <pthread.h>
 #include <assert.h>
@@ -244,11 +245,12 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
      * 5. Destroy the object using sqlite3_finalize().
      */
+    int retval;
 
     assert(dbhandler);
     assert(sid < DB_SELECT_ID_MAX);
     const char *sql = db_select_statement[sid];
-    debug(1, "db selected %d:'%s'", sid, sql);
+    debug(1, "db selected %d: '%s'", sid, sql);
 
     sqlite3_stmt *ppstmt;
     if ( !db_prepared_stmt[sid] )
@@ -257,7 +259,73 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
     else
 	ppstmt = db_prepared_stmt[sid];
 
-    int retval;
+    /* evaluate the remaining arguments */
+    int col = 1;	// column position index
+    va_list args;
+    va_start(args, callback_arg);
+    while (*sql)
+    {
+	if ('%' == *sql++)
+	{
+	    switch(*sql++)
+	    {
+	    case 'p':
+		/* found pointer value "%p". The next argument is the
+		 * type "void *" */
+#warning todo
+		assert(0);
+		break;
+
+	    case 'f':
+		/* found double value "%f". The next argument is the
+		 * type "double" */
+#warning todo
+		assert(0);
+		break;
+
+	    case 's':
+		/* found string value "%s". The next argument is the
+		 * type "const char *" */
+	    {
+                const char *s = va_arg(args, char *);
+                retval = sqlite3_bind_text(ppstmt, col++, s, -1, SQLITE_STATIC);
+                if ( SQLITE_OK != retval )
+                {
+                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    exit(EXIT_FAILURE);
+                }
+		break;
+	    }
+
+	    case 'd':	// fall through
+	    case 'i':
+		/* found integer value "%i". The next argument is the
+		 * type "int" */
+#warning todo
+		assert(0);
+		break;
+
+	    case '%':
+		/* found double percent sign "%%". just go on */
+		break;
+
+	    case '\0':
+		/* percentage sign has been the last character in the string
+		 * rewind the string, so the outer while() catches the end of
+		 * the string.
+		 */
+		sql--;
+		break;
+
+	    default:
+		/* unknown character found. exit */
+		printlog("unknown character found in sql string '%s', position %ld: %c", db_select_statement[sid], (long int)(sql - db_select_statement[sid]), *sql);
+		exit(EXIT_FAILURE);
+	    }
+	}
+    }
+    va_end(args);
+
     int try_num = 0;
     do {
 	retval = sqlite3_step(ppstmt);
@@ -488,11 +556,8 @@ void db_init(void)
     /* prepare further statements */
 //    db_statements_prepare();
 
-
     projectlist = qgis_proj_list_new();
     shutdownlist = qgis_process_list_new();
-
-
 }
 
 
