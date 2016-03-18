@@ -260,6 +260,9 @@ static void *qgis_shutdown_thread(void *arg)
 		exit(EXIT_FAILURE);
 	    }
 	}
+	db_free_list_process(pidlist, len);
+	pidlist = NULL;
+	len = 0;
 
 	/* we checked all processes in the shutdown list.
 	 * now wheed out the processes with state exit
