@@ -175,7 +175,7 @@ static void db_statement_finalize(sqlite3_stmt *ppstmt)
 }
 
 
-static int db_select_parameter_new_callback(enum db_select_statement_id sid, db_callback callback, void *callback_arg, ...)
+static int db_select_parameter_callback(enum db_select_statement_id sid, db_callback callback, void *callback_arg, ...)
 {
     /* The life-cycle of a prepared statement object usually goes like this:
      *
@@ -344,7 +344,7 @@ static int db_select_parameter_new_callback(enum db_select_statement_id sid, db_
 
 
 #define db_select_parameter(sid, ...)	\
-	db_select_parameter_new_callback(sid, NULL, NULL, # __VA_ARGS__ );
+	db_select_parameter_callback(sid, NULL, NULL, # __VA_ARGS__ );
 
 
 /* prepare database stements for use */
@@ -564,7 +564,7 @@ int db_get_names_project(char ***projname, int *len)
     STAILQ_INIT(&namelist.head);
 
 //    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
-    db_select_parameter_new_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_new_names_list, &namelist);
+    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_new_names_list, &namelist);
 
     struct nameiterator_s *it;
     STAILQ_FOREACH(it, &namelist.head, entries)
