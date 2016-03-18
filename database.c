@@ -150,13 +150,74 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
     assert(sid < DB_SELECT_ID_MAX);
 
     sqlite3_stmt *ppstmt;
-    const char *sql = db_select_statement[sid];
-    int retval = sqlite3_prepare(dbhandler, sql, -1, &ppstmt, NULL);
+    const char *const sql = db_select_statement[sid];
+    const char *srcsql = sql;
+
+    /* exchange "%N" markers with '?' */
+    char * const copysql = strdup(sql);
+    char *destsql = copysql;
+    char c;
+    do
+    {
+	c = *srcsql++;
+	if ('%' == c)
+	{
+	    switch(*srcsql++)
+	    {
+	    case 'p':
+		/* found pointer value "%p". */
+		// fall through
+	    case 'f':
+		/* found double value "%f". */
+		// fall through
+	    case 's':
+		/* found string value "%s". */
+		// fall through
+	    case 'd':
+		/* found integer value "%i". */
+		// fall through
+	    case 'i':
+		/* found integer value "%i". */
+
+		/* exchange "%N" with '?' */
+		c = '?';
+		break;
+
+	    case '%':
+		/* found double percent sign "%%". just go on */
+
+		/* exchange "%%" with '%' */
+		break;
+
+	    case '\0':
+		/* percentage sign has been the last character in the string
+		 * rewind the string, so the outer while() catches the end of
+		 * the string.
+		 */
+		debug(1, "Huh? found '%%' at the end of the sql '%s'", sql);
+		srcsql--;
+		break;
+
+	    default:
+		/* unknown character found. exit */
+		srcsql--;
+		printlog("unknown character found in sql string '%s', position %ld: '%c'", db_select_statement[sid], (long int)(srcsql - db_select_statement[sid]), *srcsql);
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+	*destsql++ = c;
+    } while ( c ); // moved while() down here to copy terminating '\0' to "destsql"
+    debug(1, "transferred sql from '%s' to '%s'", sql, copysql);
+
+    int retval = sqlite3_prepare(dbhandler, copysql, -1, &ppstmt, NULL);
     if (SQLITE_OK != retval)
     {
 	printlog("error: preparing sql statement '%s': %s", sql, sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
+
+    free(copysql);
 
     return ppstmt;
 }
