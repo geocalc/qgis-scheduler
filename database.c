@@ -110,6 +110,7 @@ enum db_select_statement_id
     // from this id on we can use prepared statements
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
+    DB_INSERT_PROCESS_DATA,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -130,6 +131,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
 	"INSERT INTO projects (name, configpath, configbasename) VALUES (%s,%s,%s)",
+	// DB_INSERT_PROCESS_DATA
+	"INSERT INTO processes (projectname, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i)",
 
 };
 
@@ -789,6 +792,10 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     struct qgis_process_s *childproc = qgis_process_new(pid, process_socket_fd);
     struct qgis_project_s *project = find_project_by_name(projectlist, projname );
     qgis_project_add_process(project, childproc);
+
+
+    db_select_parameter(DB_INSERT_PROCESS_DATA, projname, PROC_STATE_START, pid, process_socket_fd);
+
 }
 
 
