@@ -135,7 +135,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_INSERT_PROJECT_DATA
 	"INSERT INTO projects (name, configpath, configbasename) VALUES (%s,%s,%s)",
 	// DB_INSERT_PROCESS_DATA
-	"INSERT INTO processes (projectname, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i)",
+	"INSERT INTO processes (projectname, list, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
 	"UPDATE processes SET state = %i, threadid = %l WHERE pid = %i",
 	// DB_GET_PROCESS_STATE
@@ -818,7 +818,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     qgis_project_add_process(project, childproc);
 
 
-    db_select_parameter(DB_INSERT_PROCESS_DATA, projname, PROC_STATE_START, pid, process_socket_fd);
+    db_select_parameter(DB_INSERT_PROCESS_DATA, projname, LIST_INIT, PROC_STATE_START, pid, process_socket_fd);
 
 }
 
