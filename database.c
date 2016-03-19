@@ -111,6 +111,7 @@ enum db_select_statement_id
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
     DB_INSERT_PROCESS_DATA,
+    DB_UPDATE_PROCESS_STATE,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -133,6 +134,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"INSERT INTO projects (name, configpath, configbasename) VALUES (%s,%s,%s)",
 	// DB_INSERT_PROCESS_DATA
 	"INSERT INTO processes (projectname, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i)",
+	// DB_UPDATE_PROCESS_STATE
+	"UPDATE processes SET state = %i, threadid = %l WHERE pid = %i",
 
 };
 
@@ -997,6 +1000,8 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 	ret = qgis_process_set_state_init(proc, thread_id);
     debug(1, "for process %d returned %d", pid, ret);
 
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, thread_id, pid);
+
     return ret;
 
 }
@@ -1027,6 +1032,8 @@ int db_process_set_state_idle(pid_t pid)
 	ret = qgis_process_set_state_idle(proc);
     debug(1, "for process %d returned %d", pid, ret);
 
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_IDLE, 0, pid);
+
     return ret;
 }
 
@@ -1050,12 +1057,15 @@ int db_process_set_state_exit(pid_t pid)
 	ret = qgis_process_set_state_exit(proc);
     debug(1, "for process %d returned %d", pid, ret);
 
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_EXIT, 0, pid);
+
     return ret;
 }
 
 
 int db_process_set_state(pid_t pid, enum db_process_state_e state)
 {
+    // TODO !! extend api with ", pthread_t thread_id" to get a generic interface
     int ret = -1;
     struct qgis_process_s *proc = NULL;
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
@@ -1072,6 +1082,8 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
     if (proc)
 	ret = qgis_process_set_state(proc, state);
     debug(1, "set state %d for process %d returned %d", state, pid, ret);
+
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, state, 0, pid);
 
     return ret;
 }
