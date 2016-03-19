@@ -112,6 +112,7 @@ enum db_select_statement_id
     DB_INSERT_PROJECT_DATA,
     DB_INSERT_PROCESS_DATA,
     DB_UPDATE_PROCESS_STATE,
+    DB_GET_PROCESS_STATE,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -136,6 +137,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"INSERT INTO processes (projectname, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
 	"UPDATE processes SET state = %i, threadid = %l WHERE pid = %i",
+	// DB_GET_PROCESS_STATE
+	"SELECT state FROM processes WHERE pid = %i",
 
 };
 
@@ -952,6 +955,20 @@ int db_get_process_socket(pid_t pid)
 enum db_process_state_e db_get_process_state(pid_t pid)
 {
     enum db_process_state_e ret = PROCESS_STATE_MAX ;
+#if 1
+    int get_process_state(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	enum db_process_state_e *state = data;
+
+	assert(SQLITE_INTEGER == type[0]);
+	*state = results[0].integer;
+
+	return 0;
+    }
+
+    db_select_parameter_callback(DB_GET_PROCESS_STATE, get_process_state, &ret, pid);
+
+#else
     struct qgis_process_s *proc = NULL;
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
@@ -966,6 +983,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
     }
     if (proc)
 	ret = qgis_process_get_state(proc);
+#endif
     debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
