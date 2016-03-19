@@ -83,7 +83,7 @@
  * Fifth parameter is the array of column names.
  */
 union callback_result_t {
-    int integer;
+    long long int integer;
     double floating;
     const unsigned char *text;
     const void *blob;
@@ -184,6 +184,9 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
 		// fall through
 	    case 'i':
 		/* found integer value "%i". */
+		// fall through
+	    case 'l':
+		/* found long long integer value "%l". */
 
 		/* exchange "%N" with '?' */
 		c = '?';
@@ -332,6 +335,20 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 		break;
 	    }
 
+	    case 'l':
+		/* found 64bit integer value "%l". The next argument is the
+		 * type "long long int" */
+	    {
+                long long int l = va_arg(args, long long int);
+                retval = sqlite3_bind_int64(ppstmt, col++, l);
+                if ( SQLITE_OK != retval )
+                {
+                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    exit(EXIT_FAILURE);
+                }
+		break;
+	    }
+
 	    case '%':
 		/* found double percent sign "%%". just go on */
 		break;
@@ -399,7 +416,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 		    switch(mytype)
 		    {
 		    case SQLITE_INTEGER:
-			results[i].integer = sqlite3_column_int(ppstmt, i);
+			results[i].integer = sqlite3_column_int64(ppstmt, i);
 			break;
 
 		    case SQLITE_FLOAT:
