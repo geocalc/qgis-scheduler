@@ -496,7 +496,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
 
 #define db_select_parameter(sid, ...)	\
-	db_select_parameter_callback(sid, NULL, NULL, # __VA_ARGS__ );
+	db_select_parameter_callback(sid, NULL, NULL, ##__VA_ARGS__);
 
 
 /* prepare database stements for use */
@@ -619,7 +619,7 @@ void db_add_project(const char *projname, const char *configpath)
 
     char *basenam = basename(configpath);
 
-    db_select_parameter_callback(DB_INSERT_PROJECT_DATA, NULL, NULL, projname, configpath, basenam);
+    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam);
 
     struct qgis_project_s *project = qgis_project_new(projname, configpath);
     qgis_proj_list_add_project(projectlist, project);
