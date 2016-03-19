@@ -126,6 +126,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER)",
 	// DB_SELECT_CREATE_PROCESS_TABLE
 	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
+	    "list INTEGER NOT NULL, "
 	    "state INTEGER NOT NULL, threadid INTEGER, pid INTEGER UNIQ NOT NULL, "
 	    "process_socket_fd INTEGER UNIQ NOT NULL, client_socket_fd INTEGER, "
 	    "starttime_sec INTEGER, starttime_nsec INTEGER, signaltime_sec INTEGER, signaltime_nsec INTEGER )",
