@@ -43,7 +43,7 @@
 struct qgis_project_s;
 
 
-struct qgis_project_s *qgis_project_new(const char *name, const char *configpath);
+struct qgis_project_s *qgis_project_new(const char *name, const char *configpath, int inotifyfd);
 void qgis_project_delete(struct qgis_project_s *proj);
 
 

@@ -35,6 +35,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "database.h"
 #include "qgis_config.h"
@@ -94,11 +97,57 @@ void project_manager_startup_projects(void)
 	int i;
 	for (i=0; i<num_proj; i++)
 	{
+	    int inotifyfd = 0;
 	    const char *projname = config_get_name_project(i);
 	    debug(1, "found project '%s'. Startup child processes", projname);
 
 	    const char *configpath = config_get_project_config_path(projname);
-	    db_add_project(projname, configpath);
+	    /* if the path to a configuration file has been given and the path
+	     * is correct (stat()), then watch the file with inotify for changes
+	     * If the file changed, kill all processes and restart them anew.
+	     */
+	    if (configpath)
+	    {
+		struct stat statbuf;
+		retval = stat(configpath, &statbuf);
+		if (-1 == retval)
+		{
+		    switch(errno)
+		    {
+		    case EACCES:
+		    case ELOOP:
+		    case EFAULT:
+		    case ENAMETOOLONG:
+		    case ENOENT:
+		    case ENOTDIR:
+		    case EOVERFLOW:
+			logerror("error accessing file '%s': ", configpath);
+			debug(1, "file is not watched for changes");
+			break;
+
+		    default:
+			logerror("error accessing file '%s': ", configpath);
+			exit(EXIT_FAILURE);
+		    }
+		}
+		else
+		{
+		    if (S_ISREG(statbuf.st_mode))
+		    {
+			/* if I can stat the file I assume we can read it.
+			 * Now setup the inotify descriptor.
+			 */
+			retval = qgis_inotify_watch_file(configpath);
+			inotifyfd = retval;
+		    }
+		    else
+		    {
+			debug(1, "error '%s' is no regular file", configpath);
+		    }
+		}
+	    }
+
+	    db_add_project(projname, configpath, inotifyfd);
 
 	    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
 

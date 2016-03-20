@@ -135,7 +135,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
-	"INSERT INTO projects (name, configpath, configbasename) VALUES (%s,%s,%s)",
+	"INSERT INTO projects (name, configpath, configbasename, inotifyfd) VALUES (%s,%s,%s,%i)",
 	// DB_INSERT_PROCESS_DATA
 	"INSERT INTO processes (projectname, list, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
@@ -645,16 +645,16 @@ void db_delete(void)
 }
 
 
-void db_add_project(const char *projname, const char *configpath)
+void db_add_project(const char *projname, const char *configpath, int inotifyfd)
 {
     assert(projname);
     assert(configpath);
 
     char *basenam = basename(configpath);
 
-    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam);
+    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyfd);
 
-    struct qgis_project_s *project = qgis_project_new(projname, configpath);
+    struct qgis_project_s *project = qgis_project_new(projname, configpath, inotifyfd);
     qgis_proj_list_add_project(projectlist, project);
 
 }

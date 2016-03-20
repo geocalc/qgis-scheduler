@@ -91,7 +91,7 @@ struct thread_watch_config_args
 
 
 
-struct qgis_project_s *qgis_project_new(const char *name, const char *configpath)
+struct qgis_project_s *qgis_project_new(const char *name, const char *configpath, int inotifyfd)
 {
     assert(name);
     //assert(configpath); configpath is allowed to be NULL. in this case no watcher thread is started
@@ -106,6 +106,9 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     proj->initproclist = qgis_process_list_new();
     proj->activeproclist = qgis_process_list_new();
     proj->name = name;
+    proj->inotifywatchfd = inotifyfd;
+    proj->configbasename = basename((char *)configpath);
+    proj->configpath = configpath;
 
     int retval = pthread_rwlock_init(&proj->rwlock, NULL);
     if (retval)
@@ -113,55 +116,6 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
 	errno = retval;
 	logerror("error init read-write lock");
 	exit(EXIT_FAILURE);
-    }
-
-    /* if the path to a configuration file has been given and the path
-     * is correct (stat()), then watch the file with inotify for changes
-     * If the file changed, kill all processes and restart them anew.
-     */
-    if (configpath)
-    {
-	struct stat statbuf;
-	retval = stat(configpath, &statbuf);
-	if (-1 == retval)
-	{
-	    switch(errno)
-	    {
-	    case EACCES:
-	    case ELOOP:
-	    case EFAULT:
-	    case ENAMETOOLONG:
-	    case ENOENT:
-	    case ENOTDIR:
-	    case EOVERFLOW:
-		logerror("error accessing file '%s': ", configpath);
-		debug(1, "file is not watched for changes");
-		break;
-
-	    default:
-		logerror("error accessing file '%s': ", configpath);
-		exit(EXIT_FAILURE);
-	    }
-	}
-	else
-	{
-	    if (S_ISREG(statbuf.st_mode))
-	    {
-		/* if I can stat the file I assume we can read it.
-		 * Now setup the inotify descriptor.
-		 */
-		retval = qgis_inotify_watch_file(configpath);
-		proj->inotifywatchfd = retval;
-
-		proj->configbasename = basename((char *)configpath);
-		proj->configpath = configpath;
-
-	    }
-	    else
-	    {
-		debug(1, "error '%s' is no regular file", configpath);
-	    }
-	}
     }
 
     return proj;
