@@ -1614,6 +1614,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 {
 #if 1
+    struct timespec retval = {0,0};
 
     int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
@@ -1630,7 +1631,9 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 	return 0;
     }
 
-    db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, maxtimeval);
+    db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, &retval);
+
+    *maxtimeval = retval;
 
 #else
     qgis_process_list_get_min_signaltimer(shutdownlist, maxtimeval);
