@@ -1047,7 +1047,10 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 	ret = qgis_process_set_state_init(proc, thread_id);
     debug(1, "for process %d returned %d", pid, ret);
 
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, thread_id, pid);
+    // we need to copy values to a "guaranteed" 64 bit value
+    // because the vararg parser assumes type "long long int" with "%l"
+    long long threadid = thread_id;
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, threadid, pid);
 
     return ret;
 
@@ -1079,7 +1082,9 @@ int db_process_set_state_idle(pid_t pid)
 	ret = qgis_process_set_state_idle(proc);
     debug(1, "for process %d returned %d", pid, ret);
 
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_IDLE, 0, pid);
+    // we need to type cast values to a "guaranteed" 64 bit value
+    // because the vararg parser assumes type "long long int" with "%l"
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_IDLE, (long long)0, pid);
 
     return ret;
 }
@@ -1104,7 +1109,9 @@ int db_process_set_state_exit(pid_t pid)
 	ret = qgis_process_set_state_exit(proc);
     debug(1, "for process %d returned %d", pid, ret);
 
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_EXIT, 0, pid);
+    // we need to type cast values to a "guaranteed" 64 bit value
+    // because the vararg parser assumes type "long long int" with "%l"
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_EXIT, (long long)0, pid);
 
     return ret;
 }
@@ -1130,7 +1137,9 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
 	ret = qgis_process_set_state(proc, state);
     debug(1, "set state %d for process %d returned %d", state, pid, ret);
 
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, state, 0, pid);
+    // we need to type cast values to a "guaranteed" 64 bit value
+    // because the vararg parser assumes type "long long int" with "%l"
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, state, (long long)0, pid);
 
     return ret;
 }
@@ -1537,7 +1546,7 @@ int db_reset_signal_timer(pid_t pid)
     qgis_timer_start(&ts);
 
     // we need to copy values to a "guaranteed" 64 bit value
-    // because the vararg parster assumes long long int over here
+    // because the vararg parser assumes type "long long int" with "%l"
     long long sec = ts.tv_sec;
     long long nsec = ts.tv_nsec;
     db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, pid);
