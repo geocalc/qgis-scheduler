@@ -45,6 +45,7 @@
 #include "logger.h"
 #include "qgis_shutdown_queue.h"
 #include "statistic.h"
+#include "timer.h"
 
 
 /* process data:
@@ -115,6 +116,7 @@ enum db_select_statement_id
     DB_GET_PROCESS_STATE,
     DB_UPDATE_PROCESS_LISTS,
     DB_UPDATE_PROCESS_LIST_PID,
+    DB_UPDATE_PROCESS_SIGNAL_TIMER,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -146,6 +148,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE processes SET list = %i WHERE projectname = %s AND list = %i",
 	// DB_UPDATE_PROCESS_LIST_PID
 	"UPDATE processes SET list = %i WHERE pid = %i",
+	// DB_UPDATE_PROCESS_SIGNAL_TIMER
+	"UPDATE processes SET signaltime_sec = %l, signaltime_nsec = %l WHERE pid = %i",
 
 };
 
@@ -1511,6 +1515,15 @@ int db_reset_signal_timer(pid_t pid)
     if (proc)
 	ret = qgis_process_reset_signaltime(proc);
     debug(1, "for process %d returned %d", pid, ret);
+
+    struct timespec ts;
+    qgis_timer_start(&ts);
+
+    // we need to copy values to a "guaranteed" 64 bit value
+    // because the vararg parster assumes long long int over here
+    long long sec = ts.tv_sec;
+    long long nsec = ts.tv_nsec;
+    db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, pid);
 
     return ret;
 }
