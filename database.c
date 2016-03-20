@@ -41,6 +41,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <sys/queue.h>
+#include <errno.h>
 
 #include "logger.h"
 #include "qgis_shutdown_queue.h"
@@ -100,6 +101,7 @@ static sqlite3 *dbhandler = NULL;
 static struct qgis_project_list_s *projectlist = NULL;
 static struct qgis_process_list_s *shutdownlist = NULL;	// list pf processes to be killed and removed
 //static struct qgis_process_list_s *busylist = NULL;	// list of processes being state busy or added via api
+static pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -271,7 +273,13 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
      * 5. Destroy the object using sqlite3_finalize().
      */
-    int retval;
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     assert(dbhandler);
     assert(sid < DB_SELECT_ID_MAX);
@@ -528,6 +536,14 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
 //    if ( !db_prepared_stmt[sid] )
 //	db_statement_finalize(ppstmt);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
