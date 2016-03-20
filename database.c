@@ -1449,9 +1449,10 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_INIT, projname, LIST_SHUTDOWN);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_ACTIVE, projname, LIST_SHUTDOWN);
 
     qgis_shutdown_notify_changes();
+
 }
 
 
@@ -1466,10 +1467,9 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_ACTIVE, projname, LIST_SHUTDOWN);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_INIT, projname, LIST_SHUTDOWN);
 
     qgis_shutdown_notify_changes();
-
 }
 
 
