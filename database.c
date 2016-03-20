@@ -119,6 +119,8 @@ enum db_select_statement_id
     DB_UPDATE_PROCESS_LISTS,
     DB_UPDATE_PROCESS_LIST_PID,
     DB_UPDATE_PROCESS_SIGNAL_TIMER,
+    DB_SELECT_PROCESS_SIGNAL_TIMER,
+    DB_SELECT_PROCESS_MIN_SIGNAL_TIMER,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -153,6 +155,10 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE processes SET list = %i WHERE pid = %i",
 	// DB_UPDATE_PROCESS_SIGNAL_TIMER
 	"UPDATE processes SET signaltime_sec = %l, signaltime_nsec = %l WHERE pid = %i",
+	// DB_SELECT_PROCESS_SIGNAL_TIMER
+	"SELECT signaltime_sec,signaltime_nsec FROM processes WHERE pid = %i",
+	// DB_SELECT_PROCESS_MIN_SIGNAL_TIMER
+	"SELECT signaltime_sec,signaltime_nsec FROM processes WHERE signaltime_sec != 0  AND signaltime_nsec != 0 ORDER BY signaltime_sec ASC, signaltime_nsec ASC LIMIT 1",
 
 };
 
@@ -1558,7 +1564,28 @@ int db_reset_signal_timer(pid_t pid)
 int db_get_signal_timer(struct timespec *ts, pid_t pid)
 {
     assert(ts);
+    assert(0 < pid);
+#if 1
 
+    int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct timespec *ts = data;
+
+	assert(2 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	assert(SQLITE_INTEGER == type[1]);
+
+	ts->tv_sec = results[0].integer;
+	ts->tv_nsec = results[1].integer;
+
+	return 0;
+    }
+
+    db_select_parameter_callback(DB_SELECT_PROCESS_SIGNAL_TIMER, get_signal_timer, ts, pid);
+
+    int ret = 0;
+
+#else
     int ret = -1;
     struct qgis_process_s *proc = NULL;
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
@@ -1577,6 +1604,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 	*ts = *qgis_process_get_signaltime(proc);
 	ret = 0;
     }
+#endif
     debug(1, "pid %d, value %ld,%03lds. returned %d", pid, ts->tv_sec, (ts->tv_nsec/(1000*1000)), ret);
 
     return ret;
@@ -1585,7 +1613,30 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 
 void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 {
+#if 1
+
+    int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct timespec *ts = data;
+
+	assert(2 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	assert(SQLITE_INTEGER == type[1]);
+
+	ts->tv_sec = results[0].integer;
+	ts->tv_nsec = results[1].integer;
+	    debug(1, "returned value %ld,%03lds", ts->tv_sec, (ts->tv_nsec/(1000*1000)));
+
+	return 0;
+    }
+
+    db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, maxtimeval);
+
+#else
     qgis_process_list_get_min_signaltimer(shutdownlist, maxtimeval);
+#endif
+
+    debug(1, "returned value %ld,%03lds", maxtimeval->tv_sec, (maxtimeval->tv_nsec/(1000*1000)));
 }
 
 
