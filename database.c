@@ -126,6 +126,7 @@ enum db_select_statement_id
     DB_SELECT_PROJECT_STARTUP_FAILURE,
     DB_RESET_PROJECT_STARTUP_FAILURE,
     DB_SELECT_PROJECT_WITH_PID,
+    DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -174,6 +175,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE projects SET nr_crashs = 0 WHERE name = %s",
 	// DB_SELECT_PROJECT_WITH_PID
 	"SELECT projectname FROM processes WHERE pid = %i",
+	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
+	"SELECT pid FROM processes WHERE projectname= %s, list = %i, state = %i LIMIT 1",
 
 };
 
@@ -921,6 +924,26 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
 
+#if 1
+    int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	const char **projname = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+
+	*projname = strdup((const char *)results[0].text);
+
+	return 0;
+    }
+	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
+//	"SELECT pid FROM processes WHERE projectname= %s, list = %i, state = %i",
+
+    int mylist = list;
+    int mystate = state;
+    db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
+
+#else
     struct qgis_project_list_s *projlist = NULL;
     switch (list)
     {
@@ -948,6 +971,9 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 	printlog("error: wrong list entry found %d", list);
 	exit(EXIT_FAILURE);
     }
+#endif
+
+    debug(1, "returned %d", ret);
 
     return ret;
 }
