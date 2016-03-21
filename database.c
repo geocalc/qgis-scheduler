@@ -125,6 +125,7 @@ enum db_select_statement_id
     DB_INC_PROJECT_STARTUP_FAILURE,
     DB_SELECT_PROJECT_STARTUP_FAILURE,
     DB_RESET_PROJECT_STARTUP_FAILURE,
+    DB_SELECT_PROJECT_WITH_PID,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -171,6 +172,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT nr_crashs FROM projects WHERE name = %s",
 	// DB_RESET_PROJECT_STARTUP_FAILURE
 	"UPDATE projects SET nr_crashs = 0 WHERE name = %s",
+	// DB_SELECT_PROJECT_WITH_PID
+	"SELECT projectname FROM processes WHERE pid = %i",
 
 };
 
@@ -873,12 +876,33 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
 
 const char *db_get_project_for_this_process(pid_t pid)
 {
+#if 0
+    int get_projectname(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	const char **projname = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+
+	*projname = strdup((const char *)results[0].text);
+
+	return 0;
+    }
+	// DB_SELECT_PROJECT_WITH_PID
+//	"SELECT projectname FROM processes WHERE pid = %i",
+    const char *ret = NULL;
+    db_select_parameter_callback(DB_SELECT_PROJECT_WITH_PID, get_projectname, &ret, pid);
+
+#else
     const char *ret = NULL;
 
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
 
     if (project)
 	ret = qgis_project_get_name(project);
+#endif
+
+    debug(1, "returned %s", ret);
 
     return ret;
 }
