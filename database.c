@@ -122,6 +122,9 @@ enum db_select_statement_id
     DB_SELECT_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_MIN_SIGNAL_TIMER,
     DB_DELETE_PROCESS_WITH_STATE,
+    DB_INC_PROJECT_STARTUP_FAILURE,
+    DB_SELECT_PROJECT_STARTUP_FAILURE,
+    DB_RESET_PROJECT_STARTUP_FAILURE,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -162,6 +165,12 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT signaltime_sec,signaltime_nsec FROM processes WHERE signaltime_sec != 0  AND signaltime_nsec != 0 ORDER BY signaltime_sec ASC, signaltime_nsec ASC LIMIT 1",
 	// DB_DELETE_PROCESS_WITH_STATE
 	"DELETE FROM processes WHERE STATE = %i",
+	// DB_INC_PROJECT_STARTUP_FAILURE
+	"UPDATE projects SET nr_crashs = nr_crashs+1 WHERE name = %s",
+	// DB_SELECT_PROJECT_STARTUP_FAILURE
+	"SELECT nr_crashs FROM projects WHERE name = %s",
+	// DB_RESET_PROJECT_STARTUP_FAILURE
+	"UPDATE projects SET nr_crashs = 0 WHERE name = %s",
 
 };
 
@@ -1674,6 +1683,8 @@ void db_inc_startup_failures(const char *projname)
     {
 	qgis_project_inc_nr_crashes(project);
     }
+
+    db_select_parameter(DB_INC_PROJECT_STARTUP_FAILURE, projname);
 }
 
 
@@ -1681,12 +1692,32 @@ int db_get_startup_failures(const char *projname)
 {
     assert(projname);
 
+#if 1
+    int get_startup_failures(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*val = results[0].integer;
+	debug(1, "returned value %d", *val);
+
+	return 0;
+    }
+
+    int ret = -1;
+    db_select_parameter_callback(DB_INC_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
+#else
     int ret = -1;
     struct qgis_project_s *project = find_project_by_name(projectlist, projname);
     if (project)
     {
 	ret = qgis_project_get_nr_crashes(project);
     }
+#endif
+
+    debug(1, "returned %d", ret);
 
     return ret;
 }
@@ -1702,6 +1733,7 @@ void db_reset_startup_failures(const char *projname)
 	qgis_project_reset_nr_crashes(project);	// reset number of crashes after configuration change
     }
 
+    db_select_parameter(DB_RESET_PROJECT_STARTUP_FAILURE, projname);
 }
 
 
