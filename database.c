@@ -121,6 +121,7 @@ enum db_select_statement_id
     DB_UPDATE_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_MIN_SIGNAL_TIMER,
+    DB_DELETE_PROCESS_WITH_STATE,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -159,6 +160,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT signaltime_sec,signaltime_nsec FROM processes WHERE pid = %i",
 	// DB_SELECT_PROCESS_MIN_SIGNAL_TIMER
 	"SELECT signaltime_sec,signaltime_nsec FROM processes WHERE signaltime_sec != 0  AND signaltime_nsec != 0 ORDER BY signaltime_sec ASC, signaltime_nsec ASC LIMIT 1",
+	// DB_DELETE_PROCESS_WITH_STATE
+	"DELETE FROM processes WHERE STATE = %i",
 
 };
 
@@ -1655,6 +1658,8 @@ int db_remove_process_with_state_exit(void)
 {
     int retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
     debug(1, "removed %d processes from shutdown list", retval);
+
+    db_select_parameter(DB_DELETE_PROCESS_WITH_STATE, PROC_STATE_EXIT);
 
     return retval;
 }
