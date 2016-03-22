@@ -320,6 +320,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	// no break
 
     case SIGUSR1:	// fall through
+    case SIGUSR2:	// fall through
     case SIGTERM:	// fall through
     case SIGINT:	// fall through
     case SIGQUIT:
@@ -616,10 +617,17 @@ int main(int argc, char **argv)
 	sigemptyset(&action.sa_mask);
 	sigaddset(&action.sa_mask, SIGCHLD);
 	sigaddset(&action.sa_mask, SIGUSR1);
+	sigaddset(&action.sa_mask, SIGUSR2);
 	sigaddset(&action.sa_mask, SIGTERM);
 	sigaddset(&action.sa_mask, SIGINT);
 	sigaddset(&action.sa_mask, SIGQUIT);
 	retval = sigaction(SIGUSR1, &action, NULL);
+	if (retval)
+	{
+	    logerror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGUSR2, &action, NULL);
 	if (retval)
 	{
 	    logerror("error: can not install signal handler");
@@ -760,6 +768,10 @@ int main(int argc, char **argv)
 		    }
 		    case SIGUSR1:
 			statistic_printlog();
+			break;
+
+		    case SIGUSR2:
+			db_dump();
 			break;
 
 		    case SIGTERM:	// fall through
