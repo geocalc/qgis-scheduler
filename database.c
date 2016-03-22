@@ -178,7 +178,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_PROJECT_WITH_PID
 	"SELECT projectname FROM processes WHERE pid = %i",
 	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
-	"SELECT pid FROM processes WHERE projectname= %s, list = %i, state = %i LIMIT 1",
+	"SELECT pid FROM processes WHERE (projectname= %s AND list = %i AND state = %i) LIMIT 1",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects",
 	// DB_DUMP_PROCESS
