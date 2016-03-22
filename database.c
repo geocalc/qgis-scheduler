@@ -127,6 +127,8 @@ enum db_select_statement_id
     DB_RESET_PROJECT_STARTUP_FAILURE,
     DB_SELECT_PROJECT_WITH_PID,
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
+    DB_DUMP_PROJECT,
+    DB_DUMP_PROCESS,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -177,6 +179,11 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT projectname FROM processes WHERE pid = %i",
 	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
 	"SELECT pid FROM processes WHERE projectname= %s, list = %i, state = %i LIMIT 1",
+	// DB_DUMP_PROJECT
+	"SELECT * FROM projects",
+	// DB_DUMP_PROCESS
+	"SELECT * FROM processes",
+
 
 };
 
@@ -1800,4 +1807,81 @@ const char *db_get_project_for_watchid(int watchid)
     return ret;
 }
 
+
+void db_dump(void)
+{
+    struct callback_data_s {
+	int has_printed_headline;
+	int bufferlen;
+	char *buffer;
+    };
+
+    static const int buffer_increase = 8192;
+
+    int dump_tabledata(void *data, int ncol, char **results, char **cols)
+    {
+	struct callback_data_s *val = data;
+	int i;
+	if ( !val->has_printed_headline )
+	{
+	    for (i=0; i<ncol; i++)
+	    {
+		strcat(val->buffer, cols[i]);
+		strcat(val->buffer, ",\t");
+	    }
+	    val->has_printed_headline = 1;
+	}
+	strcat(val->buffer, "\n");
+
+	for (i=0; i<ncol; i++)
+	{
+	    if (results[i])
+		strcat(val->buffer, results[i]);
+	    else
+		strcat(val->buffer, "NULL");
+	    strcat(val->buffer, ",\t");
+	}
+	strcat(val->buffer, "\n");
+
+
+	return 0;
+    }
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    struct callback_data_s data = {0};
+
+    data.bufferlen = buffer_increase;
+    data.buffer = malloc(data.bufferlen);
+    *data.buffer = '\0';	// empty string
+
+    char *err;
+    const char *sql = db_select_statement[DB_DUMP_PROJECT];
+    strcat(data.buffer, "PROJECTS:\n");
+    sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
+    printlog("%s", data.buffer);
+
+    data.has_printed_headline = 0;
+    *data.buffer = '\0';	// empty string
+    sql = db_select_statement[DB_DUMP_PROCESS];
+    strcat(data.buffer, "PROCESSES:\n");
+    sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
+    printlog("%s", data.buffer);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    free(data.buffer);
+}
 
