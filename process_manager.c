@@ -67,14 +67,14 @@ struct thread_init_new_child_args
 
 struct thread_start_new_child_args
 {
-    const char *project_name;
+    char *project_name;
 };
 
 
 struct thread_start_process_detached_args
 {
     int num;
-    const char *project_name;
+    char *project_name;
     int do_exchange_processes;
 };
 
@@ -565,6 +565,7 @@ static void *process_manager_thread_start_new_child(void *arg)
     qgis_timer_stop(&ts);
     printlog("Startup time for project '%s' %ld.%03ld sec", tinfo->project_name, ts.tv_sec, ts.tv_nsec/(1000*1000));
 
+    free(tinfo->project_name);
     free(arg);
     return NULL;
 }
@@ -602,7 +603,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	targs->project_name = projname;
+	targs->project_name = strdup(projname);
 
 	retval = pthread_create(&threads[i], NULL, process_manager_thread_start_new_child, targs);
 	if (retval)
@@ -672,6 +673,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
 
     process_manager_start_new_process_wait(tinfo->num, tinfo->project_name, tinfo->do_exchange_processes);
 
+    free(tinfo->project_name);
     free(arg);
 
     return NULL;
@@ -700,7 +702,7 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
 	exit(EXIT_FAILURE);
     }
     targs->num = num;
-    targs->project_name = projname;
+    targs->project_name = strdup(projname);
     targs->do_exchange_processes = do_exchange_processes;
 
     pthread_t thread;

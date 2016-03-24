@@ -129,6 +129,7 @@ enum db_select_statement_id
     DB_SELECT_PROJECT_WITH_PID,
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
     DB_GET_LIST_FROM_PROCESS,
+    DB_GET_PROJECT_FROM_WATCHID,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
 
@@ -185,6 +186,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT pid FROM processes WHERE (projectname= %s AND list = %i AND state = %i) LIMIT 1",
 	// DB_GET_LIST_FROM_PROCESS
 	"SELECT list FROM processes WHERE pid = %d",
+	// DB_GET_PROJECT_FROM_WATCHID
+	"SELECT name FROM projects WHERE inotifyfd = %d",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects",
 	// DB_DUMP_PROCESS
@@ -1756,7 +1759,7 @@ int db_get_num_shutdown_processes(void)
     int num_list = qgis_process_list_get_num_process(shutdownlist);
 #endif
 
-    debug(1, "returned $d", num_list);
+    debug(1, "returned %d", num_list);
 
     return num_list;
 }
@@ -1836,15 +1839,36 @@ void db_reset_startup_failures(const char *projname)
 }
 
 
-const char *db_get_project_for_watchid(int watchid)
+char *db_get_project_for_watchid(int watchid)
 {
     assert(watchid >= 0);
+#if 1
+    int get_project_for_watchid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	const char **val = data;
 
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+
+	*val = strdup((const char *)results[0].text);
+	debug(1, "returned value %s", *val);
+
+	return 0;
+    }
+
+    char *ret = NULL;
+
+    db_select_parameter_callback(DB_GET_PROJECT_FROM_WATCHID, get_project_for_watchid, &ret, watchid);
+
+#else
     const char *ret = NULL;
 
     struct qgis_project_s *project = qgis_proj_list_find_project_by_inotifyid(projectlist, watchid);
     if (project)
 	ret = qgis_project_get_name(project);
+#endif
+
+    debug(1, "returned %s", ret);
 
     return ret;
 }

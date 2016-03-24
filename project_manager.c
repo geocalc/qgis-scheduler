@@ -38,11 +38,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "database.h"
 #include "qgis_config.h"
 #include "logger.h"
 #include "process_manager.h"
+#include "qgis_inotify.h"
 
 
 #define max(a,b) \
@@ -53,7 +55,7 @@
 
 struct thread_start_project_processes_args
 {
-    const char *project_name;
+    char *project_name;
     int num;
 };
 
@@ -75,6 +77,7 @@ static void *project_manager_thread_start_project_processes(void *arg)
     process_manager_start_new_process_wait(num, projname, 0);
 
 
+    free(targ->project_name);
     free(arg);
     return NULL;
 }
@@ -159,7 +162,7 @@ void project_manager_startup_projects(void)
 		logerror("could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
-	    targs->project_name = projname;
+	    targs->project_name = strdup(projname);
 	    targs->num = nr_of_childs_during_startup;
 
 	    retval = pthread_create(&threads[i], NULL, project_manager_thread_start_project_processes, targs);
@@ -219,7 +222,7 @@ void project_manager_inotify_configfile_changed(int wd)
 {
     assert(wd >= 0);
 
-    const char *projname = db_get_project_for_watchid(wd);
+    char *projname = db_get_project_for_watchid(wd);
     if (projname)
     {
 	printlog("Project '%s' config change. Restart processes", projname);
@@ -230,6 +233,7 @@ void project_manager_inotify_configfile_changed(int wd)
 	printlog("error: got config change request for watch id %d but no project responsible?", wd);
 	exit(EXIT_FAILURE);
     }
+    free(projname);
 }
 
 
