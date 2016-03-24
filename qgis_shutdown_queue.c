@@ -155,18 +155,6 @@ static void *qgis_shutdown_thread(void *arg)
 			logerror("error setting the time value");
 			exit(EXIT_FAILURE);
 		    }
-
-		    /* get the time of the last signal action to calculate the timeout
-		     * value of the pthread_cond_timedwait() call.
-		     */
-		    retval = db_get_signal_timer(&proc_timer, pid);
-		    if ( !qgis_timer_is_empty(&proc_timer) )
-		    {
-			if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
-			{
-			    min_timer = proc_timer;
-			}
-		    }
 		}
 		break;
 
@@ -179,6 +167,7 @@ static void *qgis_shutdown_thread(void *arg)
 		qgis_timer_add(&proc_timer, &default_signal_timeout);
 		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
 		{
+		    printlog("timeout (%dsec) for process %d, sending SIGKILL signal", (int)default_signal_timeout.tv_sec, pid);
 		    retval = kill(pid, SIGKILL);
 		    if (-1 == retval)
 		    {
@@ -211,18 +200,6 @@ static void *qgis_shutdown_thread(void *arg)
 			}
 		    }
 		}
-
-		/* get the time of the last signal action to calculate the timeout
-		 * value of the pthread_cond_timedwait() call.
-		 */
-		retval = db_get_signal_timer(&proc_timer, pid);
-		if ( !qgis_timer_is_empty(&proc_timer) )
-		{
-		    if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
-		    {
-			min_timer = proc_timer;
-		    }
-		}
 		break;
 
 	    case PROC_STATE_KILL:
@@ -233,25 +210,14 @@ static void *qgis_shutdown_thread(void *arg)
 		qgis_timer_add(&proc_timer, &default_signal_timeout);
 		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
 		{
+		    printlog("timeout (%dsec) for process %d. Could not kill process, please look after it", (int)default_signal_timeout.tv_sec, pid);
 		    db_process_set_state_exit(pid);
-		}
-
-		/* get the time of the last signal action to calculate the timeout
-		 * value of the pthread_cond_timedwait() call.
-		 */
-		retval = db_get_signal_timer(&proc_timer, pid);
-		if ( !qgis_timer_is_empty(&proc_timer) )
-		{
-		    if ( qgis_timer_isgreaterthan(&min_timer, &proc_timer) || qgis_timer_is_empty(&min_timer) )
-		    {
-			min_timer = proc_timer;
-		    }
 		}
 		break;
 
 	    case PROC_STATE_EXIT:
 		/* zombi entry.
-		 * delete it later.
+		 * just remove it from the lists.
 		 */
 		break;
 
@@ -272,6 +238,11 @@ static void *qgis_shutdown_thread(void *arg)
 	 * now wheed out the processes with state exit
 	 */
 	db_remove_process_with_state_exit();
+
+	/* get the minimal proc timer (or {0,0}) to see if we
+	 * need to wait with timeout value.
+	 */
+	db_shutdown_get_min_signaltimer(&min_timer);
 
 	/* wait for signal or new process or thread cancel request */
 	retval = pthread_mutex_lock(&shutdownmutex);
