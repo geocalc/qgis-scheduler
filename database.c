@@ -1704,8 +1704,6 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 {
 #if 1
-    struct timespec retval = {0,0};
-
     int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	struct timespec *ts = data;
@@ -1721,6 +1719,8 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 	return 0;
     }
 
+    struct timespec retval = {0,0};
+
     db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, &retval);
 
     *maxtimeval = retval;
@@ -1735,7 +1735,28 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 
 int db_get_num_shutdown_processes(void)
 {
+#if 1
+    int get_num_shutdown_processes(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *num = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	(*num)++;
+
+	return 0;
+    }
+
+    int num_list = 0;
+
+    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list);
+
+#else
     int num_list = qgis_process_list_get_num_process(shutdownlist);
+#endif
+
+    debug(1, "returned $d", num_list);
 
     return num_list;
 }
