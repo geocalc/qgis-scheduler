@@ -130,6 +130,7 @@ enum db_select_statement_id
     DB_SELECT_PROJECT_WITH_PID,
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
     DB_GET_LIST_FROM_PROCESS,
+    DB_GET_PROCESS_SOCKET_FROM_PROCESS,
     DB_GET_PROJECT_FROM_WATCHID,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
@@ -189,6 +190,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT pid FROM processes WHERE (projectname= %s AND list = %i AND state = %i) LIMIT 1",
 	// DB_GET_LIST_FROM_PROCESS
 	"SELECT list FROM processes WHERE pid = %d",
+	// DB_GET_PROCESS_SOCKET_FROM_PROCESS
+	"SELECT process_socket_fd FROM processes WHERE pid = %d",
 	// DB_GET_PROJECT_FROM_WATCHID
 	"SELECT name FROM projects WHERE inotifyfd = %d",
 	// DB_DUMP_PROJECT
@@ -1042,6 +1045,24 @@ int db_has_process(pid_t pid)
 
 int db_get_process_socket(pid_t pid)
 {
+#if 1
+
+    int get_process_socket(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *socket = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	*socket = results[0].integer;
+
+	return 0;
+    }
+
+    int ret = -1;
+
+    db_select_parameter_callback(DB_GET_PROCESS_SOCKET_FROM_PROCESS, get_process_socket, &ret, (int)pid);
+
+#else
     int ret = -1;
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
     if (project)
@@ -1064,6 +1085,7 @@ int db_get_process_socket(pid_t pid)
 	    }
 	}
     }
+#endif
 
     return ret;
 }
