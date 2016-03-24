@@ -128,6 +128,7 @@ enum db_select_statement_id
     DB_RESET_PROJECT_STARTUP_FAILURE,
     DB_SELECT_PROJECT_WITH_PID,
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
+    DB_GET_LIST_FROM_PROCESS,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
 
@@ -182,6 +183,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT projectname FROM processes WHERE pid = %i",
 	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
 	"SELECT pid FROM processes WHERE (projectname= %s AND list = %i AND state = %i) LIMIT 1",
+	// DB_GET_LIST_FROM_PROCESS
+	"SELECT list FROM processes WHERE pid = %d",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects",
 	// DB_DUMP_PROCESS
@@ -1489,6 +1492,23 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 
 enum db_process_list_e db_get_process_list(pid_t pid)
 {
+#if 1
+    int get_list_pid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	enum db_process_list_e *list = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	*list = results[0].integer;
+
+	return 0;
+    }
+
+    enum db_process_list_e ret = LIST_SELECTOR_MAX;
+
+    db_select_parameter_callback(DB_GET_LIST_FROM_PROCESS, get_list_pid, &ret, (int)pid);
+
+#else
     enum db_process_list_e ret = LIST_SELECTOR_MAX;
     struct qgis_process_s *proc = NULL;
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
@@ -1516,6 +1536,9 @@ enum db_process_list_e db_get_process_list(pid_t pid)
 	if (proc)
 	    ret = LIST_SHUTDOWN;
     }
+#endif
+
+    debug(1, "returned %d", ret);
 
     return ret;
 }
