@@ -116,6 +116,7 @@ enum db_select_statement_id
     DB_INSERT_PROCESS_DATA,
     DB_UPDATE_PROCESS_STATE,
     DB_GET_PROCESS_STATE,
+    DB_GET_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS,
     DB_UPDATE_PROCESS_LIST_PID,
     DB_UPDATE_PROCESS_SIGNAL_TIMER,
@@ -157,6 +158,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE processes SET state = %i, threadid = %l WHERE pid = %i",
 	// DB_GET_PROCESS_STATE
 	"SELECT state FROM processes WHERE pid = %i",
+	// DB_GET_PROCESS_FROM_LIST
+	"SELECT pid FROM processes WHERE list = %d",
 	// DB_UPDATE_PROCESS_LISTS
 	"UPDATE processes SET list = %i WHERE projectname = %s AND list = %i",
 	// DB_UPDATE_PROCESS_LIST_PID
@@ -1279,8 +1282,8 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
         pid_t pid;
     };
 
-#if 0
-    int get_pid_list(void *data, int ncol, char **text, char **cols)
+#if 1
+    int get_pid_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	struct pidlist_s *list = data;
 
@@ -1291,8 +1294,10 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
 	    logerror("could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
-	entry->pid = atol(text[0]);	// TODO: get better converter or use converter from sqlite
-		    // TODO is pid int or long int?
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	entry->pid = results[0].integer;
 
 	if (STAILQ_EMPTY(&list->head))
 	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
@@ -1306,23 +1311,11 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     struct pidlist_s mypidlist;
     STAILQ_INIT(&mypidlist.head);
 
-    static const char sql_get_pid[] = "SELECT name FROM projects WHERE list = %d";
-    char *sql;
-    int retval = asprintf(&sql, sql_get_pid, list);
-    if (retval < 0)
-    {
-	logerror("error: asprintf");
-	exit(EXIT_FAILURE);
-    }
+    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_pid_list, &mypidlist, (int)list);
 
-    char *errormsg;
-    retval = sqlite3_exec(dbhandler, sql_get_pid, get_pid_list, &pidlist, &errormsg);
-    if (SQLITE_OK != retval)
-    {
-	printlog("error: calling sqlite with '%s': %s", sql_get_pid, sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
-    }
-    free(sql);
+
+    int retval = 0;
+
 #else
 
     int retval = 0;
