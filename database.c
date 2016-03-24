@@ -931,20 +931,18 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
 
-#if 0
+#if 1
     int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
-	const char **projname = data;
+	int *proc = data;
 
 	assert(1 == ncol);
-	assert(SQLITE_TEXT == type[0]);
+	assert(SQLITE_INTEGER == type[0]);
 
-	*projname = strdup((const char *)results[0].text);
+	*proc = results[0].integer;
 
 	return 0;
     }
-	// DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE
-//	"SELECT pid FROM processes WHERE projectname= %s, list = %i, state = %i",
 
     int mylist = list;
     int mystate = state;
@@ -988,6 +986,9 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 
 pid_t db_get_next_idle_process_for_work(const char *projname)
 {
+#if 1
+    pid_t ret = db_get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
+#else
     pid_t ret = -1;
 
     assert(projname);
@@ -1000,6 +1001,7 @@ pid_t db_get_next_idle_process_for_work(const char *projname)
 	if (proc)
 	    ret = qgis_process_get_pid(proc);
     }
+#endif
 
     return ret;
 }
