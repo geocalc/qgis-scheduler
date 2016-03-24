@@ -373,6 +373,7 @@ static void *thread_handle_connection(void *arg)
 	const char *projname = request_project_name;
 	int min_free_processes = config_get_min_idle_processes(projname);
 
+	// TODO make a specialized call only once
 	int proc_state_idle = db_get_num_process_by_status(projname, PROC_STATE_IDLE);
 	int proc_state_init = db_get_num_process_by_status(projname, PROC_STATE_INIT);
 	int proc_state_start = db_get_num_process_by_status(projname, PROC_STATE_START);
