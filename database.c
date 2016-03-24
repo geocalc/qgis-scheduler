@@ -1538,7 +1538,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
     int retval = qgis_process_list_transfer_all_process_with_state(activeproclist, initproclist, PROC_IDLE);
     debug(1, "project '%s' moved %d processes from init list to active list", projname, retval);
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_INIT, projname, LIST_ACTIVE);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_ACTIVE, projname, LIST_INIT);
 
 }
 
@@ -1554,7 +1554,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_ACTIVE, projname, LIST_SHUTDOWN);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_SHUTDOWN, projname, LIST_ACTIVE);
 
     qgis_shutdown_notify_changes();
 
@@ -1572,7 +1572,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_INIT, projname, LIST_SHUTDOWN);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_SHUTDOWN, projname, LIST_INIT);
 
     qgis_shutdown_notify_changes();
 }
