@@ -116,6 +116,7 @@ enum db_select_statement_id
     DB_INSERT_PROCESS_DATA,
     DB_UPDATE_PROCESS_STATE,
     DB_GET_PROCESS_STATE,
+    DB_GET_STATE_PROCESS,
     DB_GET_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS,
     DB_UPDATE_PROCESS_LIST_PID,
@@ -160,6 +161,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE processes SET state = %i, threadid = %l WHERE pid = %i",
 	// DB_GET_PROCESS_STATE
 	"SELECT state FROM processes WHERE pid = %i",
+	// DB_GET_STATE_PROCESS
+	"SELECT pid FROM processes WHERE state = %i",
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
 	// DB_UPDATE_PROCESS_LISTS
@@ -1236,6 +1239,24 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     assert(projname);
     assert(state < PROCESS_STATE_MAX);
 
+#if 1
+    int get_pid_by_status(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *num = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	(*num)++;
+
+	return 0;
+    }
+
+    int ret = 0;
+
+    db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, (int)state);
+
+#else
     int ret = -1;
     struct qgis_project_s *project = find_project_by_name(projectlist, projname);
     if (project)
@@ -1248,6 +1269,9 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     {
 	ret = qgis_process_list_get_num_process_by_status(shutdownlist, state);
     }
+#endif
+
+    debug(1, "returned %d", ret);
 
     return ret;
 }
@@ -1256,6 +1280,9 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 /* return the number of processes being in the active list of this project */
 int db_get_num_active_process(const char *projname)
 {
+#if 1
+    int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
+#else
     assert(projname);
 
     int ret = -1;
@@ -1266,6 +1293,7 @@ int db_get_num_active_process(const char *projname)
 	assert(proc_list);
 	ret = qgis_process_list_get_num_process(proc_list);
     }
+#endif
 
     return ret;
 }
