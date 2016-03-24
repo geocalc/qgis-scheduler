@@ -924,7 +924,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
 
-#if 1
+#if 0
     int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	const char **projname = data;
