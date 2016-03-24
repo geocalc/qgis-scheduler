@@ -1025,6 +1025,23 @@ pid_t db_get_next_idle_process_for_work(const char *projname)
 /* return 0 if the pid is not in any of the process lists, 1 otherwise */
 int db_has_process(pid_t pid)
 {
+#if 1
+    int has_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	*val = 1;
+
+	return 0;
+    }
+
+    int ret = 0;
+
+    db_select_parameter_callback(DB_GET_PROCESS_STATE, has_process, &ret, (int)pid);
+
+#else
     int ret = 0;
 
     struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
@@ -1038,6 +1055,7 @@ int db_has_process(pid_t pid)
 	if (proc)
 	    ret = 1;
     }
+#endif
 
     return ret;
 }
