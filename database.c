@@ -1605,18 +1605,18 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
  * (2) a process which is not removed from RAM and needs a KILL signal after a timeout
  * (3) a process which is not removed from RAM after a timeout and need to be removed from the db
  */
-pid_t db_get_shutdown_process_in_timeout(void)
-{
-    pid_t ret = -1;
-
-    struct qgis_process_s *proc = get_next_shutdown_proc(shutdownlist);
-    if (proc)
-    {
-	ret = qgis_process_get_pid(proc);
-    }
-
-    return ret;
-}
+//pid_t db_get_shutdown_process_in_timeout(void)
+//{
+//    pid_t ret = -1;
+//
+//    struct qgis_process_s *proc = get_next_shutdown_proc(shutdownlist);
+//    if (proc)
+//    {
+//	ret = qgis_process_get_pid(proc);
+//    }
+//
+//    return ret;
+//}
 
 
 int db_reset_signal_timer(pid_t pid)
