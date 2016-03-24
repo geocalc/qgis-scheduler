@@ -108,9 +108,9 @@ static pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
 enum db_select_statement_id
 {
     DB_SELECT_ID_NULL = 0,
+    // from this id on we can use prepared statements
     DB_SELECT_CREATE_PROJECT_TABLE,
     DB_SELECT_CREATE_PROCESS_TABLE,
-    // from this id on we can use prepared statements
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
     DB_INSERT_PROCESS_DATA,
@@ -139,7 +139,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_ID_NULL
 	"",
 	// DB_SELECT_CREATE_PROJECT_TABLE
-	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER)",
+	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER DEFAULT 0)",
 	// DB_SELECT_CREATE_PROCESS_TABLE
 	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
 	    "list INTEGER NOT NULL, state INTEGER NOT NULL, "
