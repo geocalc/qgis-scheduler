@@ -255,6 +255,10 @@ static void *qgis_shutdown_thread(void *arg)
 		 */
 		break;
 
+	    case PROCESS_STATE_MAX:
+		printlog("can not find process %d during shutdown, db changed inbetween data selects. ignoring process", pid);
+		break;
+
 	    default:
 		printlog("error: unexpected state value (%d) in shutdown list", state);
 		exit(EXIT_FAILURE);
