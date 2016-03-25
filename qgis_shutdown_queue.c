@@ -121,7 +121,10 @@ static void *qgis_shutdown_thread(void *arg)
 	    debug(1, "check pid %d, state %d", pid, state);
 	    switch(state)
 	    {
+	    case PROC_STATE_START:
+	    case PROC_STATE_INIT: // TODO: maybe wait until state changes to IDLE?
 	    case PROC_STATE_IDLE:
+	    case PROC_STATE_BUSY: // TODO: maybe wait until state changes to IDLE?
 		/* we have an idle process. immediately send a term signal */
 		retval = kill(pid, SIGTERM);
 		debug(1, "kill(%d, SIGTERM) returned %d, errno %d", pid, retval, errno);
