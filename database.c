@@ -899,9 +899,9 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
 //int db_get_num_idle_process(const char *projname);
 
 
-const char *db_get_project_for_this_process(pid_t pid)
+char *db_get_project_for_this_process(pid_t pid)
 {
-#if 0
+#if 1
     int get_projectname(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	const char **projname = data;
@@ -913,9 +913,8 @@ const char *db_get_project_for_this_process(pid_t pid)
 
 	return 0;
     }
-	// DB_SELECT_PROJECT_WITH_PID
-//	"SELECT projectname FROM processes WHERE pid = %i",
-    const char *ret = NULL;
+
+    char *ret = NULL;
     db_select_parameter_callback(DB_SELECT_PROJECT_WITH_PID, get_projectname, &ret, pid);
 
 #else

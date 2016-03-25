@@ -743,7 +743,7 @@ void process_manager_process_died(pid_t pid)
 	retval = get_program_shutdown();
 	if (!retval)
 	{
-	    const char *projname = db_get_project_for_this_process(pid);
+	    char *projname = db_get_project_for_this_process(pid);
 //	    enum db_process_list_e proclist = db_get_process_list(pid);
 //	    if (LIST_INIT == proclist)
 //	    {
@@ -759,6 +759,7 @@ void process_manager_process_died(pid_t pid)
 		{
 		    project_manager_start_new_process_detached(1, projname, 0);
 		}
+		free(projname);
 	    }
 	    else
 	    {
