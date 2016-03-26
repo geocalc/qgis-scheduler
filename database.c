@@ -873,7 +873,6 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
 
-#if 1
     int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	int *proc = data;
@@ -889,36 +888,6 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     int mylist = list;
     int mystate = state;
     db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
-
-#else
-    struct qgis_project_list_s *projlist = NULL;
-    switch (list)
-    {
-    case LIST_INIT:
-    case LIST_ACTIVE:
-    {
-	projlist = projectlist;
-	assert(projname);
-	struct qgis_project_s *project = find_project_by_name(projlist, projname);
-	if (project)
-	{
-	    struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
-	    assert(proclist);
-	    struct qgis_process_s *proc = qgis_process_list_mutex_find_process_by_status(proclist, state);
-	    if (proc)
-		ret = qgis_process_get_pid(proc);
-	}
-	break;
-    }
-    case LIST_SHUTDOWN:
-	assert(0);
-	break;
-
-    default:
-	printlog("error: wrong list entry found %d", list);
-	exit(EXIT_FAILURE);
-    }
-#endif
 
     debug(1, "returned %d", ret);
 
