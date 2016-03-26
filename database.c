@@ -1127,20 +1127,9 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 /* return the number of processes being in the active list of this project */
 int db_get_num_active_process(const char *projname)
 {
-#if 1
-    int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
-#else
     assert(projname);
 
-    int ret = -1;
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	ret = qgis_process_list_get_num_process(proc_list);
-    }
-#endif
+    int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
 
     return ret;
 }
