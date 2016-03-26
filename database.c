@@ -1562,7 +1562,7 @@ void db_reset_startup_failures(const char *projname)
 char *db_get_project_for_watchid(int watchid)
 {
     assert(watchid >= 0);
-#if 1
+
     int get_project_for_watchid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	const char **val = data;
@@ -1579,14 +1579,6 @@ char *db_get_project_for_watchid(int watchid)
     char *ret = NULL;
 
     db_select_parameter_callback(DB_GET_PROJECT_FROM_WATCHID, get_project_for_watchid, &ret, watchid);
-
-#else
-    const char *ret = NULL;
-
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_inotifyid(projectlist, watchid);
-    if (project)
-	ret = qgis_project_get_name(project);
-#endif
 
     debug(1, "returned %s", ret);
 
