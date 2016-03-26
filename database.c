@@ -1523,7 +1523,6 @@ int db_get_startup_failures(const char *projname)
 {
     assert(projname);
 
-#if 1
     int get_startup_failures(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	int *val = data;
@@ -1539,14 +1538,6 @@ int db_get_startup_failures(const char *projname)
 
     int ret = -1;
     db_select_parameter_callback(DB_SELECT_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
-#else
-    int ret = -1;
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	ret = qgis_project_get_nr_crashes(project);
-    }
-#endif
 
     debug(1, "returned %d", ret);
 
