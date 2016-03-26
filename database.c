@@ -927,7 +927,6 @@ int db_has_process(pid_t pid)
 
 int db_get_process_socket(pid_t pid)
 {
-#if 1
 
     int get_process_socket(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
@@ -943,31 +942,6 @@ int db_get_process_socket(pid_t pid)
     int ret = -1;
 
     db_select_parameter_callback(DB_GET_PROCESS_SOCKET_FROM_PROCESS, get_process_socket, &ret, (int)pid);
-
-#else
-    int ret = -1;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	if (proc)
-	{
-	    ret = qgis_process_get_socketfd(proc);
-	}
-	else
-	{
-	    proc_list = qgis_project_get_init_process_list(project);
-	    assert(proc_list);
-	    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	    if (proc)
-	    {
-		ret = qgis_process_get_socketfd(proc);
-	    }
-	}
-    }
-#endif
 
     return ret;
 }
