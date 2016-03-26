@@ -949,8 +949,7 @@ int db_get_process_socket(pid_t pid)
 
 enum db_process_state_e db_get_process_state(pid_t pid)
 {
-    enum db_process_state_e ret = PROCESS_STATE_MAX ;
-#if 1
+
     int get_process_state(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	enum db_process_state_e *state = data;
@@ -962,24 +961,10 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 	return 0;
     }
 
+    enum db_process_state_e ret = PROCESS_STATE_MAX ;
+
     db_select_parameter_callback(DB_GET_PROCESS_STATE, get_process_state, &ret, pid);
 
-#else
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-	ret = qgis_process_get_state(proc);
-#endif
     debug(1, "for process %d returned %d", pid, ret);
 
     return ret;
