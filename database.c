@@ -868,8 +868,6 @@ char *db_get_project_for_this_process(pid_t pid)
  */
 pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
 {
-    pid_t ret = -1;
-
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
 
@@ -885,6 +883,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 	return 0;
     }
 
+    pid_t ret = -1;
     int mylist = list;
     int mystate = state;
     db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
@@ -906,7 +905,7 @@ pid_t db_get_next_idle_process_for_work(const char *projname)
 /* return 0 if the pid is not in any of the process lists, 1 otherwise */
 int db_has_process(pid_t pid)
 {
-#if 1
+
     int has_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	int *val = data;
@@ -921,22 +920,6 @@ int db_has_process(pid_t pid)
     int ret = 0;
 
     db_select_parameter_callback(DB_GET_PROCESS_STATE, has_process, &ret, (int)pid);
-
-#else
-    int ret = 0;
-
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	ret = 1;
-    }
-    else
-    {
-	struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-	if (proc)
-	    ret = 1;
-    }
-#endif
 
     return ret;
 }
