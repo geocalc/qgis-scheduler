@@ -1281,7 +1281,8 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 
 enum db_process_list_e db_get_process_list(pid_t pid)
 {
-#if 1
+    assert(0 < pid);
+
     int get_list_pid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	enum db_process_list_e *list = data;
@@ -1296,36 +1297,6 @@ enum db_process_list_e db_get_process_list(pid_t pid)
     enum db_process_list_e ret = LIST_SELECTOR_MAX;
 
     db_select_parameter_callback(DB_GET_LIST_FROM_PROCESS, get_list_pid, &ret, (int)pid);
-
-#else
-    enum db_process_list_e ret = LIST_SELECTOR_MAX;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	if (proc)
-	{
-	    ret = LIST_ACTIVE;
-	}
-	else
-	{
-	    proc_list = qgis_project_get_init_process_list(project);
-	    assert(proc_list);
-	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	    if (proc)
-		ret = LIST_INIT;
-	}
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-	if (proc)
-	    ret = LIST_SHUTDOWN;
-    }
-#endif
 
     debug(1, "returned %d", ret);
 
