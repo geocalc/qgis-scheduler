@@ -897,22 +897,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 
 pid_t db_get_next_idle_process_for_work(const char *projname)
 {
-#if 1
     pid_t ret = db_get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
-#else
-    pid_t ret = -1;
-
-    assert(projname);
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
-	assert(proclist);
-	struct qgis_process_s *proc = qgis_process_list_find_idle_return_busy(proclist);
-	if (proc)
-	    ret = qgis_process_get_pid(proc);
-    }
-#endif
 
     return ret;
 }
