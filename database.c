@@ -1152,7 +1152,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
         pid_t pid;
     };
 
-#if 1
+
     int get_pid_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	struct pidlist_s *list = data;
@@ -1185,84 +1185,6 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
 
 
     int retval = 0;
-
-#else
-
-    int retval = 0;
-    struct pidlist_s mypidlist;
-    STAILQ_INIT(&mypidlist.head);
-    if (LIST_SHUTDOWN == list)
-    {
-	assert(shutdownlist);
-
-	struct qgis_process_list_s *proclist = shutdownlist;
-	struct qgis_process_iterator *process_iterator = qgis_process_list_get_iterator(proclist);
-	while (process_iterator)
-	{
-	    struct qgis_process_s *process = qgis_process_list_get_next_process(&process_iterator);
-	    pid_t pid = qgis_process_get_pid(process);
-
-	    struct piditerator_s *entry = malloc(sizeof(*entry));
-	    assert(entry);
-	    if ( !entry )
-	    {
-		logerror("could not allocate memory");
-		exit(EXIT_FAILURE);
-	    }
-	    entry->pid = pid;
-
-	    if (STAILQ_EMPTY(&mypidlist.head))
-		STAILQ_INSERT_HEAD(&mypidlist.head, entry, entries);
-	    else
-		STAILQ_INSERT_TAIL(&mypidlist.head, entry, entries);
-
-	}
-	qgis_process_list_return_iterator(proclist);
-    }
-    else
-    {
-	struct qgis_project_iterator *project_iterator = qgis_proj_list_get_iterator(projectlist);
-
-	while (project_iterator)
-	{
-	    struct qgis_project_s *project = qgis_proj_list_get_next_project(&project_iterator);
-
-	    struct qgis_process_list_s *proclist;
-	    if (LIST_INIT == list)
-		proclist = qgis_project_get_init_process_list(project);
-	    else
-		proclist = qgis_project_get_active_process_list(project);
-
-	    struct qgis_process_iterator *process_iterator = qgis_process_list_get_iterator(proclist);
-	    while (process_iterator)
-	    {
-		struct qgis_process_s *process = qgis_process_list_get_next_process(&process_iterator);
-		pid_t pid = qgis_process_get_pid(process);
-
-		struct piditerator_s *entry = malloc(sizeof(*entry));
-		assert(entry);
-		if ( !entry )
-		{
-		    logerror("could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-		entry->pid = pid;
-
-		if (STAILQ_EMPTY(&mypidlist.head))
-		    STAILQ_INSERT_HEAD(&mypidlist.head, entry, entries);
-		else
-		    STAILQ_INSERT_TAIL(&mypidlist.head, entry, entries);
-
-	    }
-	    qgis_process_list_return_iterator(proclist);
-
-	}
-
-	qgis_proj_list_return_iterator(projectlist);
-    }
-
-#endif
-
     int num = 0;
     struct piditerator_s *it;
     STAILQ_FOREACH(it, &mypidlist.head, entries)
