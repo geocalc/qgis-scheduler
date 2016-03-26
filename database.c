@@ -1412,8 +1412,6 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 {
     assert(ts);
     assert(0 < pid);
-#if 1
-    struct timespec retval = {0,0};
 
     int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
@@ -1430,31 +1428,13 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 	return 0;
     }
 
+    struct timespec retval = {0,0};
+
     db_select_parameter_callback(DB_SELECT_PROCESS_SIGNAL_TIMER, get_signal_timer, &retval, pid);
     *ts = retval;
 
     int ret = 0;
 
-#else
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-    {
-	*ts = *qgis_process_get_signaltime(proc);
-	ret = 0;
-    }
-#endif
     debug(1, "pid %d, value %ld,%03lds. returned %d", pid, ts->tv_sec, (ts->tv_nsec/(1000*1000)), ret);
 
     return ret;
