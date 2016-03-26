@@ -1102,7 +1102,6 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     assert(projname);
     assert(state < PROCESS_STATE_MAX);
 
-#if 1
     int get_pid_by_status(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	int *num = data;
@@ -1118,21 +1117,6 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     int ret = 0;
 
     db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, (int)state);
-
-#else
-    int ret = -1;
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	ret = qgis_process_list_get_num_process_by_status(proc_list, state);
-    }
-    else
-    {
-	ret = qgis_process_list_get_num_process_by_status(shutdownlist, state);
-    }
-#endif
 
     debug(1, "returned %d", ret);
 
