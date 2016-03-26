@@ -118,7 +118,7 @@ enum db_select_statement_id
     DB_GET_PROCESS_STATE,
     DB_GET_STATE_PROCESS,
     DB_GET_PROCESS_FROM_LIST,
-    DB_UPDATE_PROCESS_LISTS,
+    DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST,
     DB_UPDATE_PROCESS_LIST_PID,
     DB_UPDATE_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_SIGNAL_TIMER,
@@ -166,7 +166,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT pid FROM processes WHERE state = %i",
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
-	// DB_UPDATE_PROCESS_LISTS
+	// DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST
 	"UPDATE processes SET list = %i WHERE projectname = %s AND list = %i",
 	// DB_UPDATE_PROCESS_LIST_PID
 	"UPDATE processes SET list = %i WHERE pid = %i",
@@ -1316,7 +1316,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
     int retval = qgis_process_list_transfer_all_process_with_state(activeproclist, initproclist, PROC_IDLE);
     debug(1, "project '%s' moved %d processes from init list to active list", projname, retval);
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_ACTIVE, projname, LIST_INIT);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_ACTIVE, projname, LIST_INIT);
 
 }
 
@@ -1332,7 +1332,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_SHUTDOWN, projname, LIST_ACTIVE);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_ACTIVE);
 
     qgis_shutdown_notify_changes();
 
@@ -1350,7 +1350,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     statistic_add_process_shutdown(shutdownnum);
     qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
-    db_select_parameter(DB_UPDATE_PROCESS_LISTS, LIST_SHUTDOWN, projname, LIST_INIT);
+    db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_INIT);
 
     qgis_shutdown_notify_changes();
 }
