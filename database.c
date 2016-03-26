@@ -1471,7 +1471,7 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 
 int db_get_num_shutdown_processes(void)
 {
-#if 1
+
     int get_num_shutdown_processes(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	int *num = data;
@@ -1487,10 +1487,6 @@ int db_get_num_shutdown_processes(void)
     int num_list = 0;
 
     db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
-
-#else
-    int num_list = qgis_process_list_get_num_process(shutdownlist);
-#endif
 
     debug(1, "returned %d", num_list);
 
