@@ -675,6 +675,8 @@ void db_init(void)
     debug(1, "created memory db");
 
 
+    debug(1, "db mutex init at %p", &db_lock);
+
     /* setup all tables */
     db_select_parameter(DB_SELECT_CREATE_PROJECT_TABLE);
 
@@ -923,6 +925,8 @@ int db_has_process(pid_t pid)
     int ret = 0;
 
     db_select_parameter_callback(DB_GET_PROCESS_STATE, has_process, &ret, (int)pid);
+
+    debug(1, "pid = %d returned %d", pid, ret);
 
     return ret;
 }
