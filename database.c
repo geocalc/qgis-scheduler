@@ -1240,14 +1240,11 @@ enum db_process_list_e db_get_process_list(pid_t pid)
  */
 void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 {
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
-    struct qgis_process_list_s *activeproclist = qgis_project_get_active_process_list(project);
-    struct qgis_process_list_s *initproclist = qgis_project_get_init_process_list(project);
-
-    int retval = qgis_process_list_transfer_all_process_with_state(activeproclist, initproclist, PROC_IDLE);
-    debug(1, "project '%s' moved %d processes from init list to active list", projname, retval);
+    debug(1, "project '%s'", projname);
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_ACTIVE, projname, LIST_INIT);
+
+    qgis_shutdown_notify_changes();
 
 }
 
@@ -1257,11 +1254,6 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
-    struct qgis_process_list_s *proclist = qgis_project_get_active_process_list(project);
-    int shutdownnum = qgis_process_list_get_num_process(proclist);
-    statistic_add_process_shutdown(shutdownnum);
-    qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_ACTIVE);
 
@@ -1275,11 +1267,6 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
-    struct qgis_process_list_s *proclist = qgis_project_get_init_process_list(project);
-    int shutdownnum = qgis_process_list_get_num_process(proclist);
-    statistic_add_process_shutdown(shutdownnum);
-    qgis_process_list_transfer_all_process( shutdownlist, proclist );
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_INIT);
 
