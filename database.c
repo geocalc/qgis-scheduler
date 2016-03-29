@@ -98,9 +98,6 @@ static sqlite3 *dbhandler = NULL;
 /* transitional data. this will be deleted after the code change */
 #include "qgis_project_list.h"
 
-static struct qgis_project_list_s *projectlist = NULL;
-static struct qgis_process_list_s *shutdownlist = NULL;	// list pf processes to be killed and removed
-//static struct qgis_process_list_s *busylist = NULL;	// list of processes being state busy or added via api
 static pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
