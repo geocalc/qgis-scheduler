@@ -1370,22 +1370,7 @@ void db_move_all_process_to_list(enum db_process_list_e list)
 
 int db_reset_signal_timer(pid_t pid)
 {
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-	ret = qgis_process_reset_signaltime(proc);
-    debug(1, "for process %d returned %d", pid, ret);
+    int ret = 0;
 
     struct timespec ts;
     qgis_timer_start(&ts);
