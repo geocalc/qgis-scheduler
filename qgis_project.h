@@ -43,24 +43,23 @@
 struct qgis_project_s;
 
 
-struct qgis_project_s *qgis_project_new(const char *name, const char *configpath);
+struct qgis_project_s *qgis_project_new(const char *name, const char *configpath, int inotifyfd);
 void qgis_project_delete(struct qgis_project_s *proj);
 
 
 regex_t *qgis_project_get_regex(struct qgis_project_s *proj);
-struct qgis_process_list_s *qgis_project_get_process_list(struct qgis_project_s *proj);
+struct qgis_process_list_s *qgis_project_get_init_process_list(struct qgis_project_s *proj);
+struct qgis_process_list_s *qgis_project_get_active_process_list(struct qgis_project_s *proj);
 const char *qgis_project_get_name(struct qgis_project_s *proj);
 int qgis_project_add_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
-//int qgis_project_shutdown_process(struct qgis_project_s *proj, struct qgis_process_s *proc);
-void qgis_project_shutdown(struct qgis_project_s *proj);
 int qgis_project_shutdown_all_processes(struct qgis_project_s *proj, int signum);
 
-int qgis_project_process_died(struct qgis_project_s *proj, pid_t pid);
-void qgis_project_start_new_process_detached(int num, struct qgis_project_s *project, int do_exchange_processes);
-void qgis_project_start_new_process_wait(int num, struct qgis_project_s *project, int do_exchange_processes);
-int qgis_project_check_inotify_config_changed(struct qgis_project_s *project, int wd);
 
 void qgis_project_print(struct qgis_project_s *proj);
 
+void qgis_project_inc_nr_crashes(struct qgis_project_s *proj);
+int qgis_project_get_nr_crashes(struct qgis_project_s *proj);
+void qgis_project_reset_nr_crashes(struct qgis_project_s *proj);
+int qgis_project_get_inotify_fd(struct qgis_project_s *proj);
 
 #endif /* QGIS_PROJECT_H_ */

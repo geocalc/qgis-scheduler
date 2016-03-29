@@ -33,25 +33,36 @@
 #include "qgis_shutdown_queue.h"
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
+#include <pthread.h>
 
-#include "qgis_process_list.h"
 #include "logger.h"
 #include "timer.h"
+#include "database.h"
+#include "process_manager.h"
+#include "qgis_config.h"
+
 
 #define UNUSED_PARAMETER(x)	((void)(x))
 
 
-static struct qgis_process_list_s *shutdownlist = NULL;	// list pf processes to be killed and removed
-static struct qgis_process_list_s *busylist = NULL;	// list of processes being state busy or added via api
 static pthread_t shutdownthread = 0;
 static pthread_cond_t shutdowncondition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t shutdownmutex = PTHREAD_MUTEX_INITIALIZER;
 static int do_shutdown_thread = 0;
 static int has_list_change = 0;
+static int shutdown_main_pipe_wr = -1;
 
+#warning double declaration of type, TODO
+struct signal_data_s
+{
+    int signal;
+    pid_t pid;
+    int is_shutdown;
+};
 
 
 static void *qgis_shutdown_thread(void *arg)
@@ -80,40 +91,171 @@ static void *qgis_shutdown_thread(void *arg)
     {
 	int retval;
 
-	/* look through all processes in the busy list if the status changed.
-	 * if it does change to shutdown list */
-	static const enum qgis_process_state_e statemovelist[] = { PROC_IDLE, PROC_OPEN_IDLE, PROC_TERM, PROC_KILL, PROC_EXIT};
+	/* get a list of all processes in the shutdown list.
+	 * for each process evaluate:
+	 * - is process timeout and state kill? set state exit
+	 * - is process timeout and state term? send kill signal, set state
+	 *   kill, start timer again. if process does not exist set state exit
+	 * - is process timeout and state idle? send term signal, set state
+	 *   term, start timer. if process does not exist set state exit
+	 * - for any other process of the state term or kill do record the
+	 *   timeout and evaluate next (minimal) timeout.
+	 *
+	 * Now erase all process with state exit from list.
+	 *
+	 * Are we in shutdown mode and is no entry left? then leave
+	 *
+	 * Is a timeout value given? then wait with timeout. else wait infinite
+	 */
+
+	struct timespec current_time;
+	retval = qgis_timer_start(&current_time);
+	if (retval)
+	{
+	    logerror("error: retrieving time");
+	    exit(EXIT_FAILURE);
+	}
+
+	pid_t *pidlist;
+	int len;
+	retval = db_get_list_process_by_list(&pidlist, &len, LIST_SHUTDOWN);
+	// no need to check, retval is always 0
+
+	struct timespec min_timer = {0};
+	struct timespec proc_timer = {0};
 	int i;
-	for (i=0; i<((int)(sizeof(statemovelist)/sizeof(*statemovelist))); i++)
+	for (i=0; i<len; i++)
 	{
-	    retval = qgis_process_list_transfer_all_process_with_state(shutdownlist, busylist, statemovelist[i]);
-	    debug(1, "transferred %d %s programs from busylist to shutdownlist", retval, get_state_str(statemovelist[i]));
+	    pid_t pid = pidlist[i];
+	    enum db_process_state_e state = db_get_process_state(pid);
+	    debug(1, "check pid %d, state %d", pid, state);
+	    switch(state)
+	    {
+	    case PROC_STATE_START:
+	    case PROC_STATE_INIT: // TODO: maybe wait until state changes to IDLE?
+	    case PROC_STATE_IDLE:
+	    case PROC_STATE_BUSY: // TODO: maybe wait until state changes to IDLE?
+		/* we have an idle process. immediately send a term signal */
+		retval = kill(pid, SIGTERM);
+		debug(1, "kill(%d, SIGTERM) returned %d, errno %d", pid, retval, errno);
+		if (-1 == retval)
+		{
+		    if (ESRCH == errno)
+		    {
+			process_manager_cleanup_process(pid);
+		    }
+		    else
+		    {
+			logerror("error calling kill(%d, SIGTERM)", pid);
+			exit(EXIT_FAILURE);
+		    }
+		}
+		else
+		{
+		    /* signal has been send. reset signal time to current time
+		     * and change process state
+		     */
+		    retval = db_process_set_state(pid, PROC_STATE_TERM);
+		    if (-1 == retval)
+		    {
+			printlog("error: can not set state to pid %d, unknown", pid);
+			exit(EXIT_FAILURE);
+		    }
+
+		    retval = db_reset_signal_timer(pid);
+		    if (-1 == retval)
+		    {
+			logerror("error setting the time value");
+			exit(EXIT_FAILURE);
+		    }
+		}
+		break;
+
+	    case PROC_STATE_TERM:
+		/* we have a process which has received a TERM signal.
+		 * check the remaining signal time if it exceeds the timeout value.
+		 * if it does send a kill signal
+		 */
+		retval = db_get_signal_timer(&proc_timer, pid);
+		qgis_timer_add(&proc_timer, &default_signal_timeout);
+		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
+		{
+		    printlog("timeout (%dsec) for process %d, sending SIGKILL signal", (int)default_signal_timeout.tv_sec, pid);
+		    retval = kill(pid, SIGKILL);
+		    if (-1 == retval)
+		    {
+			if (ESRCH == errno)
+			{
+			    process_manager_cleanup_process(pid);
+			}
+			else
+			{
+			    logerror("error calling kill(%d, SIGTERM)", pid);
+			    exit(EXIT_FAILURE);
+			}
+		    }
+		    else {
+			/* signal has been send. reset signal time to current time
+			 * and change process state
+			 */
+			retval = db_process_set_state(pid, PROC_STATE_KILL);
+			if (-1 == retval)
+			{
+			    printlog("error: can not set state to pid %d, unknown", pid);
+			    exit(EXIT_FAILURE);
+			}
+
+			retval = db_reset_signal_timer(pid);
+			if (-1 == retval)
+			{
+			    logerror("error setting the time value");
+			    exit(EXIT_FAILURE);
+			}
+		    }
+		}
+		break;
+
+	    case PROC_STATE_KILL:
+		/* still not gone?
+		 * remove from db
+		 */
+		retval = db_get_signal_timer(&proc_timer, pid);
+		qgis_timer_add(&proc_timer, &default_signal_timeout);
+		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
+		{
+		    printlog("timeout (%dsec) for process %d. Could not kill process, please look after it", (int)default_signal_timeout.tv_sec, pid);
+		    process_manager_cleanup_process(pid);
+		}
+		break;
+
+	    case PROC_STATE_EXIT:
+		/* zombi entry.
+		 * just remove it from the lists.
+		 */
+		break;
+
+	    case PROCESS_STATE_MAX:
+		printlog("can not find process %d during shutdown, db changed inbetween data selects. ignoring process", pid);
+		break;
+
+	    default:
+		printlog("error: unexpected state value (%d) in shutdown list", state);
+		exit(EXIT_FAILURE);
+	    }
 	}
+	db_free_list_process(pidlist, len);
+	pidlist = NULL;
+	len = 0;
 
-	/* send a signal to all processes in the shutdown list.
-	 * If the process already died, set its state to EXIT.
+	/* we checked all processes in the shutdown list.
+	 * now wheed out the processes with state exit
 	 */
-	debug(1, "send or evaluate signal to every process in shutdown list");
-	qgis_process_list_signal_shutdown(shutdownlist);
+	db_remove_process_with_state_exit();
 
-	retval = qgis_process_list_get_num_process(shutdownlist);
-	debug(1, "got %d processes in shutdown list", retval);
-
-	/* clean the list from exited processes */
-	retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
-	debug(1, "deleted %d processes with status EXIT from shutdown list", retval);
-
-	/* get the timeout of the next signalling round.
-	 * if no process is in the list "ts_sig" may be {0,0}
+	/* get the minimal proc timer (or {0,0}) to see if we
+	 * need to wait with timeout value.
 	 */
-	struct timespec ts_sig = {0,0};
-	qgis_process_list_get_min_signaltimer(shutdownlist, &ts_sig);
-	debug(1, "min signal timer is %ld,%03lds", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-	if ( !qgis_timer_is_empty(&ts_sig) )
-	{
-	    qgis_timer_add(&ts_sig, &default_signal_timeout);
-	}
-
+	db_shutdown_get_min_signaltimer(&min_timer);
 
 	/* wait for signal or new process or thread cancel request */
 	retval = pthread_mutex_lock(&shutdownmutex);
@@ -131,7 +273,7 @@ static void *qgis_shutdown_thread(void *arg)
 	 */
 	if ( !has_list_change )
 	{
-	    if ( qgis_timer_is_empty(&ts_sig) )
+	    if ( qgis_timer_is_empty(&min_timer) )
 	    {
 		if (do_shutdown_thread)
 		{
@@ -143,7 +285,7 @@ static void *qgis_shutdown_thread(void *arg)
 		     * Set a small timeout of 0.2 seconds in case we do not exit
 		     * this loop immediately.
 		     */
-		    retval = qgis_timer_start(&ts_sig);
+		    retval = qgis_timer_start(&min_timer);
 		    if (retval)
 		    {
 			logerror("error: can not get clock value");
@@ -153,10 +295,12 @@ static void *qgis_shutdown_thread(void *arg)
 			    tv_sec: 0,
 			    tv_nsec: 200*1000*1000
 		    };
-		    qgis_timer_add(&ts_sig, &ts_timeout);
+		    qgis_timer_add(&min_timer, &ts_timeout);
 
-		    debug(1, "wait %ld,%03ld seconds (until %ld,%03ld) or until next condition", ts_timeout.tv_sec, (ts_timeout.tv_nsec/(1000*1000)), ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
+		    struct timespec temp_ts;
+		    qgis_timer_start(&temp_ts);
+		    debug(1, "do shutdown and not signal timer set? current time: %ld,%03lds. wait %ld,%03ld seconds (until %ld,%03ld) or until next condition", temp_ts.tv_sec, (temp_ts.tv_nsec/(1000*1000)), ts_timeout.tv_sec, (ts_timeout.tv_nsec/(1000*1000)), min_timer.tv_sec, (min_timer.tv_nsec/(1000*1000)));
+		    retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &min_timer);
 		}
 		else
 		{
@@ -166,8 +310,12 @@ static void *qgis_shutdown_thread(void *arg)
 	    }
 	    else
 	    {
-		debug(1, "wait until %ld,%03ld or until next condition", ts_sig.tv_sec, (ts_sig.tv_nsec/(1000*1000)));
-		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &ts_sig);
+		qgis_timer_add(&min_timer, &default_signal_timeout);
+		struct timespec temp_ts;
+		qgis_timer_start(&temp_ts);
+		debug(1, "current time: %ld,%03lds. wait until %ld,%03ld or until next condition", temp_ts.tv_sec, (temp_ts.tv_nsec/(1000*1000)), min_timer.tv_sec, (min_timer.tv_nsec/(1000*1000)));
+		retval = pthread_cond_timedwait(&shutdowncondition, &shutdownmutex, &min_timer);
+		debug(1, "pthread_cond_timedwait() returned %d", retval);
 	    }
 
 	    if ( 0 != retval && ETIMEDOUT != retval )
@@ -201,58 +349,112 @@ static void *qgis_shutdown_thread(void *arg)
 
 	if (local_do_shutdown_thread)
 	{
-	    int num_list = qgis_process_list_get_num_process(shutdownlist);
+	    int num_list = db_get_num_shutdown_processes();
 	    if ( 0 >= num_list )
 	    {
-		num_list = qgis_process_list_get_num_process(busylist);
-		if ( 0 >= num_list )
-		{
-		    break;
-		}
+		break;
 	    }
 	}
-
     }
+
+    /* write to main thread, we are done */
+    struct signal_data_s sigdata;
+    sigdata.signal = 0;
+    sigdata.pid = 0;
+    sigdata.is_shutdown = 1;
+
+    int retval = write(shutdown_main_pipe_wr, &sigdata, sizeof(sigdata));
+    if (-1 == retval)
+    {
+	logerror("write signal data");
+	exit(EXIT_FAILURE);
+    }
+    debug(1, "wrote %d bytes to sig pipe", retval);
 
     return NULL;
 }
 
 
-void qgis_shutdown_init()
+void qgis_shutdown_init(int main_pipe_wr)
 {
-    shutdownlist = qgis_process_list_new();
-    busylist = qgis_process_list_new();
+    assert(0 <= main_pipe_wr);
+    shutdown_main_pipe_wr = main_pipe_wr;
 
-    int retval = pthread_create(&shutdownthread, NULL, qgis_shutdown_thread, NULL);
+    /* initialize the condition variable timeout clock attribute with the same
+     * value we use in the clock measurements. Else if we don't we have
+     * different timeout values (clock module <-> pthread condition timeout)
+     */
+    pthread_condattr_t	condattr;
+    int retval = pthread_condattr_init(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_setclock() id %d", get_valid_clock_id());
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_cond_init(&shutdowncondition, &condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_cond_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_destroy(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_destroy");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_create(&shutdownthread, NULL, qgis_shutdown_thread, NULL);
     if (retval)
     {
 	errno = retval;
 	logerror("error creating thread");
 	exit(EXIT_FAILURE);
     }
-
 }
 
 
 void qgis_shutdown_delete()
 {
-    qgis_process_list_delete(shutdownlist);
-    qgis_process_list_delete(busylist);
+    assert(shutdownthread);
+    int retval = pthread_join(shutdownthread, NULL);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error joining thread");
+	exit(EXIT_FAILURE);
+    }
+    shutdownthread = 0;
 }
 
 
 /* Adds a process entry to the list of processes to end.
  * Do this before we call qgis_shutdown_wait_empty().
  */
-void qgis_shutdown_add_process(struct qgis_process_s *proc)
+void qgis_shutdown_add_process(pid_t pid)
 {
-    assert(!do_shutdown_thread);
-    assert(busylist);
+    /* during shutdown sequence there may arrive a signal SIGCHLD from the
+     * signal handler after we successfully did shut down this module.
+     * Be a bit more relaxed during shutdown sequence.
+     */
+    int retval = get_program_shutdown();
+    if (!retval)
+	assert(!do_shutdown_thread);
 
-    qgis_process_list_add_process( busylist, proc );
+    db_move_process_to_list(LIST_SHUTDOWN, pid);
+
     debug(1, "add one process to shutdown list");
 
-    int retval = pthread_mutex_lock(&shutdownmutex);
+    retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
@@ -277,16 +479,23 @@ void qgis_shutdown_add_process(struct qgis_process_s *proc)
 }
 
 
-/* moves an entire list of processes to the shutdown module */
-void qgis_shutdown_add_process_list(struct qgis_process_list_s *list)
+/* move all processes in init list and active list for this project to the
+ * shutdown list.
+ */
+void qgis_shutdown_add_all_process(const char *project_name)
 {
-    assert(busylist);
+    db_move_all_process_from_init_to_shutdown_list(project_name);
+    db_move_all_process_from_active_to_shutdown_list(project_name);
+}
+
+
+void qgis_shutdown_notify_changes(void)
+{
     assert(!do_shutdown_thread);
 
-    int retval = qgis_process_list_transfer_all_process( busylist, list );
-    debug(1, "moved %d processes to shutdown list", retval);
+    debug(1, "notify shutdown list about change");
 
-    retval = pthread_mutex_lock(&shutdownmutex);
+    int retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
@@ -342,54 +551,47 @@ void qgis_shutdown_wait_empty(void)
 	logerror("error: can not unlock mutex");
 	exit(EXIT_FAILURE);
     }
-
-
-    assert(shutdownthread);
-    retval = pthread_join(shutdownthread, NULL);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error joining thread");
-	exit(EXIT_FAILURE);
-    }
-    shutdownthread = 0;
 }
 
 
 /* Called if a child process signalled its exit.
  * Then we can look in all lists to remove the process entry.
  */
-void qgis_shutdown_process_died(pid_t pid)
-{
-    debug(1,"process %d died", pid);
-
-    /* remove the process with "pid" from the lists,
-     * then signal the thread.
-     */
-    //int retval =
-
-    int retval = pthread_mutex_lock(&shutdownmutex);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not lock mutex");
-	exit(EXIT_FAILURE);
-    }
-    has_list_change = 1;
-    retval = pthread_cond_signal(&shutdowncondition);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not wait on condition");
-	exit(EXIT_FAILURE);
-    }
-    retval = pthread_mutex_unlock(&shutdownmutex);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not unlock mutex");
-	exit(EXIT_FAILURE);
-    }
-}
+//void qgis_shutdown_process_died(pid_t pid)
+//{
+//    debug(1,"process %d died", pid);
+//
+//    /* remove the process with "pid" from the lists,
+//     * then signal the thread.
+//     */
+//    int retval = process_manager_cleanup_process(pid);
+//    if (-1 == retval)
+//    {
+//	printlog("error: signalled process %d not found in internal lists", pid);
+//    }
+//
+//    retval = pthread_mutex_lock(&shutdownmutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not lock mutex");
+//	exit(EXIT_FAILURE);
+//    }
+//    has_list_change = 1;
+//    retval = pthread_cond_signal(&shutdowncondition);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not wait on condition");
+//	exit(EXIT_FAILURE);
+//    }
+//    retval = pthread_mutex_unlock(&shutdownmutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not unlock mutex");
+//	exit(EXIT_FAILURE);
+//    }
+//}
 
 

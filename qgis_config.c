@@ -98,9 +98,18 @@
 
 #define INVALID_STRING	((char *)-1)
 
+/* Default time to wait between sending SIGTERM and SIGKILL */
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
+#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
 
 
 
+
+const struct timespec default_signal_timeout =
+{
+	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
+	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
+};
 
 
 
@@ -1223,8 +1232,11 @@ int get_program_shutdown(void)
 void test_set_valid_clock_id(void)
 {
     static const clockid_t clockidarr[] = {
-	    CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC,
-	    CLOCK_REALTIME_COARSE, CLOCK_REALTIME};
+	    /* Note: we use the same clock id in pthread_condattr_setclock()
+	     * which seems to accept only CLOCK_MONOTONIC and CLOCK_REALTIME
+	     */
+	    /*CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC_COARSE,*/ CLOCK_MONOTONIC,
+	    /*CLOCK_REALTIME_COARSE,*/ CLOCK_REALTIME};
     static const int numarr = sizeof(clockidarr)/sizeof(*clockidarr);
     int i;
 

@@ -17,6 +17,8 @@
 #include <string.h>
 
 #include "logger.h"
+#include "process_manager.h"
+#include "project_manager.h"
 
 
 struct qgis_project_iterator
@@ -238,7 +240,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	LIST_FOREACH(np, &list->head, entries)
 	{
 	    struct qgis_project_s *myproj = np->proj;
-	    struct qgis_process_list_s *proc_list = qgis_project_get_process_list(myproj);
+	    struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(myproj);
 	    if (proc_list)
 	    {
 		// iterate through the list to find the relevant process
@@ -251,6 +253,69 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 		    proj = myproj;
 		    break;
 		}
+	    }
+	    if (!proj)
+	    {
+		/* not found in active list, try the init list */
+		proc_list = qgis_project_get_init_process_list(myproj);
+		if (proc_list)
+		{
+		    // iterate through the list to find the relevant process
+		    struct qgis_process_s *proc = qgis_process_list_find_process_by_pid(proc_list, pid);
+		    if (proc)
+		    {
+			/* proc is not NULL, we found the process item.
+			 * return the project which owns this process
+			 */
+			proj = myproj;
+			break;
+		    }
+		}
+	    }
+	}
+
+	retval = pthread_rwlock_unlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    return proj;
+}
+
+
+struct qgis_project_s *qgis_proj_list_find_project_by_inotifyid(struct qgis_project_list_s *list, int inotifyid)
+{
+    struct qgis_project_s *proj = NULL;
+
+    assert(list);
+    if (list)
+    {
+	struct qgis_project_iterator *np;
+
+	int retval = pthread_rwlock_rdlock(&list->rwlock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error acquire read-write lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	LIST_FOREACH(np, &list->head, entries)
+	{
+	    struct qgis_project_s *myproj = np->proj;
+	    assert(myproj);
+	    int watchfd = qgis_project_get_inotify_fd(myproj);
+	    if (watchfd == inotifyid)
+	    {
+		/* we found the inotify id.
+		 * return the project which owns this process
+		 */
+		proj = myproj;
+		break;
 	    }
 	}
 
@@ -310,125 +375,6 @@ void qgis_proj_list_return_iterator(struct qgis_project_list_s *list)
     if (list)
     {
 	int retval = pthread_rwlock_unlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-    }
-}
-
-
-/* signals a dying process. The signal has been received by the signal trap.
- * now every project has to look, if the process is in its own process list.
- */
-void qgis_proj_list_process_died(struct qgis_project_list_s *list, pid_t pid)
-{
-    assert(pid>0);
-    assert(list);
-    if (list)
-    {
-	struct qgis_project_iterator *np;
-
-	int retval = pthread_rwlock_rdlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-
-	LIST_FOREACH(np, &list->head, entries)
-	{
-	    struct qgis_project_s *myproj = np->proj;
-
-	    /* every project has to look in its process lists if the pid
-	     * matches an entry.
-	     * remove the entry and in case restart the process
-	     */
-	    retval = qgis_project_process_died(myproj, pid);
-	    if (retval)
-		// found process, no need to look further
-		break;
-	}
-	/* Note: if retval==0 then the process item could already live in the
-	 * separate shutdown list.
-	 */
-
-	retval = pthread_rwlock_unlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-    }
-
-}
-
-
-/* notification from the inotify thread: some file has changed.
- * Go through all projects, check the watch descriptor (wd) and the file name.
- *
- */
-void qgis_proj_list_config_change(struct qgis_project_list_s *list, int wd)
-{
-    assert(list);
-    if (list)
-    {
-	struct qgis_project_iterator *np;
-
-	int retval = pthread_rwlock_rdlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-
-	LIST_FOREACH(np, &list->head, entries)
-	{
-	    struct qgis_project_s *myproj = np->proj;
-	    qgis_project_check_inotify_config_changed(myproj, wd);
-	}
-
-	retval = pthread_rwlock_unlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error unlock read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-    }
-}
-
-
-/* shut down this project list, i.e. move all processes from all projects
- * to the shutdown list.
- */
-void qgis_proj_list_shutdown(struct qgis_project_list_s *list)
-{
-    assert(list);
-    if (list)
-    {
-	struct qgis_project_iterator *np;
-
-	int retval = pthread_rwlock_rdlock(&list->rwlock);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error acquire read-write lock");
-	    exit(EXIT_FAILURE);
-	}
-
-	LIST_FOREACH(np, &list->head, entries)
-	{
-	    struct qgis_project_s *myproj = np->proj;
-	    qgis_project_shutdown(myproj);
-	}
-
-	retval = pthread_rwlock_unlock(&list->rwlock);
 	if (retval)
 	{
 	    errno = retval;

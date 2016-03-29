@@ -1,14 +1,13 @@
 /*
- * qgis_shutdown_queue.h
+ * project_manager.h
  *
- *  Created on: 10.02.2016
+ *  Created on: 04.03.2016
  *      Author: jh
  */
 
 /*
-    Separate queue to shutdown child processes.
-    It gets the process descriptions and sends them a kill signal and
-    waits until the process ended and no more threads are working with them.
+    Management module for the projects.
+    Organize startup and shutdown of a whole project.
 
     Copyright (C) 2015,2016  Jörg Habenicht (jh@mwerk.net)
 
@@ -30,18 +29,17 @@
 */
 
 
-#ifndef QGIS_SHUTDOWN_QUEUE_H_
-#define QGIS_SHUTDOWN_QUEUE_H_
-
-#include <sys/types.h>
+#ifndef PROJECT_MANAGER_H_
+#define PROJECT_MANAGER_H_
 
 
-void qgis_shutdown_init(int main_pipe_wr);
-void qgis_shutdown_delete(void);
-void qgis_shutdown_add_process(pid_t pid);
-void qgis_shutdown_add_all_process(const char *project_name);
-void qgis_shutdown_notify_changes(void);
-void qgis_shutdown_wait_empty(void);
-void qgis_shutdown_process_died(pid_t pid);
 
-#endif /* QGIS_SHUTDOWN_QUEUE_H_ */
+void project_manager_startup_projects(void);
+
+void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes);
+void project_manager_inotify_configfile_changed(int wd);
+
+void project_manager_shutdown_project(const char *project_name);
+void project_manager_shutdown(void);
+
+#endif /* PROJECT_MANAGER_H_ */

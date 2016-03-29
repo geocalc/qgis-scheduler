@@ -43,11 +43,7 @@
 
 #include "logger.h"
 #include "timer.h"
-
-
-/* Default time to wait between sending SIGTERM and SIGKILL */
-#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
-#define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
+#include "qgis_config.h"
 
 
 
@@ -63,12 +59,6 @@ struct qgis_process_s
     struct timespec signaltime;	// stored time of last signal send to this process
 };
 
-
-const struct timespec default_signal_timeout =
-{
-	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
-	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
-};
 
 
 
@@ -245,10 +235,53 @@ int qgis_process_set_state_init(struct qgis_process_s *proc, pthread_t thread_id
 }
 
 
+int qgis_process_set_state_exit(struct qgis_process_s *proc)
+{
+    assert(proc);
+    int retval = -1;
+    if (proc)
+    {
+//	switch (proc->state)
+//	{
+//	case PROC_START:
+//	    proc->state = PROC_INIT;
+//	    // no break
+//	case PROC_INIT:
+//	    proc->threadid = thread_id;
+//	    retval = 0;
+//	    break;
+//
+//	//case PROC_IDLE:
+//	//case PROC_BUSY:
+//	//case PROC_OPEN_IDLE:
+//	default:
+//	    // is this an error?
+//	    debug(1, "warning: trying to set %s from %s for process %d",get_state_str(PROC_INIT),get_state_str(proc->state),proc->pid);
+//	    /* do nothing */
+//	    break;
+//	}
+	proc->state = PROC_EXIT;
+	retval = 0;
+    }
+
+    return retval;
+}
+
+
 enum qgis_process_state_e qgis_process_get_state(struct qgis_process_s *proc)
 {
     assert(proc);
     return proc?proc->state:(enum qgis_process_state_e)-1;
+}
+
+
+int qgis_process_set_state(struct qgis_process_s *proc, enum qgis_process_state_e state)
+{
+    assert(proc);
+    assert(state < PROC_STATE_MAX);
+    proc->state = state;
+
+    return 0;
 }
 
 
@@ -286,12 +319,10 @@ const struct timespec *qgis_process_get_signaltime(struct qgis_process_s *proc)
     return &proc->signaltime;
 }
 
-
-static void qgis_process_set_state_exit(struct qgis_process_s *proc)
+int qgis_process_reset_signaltime(struct qgis_process_s *proc)
 {
-    printlog("shutdown process %d", proc->pid);
     assert(proc);
-    proc->state = PROC_EXIT;
+    return qgis_timer_start(&proc->signaltime);
 }
 
 
