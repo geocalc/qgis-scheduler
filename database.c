@@ -1153,60 +1153,10 @@ void db_free_list_process(pid_t *list, int len)
 
 void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 {
-    struct qgis_process_s *proc;
-    switch(list)
-    {
-    // TODO: separate init and active processes in separate lists
-    case LIST_INIT:
-    case LIST_ACTIVE:
-	/* nothing to do.
-	 * only check if that process is in shutdown list already and error out
-	 */
-//	proc = qgis_process_list_find_process_by_pid(busylist, pid);
-//	if (proc)
-//	{
-//	    printlog("error: shall not move process %d from shutdown list to active list", pid);
-//	    exit(EXIT_FAILURE);
-//	}
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-	if (proc)
-	{
-	    printlog("error: shall not move process %d from shutdown list to active list", pid);
-	    exit(EXIT_FAILURE);
-	}
-	break;
-
-    case LIST_SHUTDOWN:
-    {
-	struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-	if (project)
-	{
-	    struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	    if (!proc)
-	    {
-		debug(1, "error: did not find process %d in active list", pid);
-	    }
-	    else
-	    {
-		qgis_process_list_transfer_process(shutdownlist, proc_list, proc);
-	    }
-	}
-	else
-	{
-	    debug(1, "error: did not find process %d in projects", pid);
-	}
-	break;
-    }
-    default:
-	printlog("error: unknown list enumeration %d", list);
-	exit(EXIT_FAILURE);
-    }
-
     assert(LIST_SELECTOR_MAX > list);
     assert(0 < pid);
-    db_select_parameter(DB_UPDATE_PROCESS_LIST_PID, list, pid);
 
+    db_select_parameter(DB_UPDATE_PROCESS_LIST_PID, list, pid);
 }
 
 
