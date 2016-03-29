@@ -557,41 +557,41 @@ void qgis_shutdown_wait_empty(void)
 /* Called if a child process signalled its exit.
  * Then we can look in all lists to remove the process entry.
  */
-void qgis_shutdown_process_died(pid_t pid)
-{
-    debug(1,"process %d died", pid);
-
-    /* remove the process with "pid" from the lists,
-     * then signal the thread.
-     */
-    int retval = db_process_set_state_exit(pid);
-    if (-1 == retval)
-    {
-	printlog("error: signalled process %d not found in internal lists", pid);
-    }
-
-    retval = pthread_mutex_lock(&shutdownmutex);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not lock mutex");
-	exit(EXIT_FAILURE);
-    }
-    has_list_change = 1;
-    retval = pthread_cond_signal(&shutdowncondition);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not wait on condition");
-	exit(EXIT_FAILURE);
-    }
-    retval = pthread_mutex_unlock(&shutdownmutex);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error: can not unlock mutex");
-	exit(EXIT_FAILURE);
-    }
-}
+//void qgis_shutdown_process_died(pid_t pid)
+//{
+//    debug(1,"process %d died", pid);
+//
+//    /* remove the process with "pid" from the lists,
+//     * then signal the thread.
+//     */
+//    int retval = process_manager_cleanup_process(pid);
+//    if (-1 == retval)
+//    {
+//	printlog("error: signalled process %d not found in internal lists", pid);
+//    }
+//
+//    retval = pthread_mutex_lock(&shutdownmutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not lock mutex");
+//	exit(EXIT_FAILURE);
+//    }
+//    has_list_change = 1;
+//    retval = pthread_cond_signal(&shutdowncondition);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not wait on condition");
+//	exit(EXIT_FAILURE);
+//    }
+//    retval = pthread_mutex_unlock(&shutdownmutex);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error: can not unlock mutex");
+//	exit(EXIT_FAILURE);
+//    }
+//}
 
 
