@@ -248,26 +248,7 @@ void project_manager_shutdown_project(const char *project_name)
 void project_manager_shutdown(void)
 {
     debug(1, "");
-    char **projlist = NULL;
-    int len = 0;
-
-    int retval = db_get_names_project(&projlist, &len);
-    if (retval)
-    {
-	printlog("error: can not get list of projects, got %d entries", len);
-	exit(EXIT_FAILURE);
-    }
-
-    int i;
-    for (i=0; i<len; i++)
-    {
-	const char *projname = projlist[i];
-	assert(projname);
-
-	project_manager_shutdown_project(projname);
-    }
-
-    db_free_names_project(projlist, len);
+    db_move_all_process_to_list(LIST_SHUTDOWN);
 }
 
 
