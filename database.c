@@ -684,18 +684,12 @@ void db_init(void)
 
     /* prepare further statements */
 //    db_statements_prepare();
-
-    projectlist = qgis_proj_list_new();
-    shutdownlist = qgis_process_list_new();
 }
 
 
 void db_delete(void)
 {
     /* remove the projects */
-    qgis_proj_list_delete(projectlist);
-    qgis_process_list_delete(shutdownlist);
-
 
     debug(1, "shutdown memory db");
     db_statements_finalize();
