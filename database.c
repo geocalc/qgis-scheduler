@@ -1877,7 +1877,7 @@ int db_get_startup_failures(const char *projname)
     }
 
     int ret = -1;
-    db_select_parameter_callback(DB_INC_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
+    db_select_parameter_callback(DB_SELECT_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
 #else
     int ret = -1;
     struct qgis_project_s *project = find_project_by_name(projectlist, projname);
