@@ -281,15 +281,11 @@ void check_ressource_limits(void)
 struct signal_data_s
 {
     int signal;
-    union {
-	pid_t pid;
-    };
+    pid_t pid;
+    int is_shutdown;
 };
 
 /* act on signals */
-/* TODO: sometimes the program hangs during shutdown.
- *       we receive a signal (SIGCHLD) but dont react on it?
- */
 /* TODO: according to this website
  *       http://www.securecoding.cert.org/confluence/display/c/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers
  *       we should not call fprintf (or vdprintf in log message) from a signal
@@ -305,38 +301,25 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     struct signal_data_s sigdata;
     sigdata.signal = sig;
     sigdata.pid = info->si_pid;
+    sigdata.is_shutdown = 0;
     debug(1, "got signal %d from pid %d", sig, info->si_pid);
     switch (sig)
     {
-    case SIGCHLD:
-	/* got a child signal. Additionally
-	 * call the shutdown handler, maybe it knows what to do with this
-	 * TODO: doing a 2 channel approach is no good design. Try to get this
-	 *       solved using the pipe until the very end.
-	 */
-//	if ( get_program_shutdown() )
-//	    qgis_shutdown_process_died(info->si_pid);
-	process_manager_process_died(info->si_pid);
-	// no break
-
+    case SIGCHLD:	// fall through
     case SIGUSR1:	// fall through
     case SIGUSR2:	// fall through
     case SIGTERM:	// fall through
     case SIGINT:	// fall through
     case SIGQUIT:
-	/* write signal to main thread in case we are not in the progress
-	 * of shutting down */
-	if ( !get_program_shutdown() )
+	/* write signal to main thread */
+	assert(signalpipe_wr >= 0);
+	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
+	if (-1 == retval)
 	{
-	    assert(signalpipe_wr >= 0);
-	    retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
-	    if (-1 == retval)
-	    {
-		logerror("write signal data");
-		exit(EXIT_FAILURE);
-	    }
-	    debug(1, "wrote %d bytes to sig pipe", retval);
+	    logerror("write signal data");
+	    exit(EXIT_FAILURE);
 	}
+	debug(1, "wrote %d bytes to sig pipe", retval);
 	break;
 
     case SIGSEGV:
@@ -671,7 +654,7 @@ int main(int argc, char **argv)
     qgis_inotify_init();
 
     /* start the process shutdown module */
-    qgis_shutdown_init();
+    qgis_shutdown_init(signalpipe_wr);
 
     /* start the child processes */
     project_manager_startup_projects();
@@ -694,6 +677,7 @@ int main(int argc, char **argv)
     pfd[pipefd_slot].fd = signalpipe_rd;
 
     int has_finished = 0;
+    int has_restored_signal = 0;
     int is_readable_serversocket = 0;
     int is_readable_signalpipe = 0;
     printlog("Initialization done. Waiting for network connection requests..");
@@ -763,7 +747,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-//			process_manager_process_died(sigdata.pid);
+			process_manager_process_died(sigdata.pid);
 			break;
 		    }
 		    case SIGUSR1:
@@ -778,8 +762,28 @@ int main(int argc, char **argv)
 		    case SIGINT:
 		    case SIGQUIT:
 			/* termination signal, kill all child processes */
-			debug(1, "exit program");
+			debug(1, "got termination signal, exit program");
 			set_program_shutdown(1);
+
+			/* close the inotify module, so no processes are recreated afterwards
+			 * because of a change in the configuration.
+			 */
+			qgis_inotify_delete();
+
+			project_manager_shutdown();
+
+			/* wait for the shutdown module so it has closed all its processes
+			 * Then clean up the module */
+			qgis_shutdown_wait_empty();
+
+			// TODO restore default signal handler over here not below
+			break;
+		    case 0:
+			if (sigdata.is_shutdown)
+			{
+			    debug(1, "got signal from shutdown module, exit");
+			    has_finished = 1;
+			}
 			break;
 		    }
 
@@ -817,7 +821,7 @@ int main(int argc, char **argv)
 	 * If this expectation does not fulfill we have to look for a different
 	 * design in this section.
 	 */
-	if ( get_program_shutdown() )
+	if ( get_program_shutdown() && !has_restored_signal )
 	{
 	    /* we received a termination signal.
 	     * reinstall the default signal handler,
@@ -847,22 +851,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	    }
 
-
-	    /* note: we do not need to empty the signal pipe. Either it
-	     * contains a signal of SIGTERM, SIGINT, SIGQUIT or it
-	     * contains a signal of SIGCHLD.
-	     * In the former case we already know that we have to shut down.
-	     * In the latter case we get to know the child which has exited
-	     * during the clean up sequence.
-	     */
-
-	    /* close the pipe */
-	    close(signalpipe_rd);
-	    close(signalpipe_wr);
-	    signalpipe_rd = signalpipe_wr = -1;
-
-	    /* exit the main loop */
-	    break;
+	    has_restored_signal = 1;
 	}
 
     }
@@ -873,16 +862,8 @@ int main(int argc, char **argv)
     retval = close(serversocketfd);
     debug(1, "closed internet server socket fd %d, retval %d, errno %d", serversocketfd, retval, errno);
 
-    /* close the inotify module, so no processes are recreated afterwards
-     * because of a change in the configuration.
-     */
-    qgis_inotify_delete();
-
-    project_manager_shutdown();
-
     /* wait for the shutdown module so it has closed all its processes
      * Then clean up the module */
-    qgis_shutdown_wait_empty();
     qgis_shutdown_delete();
 
     {
@@ -894,6 +875,12 @@ int main(int argc, char **argv)
     }
     db_delete();
     config_shutdown();
+
+    /* close the pipe */
+    close(signalpipe_rd);
+    close(signalpipe_wr);
+    signalpipe_rd = signalpipe_wr = -1;
+
     printlog("shut down %s", basename(argv[0]));
 
     return exitvalue;

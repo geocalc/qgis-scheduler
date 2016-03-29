@@ -33,6 +33,7 @@
 #include "qgis_shutdown_queue.h"
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
@@ -52,7 +53,15 @@ static pthread_cond_t shutdowncondition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t shutdownmutex = PTHREAD_MUTEX_INITIALIZER;
 static int do_shutdown_thread = 0;
 static int has_list_change = 0;
+static int shutdown_main_pipe_wr = -1;
 
+#warning double declaration of type, TODO
+struct signal_data_s
+{
+    int signal;
+    pid_t pid;
+    int is_shutdown;
+};
 
 
 static void *qgis_shutdown_thread(void *arg)
@@ -347,12 +356,29 @@ static void *qgis_shutdown_thread(void *arg)
 	}
     }
 
+    /* write to main thread, we are done */
+    struct signal_data_s sigdata;
+    sigdata.signal = 0;
+    sigdata.pid = 0;
+    sigdata.is_shutdown = 1;
+
+    int retval = write(shutdown_main_pipe_wr, &sigdata, sizeof(sigdata));
+    if (-1 == retval)
+    {
+	logerror("write signal data");
+	exit(EXIT_FAILURE);
+    }
+    debug(1, "wrote %d bytes to sig pipe", retval);
+
     return NULL;
 }
 
 
-void qgis_shutdown_init()
+void qgis_shutdown_init(int main_pipe_wr)
 {
+    assert(0 <= main_pipe_wr);
+    shutdown_main_pipe_wr = main_pipe_wr;
+
     /* initialize the condition variable timeout clock attribute with the same
      * value we use in the clock measurements. Else if we don't we have
      * different timeout values (clock module <-> pthread condition timeout)

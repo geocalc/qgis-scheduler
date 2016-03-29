@@ -36,7 +36,7 @@
 #include <sys/types.h>
 
 
-void qgis_shutdown_init(void);
+void qgis_shutdown_init(int main_pipe_wr);
 void qgis_shutdown_delete(void);
 void qgis_shutdown_add_process(pid_t pid);
 void qgis_shutdown_add_all_process(const char *project_name);
