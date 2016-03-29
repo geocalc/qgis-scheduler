@@ -1002,7 +1002,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
     // we need to copy values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
     long long threadid = thread_id;
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, threadid, pid);
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, threadid, (int)pid);
 
     return ret;
 
@@ -1402,7 +1402,7 @@ int db_reset_signal_timer(pid_t pid)
     // because the vararg parser assumes type "long long int" with "%l"
     long long sec = ts.tv_sec;
     long long nsec = ts.tv_nsec;
-    db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, pid);
+    db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, (int)pid);
 
     return ret;
 }
