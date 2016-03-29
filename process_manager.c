@@ -808,3 +808,16 @@ void process_manager_process_died_during_init(pid_t pid, const char *projname)
 }
 
 
+void process_manager_cleanup_process(pid_t pid)
+{
+    assert(0 < pid);
+
+    int fd = db_get_process_socket(pid);
+    if (-1 == fd)
+	printlog("error: can not get socket fd from process %d during cleanup", pid);
+    else
+	close(fd);
+    db_process_set_state_exit(pid);
+}
+
+
