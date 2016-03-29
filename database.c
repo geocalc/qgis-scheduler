@@ -1484,8 +1484,7 @@ int db_get_num_shutdown_processes(void)
 
 int db_remove_process_with_state_exit(void)
 {
-    int retval = qgis_process_list_delete_all_process_with_state(shutdownlist, PROC_EXIT);
-    debug(1, "removed %d processes from shutdown list", retval);
+    int retval = 0;
 
     db_select_parameter(DB_DELETE_PROCESS_WITH_STATE, PROC_STATE_EXIT);
 
