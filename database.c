@@ -1500,12 +1500,6 @@ void db_inc_startup_failures(const char *projname)
 {
     assert(projname);
 
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	qgis_project_inc_nr_crashes(project);
-    }
-
     db_select_parameter(DB_INC_PROJECT_STARTUP_FAILURE, projname);
 }
 
