@@ -1821,7 +1821,7 @@ int db_get_num_shutdown_processes(void)
 
     int num_list = 0;
 
-    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list);
+    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
 
 #else
     int num_list = qgis_process_list_get_num_process(shutdownlist);
