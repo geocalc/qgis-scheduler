@@ -120,6 +120,7 @@ enum db_select_statement_id
     DB_GET_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST,
     DB_UPDATE_PROCESS_LIST_PID,
+    DB_UPDATE_PROCESS_LIST,
     DB_UPDATE_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_SIGNAL_TIMER,
     DB_SELECT_PROCESS_MIN_SIGNAL_TIMER,
@@ -170,6 +171,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"UPDATE processes SET list = %i WHERE projectname = %s AND list = %i",
 	// DB_UPDATE_PROCESS_LIST_PID
 	"UPDATE processes SET list = %i WHERE pid = %i",
+	// DB_UPDATE_PROCESS_LIST
+	"UPDATE processes SET list = %i",
 	// DB_UPDATE_PROCESS_SIGNAL_TIMER
 	"UPDATE processes SET signaltime_sec = %l, signaltime_nsec = %l WHERE pid = %i",
 	// DB_SELECT_PROCESS_SIGNAL_TIMER
@@ -1331,6 +1334,15 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     qgis_shutdown_notify_changes();
 }
 
+
+void db_move_all_process_to_list(enum db_process_list_e list)
+{
+    assert(LIST_SELECTOR_MAX > list);
+
+    int mylist = list;
+    db_select_parameter(DB_UPDATE_PROCESS_LIST, mylist);
+
+}
 
 /* returns the next process (pid) which needs to be worked on.
  * This could be
