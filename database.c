@@ -973,31 +973,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 
 int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 {
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	if (!proc)
-	{
-	    proc_list = qgis_project_get_init_process_list(project);
-	    assert(proc_list);
-	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	}
-    }
-    /* no need to test the shutdown list, processes in there won't get the
-     * state "init".
-     */
-//    else
-//    {
-//	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-//    }
-    if (proc)
-	ret = qgis_process_set_state_init(proc, thread_id);
-    debug(1, "for process %d returned %d", pid, ret);
+    int ret = 0;
 
     // we need to copy values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
