@@ -755,7 +755,12 @@ void process_manager_process_died(pid_t pid)
 	    if (projname)
 	    {
 		retval = db_get_startup_failures(projname);
-		if (max_nr_process_crashes > retval)
+		if ( 0 > retval )
+		{
+		    printlog("error: can not get number of startup failures, function call failed for project %s", projname);
+		    exit(EXIT_FAILURE);
+		}
+		else if (max_nr_process_crashes > retval)
 		{
 		    project_manager_start_new_process_detached(1, projname, 0);
 		}
