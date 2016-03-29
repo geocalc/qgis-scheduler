@@ -829,13 +829,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     assert(pid > 0);
     assert(process_socket_fd >= 0);
 
-    struct qgis_process_s *childproc = qgis_process_new(pid, process_socket_fd);
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname );
-    qgis_project_add_process(project, childproc);
-
-
     db_select_parameter(DB_INSERT_PROCESS_DATA, projname, LIST_INIT, PROC_STATE_START, pid, process_socket_fd);
-
 }
 
 

@@ -775,7 +775,7 @@ void process_manager_process_died(pid_t pid)
 	/* change state of the process to STATE_EXIT
 	 * and move the entry to the shutdown list
 	 */
-	db_process_set_state_exit(pid);
+	process_manager_cleanup_process(pid);
 	qgis_shutdown_add_process(pid);
     }
     else

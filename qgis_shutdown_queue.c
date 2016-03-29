@@ -42,6 +42,7 @@
 #include "logger.h"
 #include "timer.h"
 #include "database.h"
+#include "process_manager.h"
 #include "qgis_config.h"
 
 
@@ -141,7 +142,7 @@ static void *qgis_shutdown_thread(void *arg)
 		{
 		    if (ESRCH == errno)
 		    {
-			db_process_set_state_exit(pid);
+			process_manager_cleanup_process(pid);
 		    }
 		    else
 		    {
@@ -185,7 +186,7 @@ static void *qgis_shutdown_thread(void *arg)
 		    {
 			if (ESRCH == errno)
 			{
-			    db_process_set_state_exit(pid);
+			    process_manager_cleanup_process(pid);
 			}
 			else
 			{
@@ -223,7 +224,7 @@ static void *qgis_shutdown_thread(void *arg)
 		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
 		{
 		    printlog("timeout (%dsec) for process %d. Could not kill process, please look after it", (int)default_signal_timeout.tv_sec, pid);
-		    db_process_set_state_exit(pid);
+		    process_manager_cleanup_process(pid);
 		}
 		break;
 
