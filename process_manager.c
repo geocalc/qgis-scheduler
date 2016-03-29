@@ -743,32 +743,31 @@ void process_manager_process_died(pid_t pid)
 	retval = get_program_shutdown();
 	if (!retval)
 	{
-	    char *projname = db_get_project_for_this_process(pid);
-//	    enum db_process_list_e proclist = db_get_process_list(pid);
-//	    if (LIST_INIT == proclist)
-//	    {
-//		/* died during initialization. if this happens every time,
-//		 * we do get a startup loop. stop after some (5) tries.
-//		 */
-//		db_inc_startup_failures(projname);
-//	    }
-	    if (projname)
+	    enum db_process_list_e proclist = db_get_process_list(pid);
+	    if (LIST_SHUTDOWN != proclist)
 	    {
-		retval = db_get_startup_failures(projname);
-		if ( 0 > retval )
+		char *projname = db_get_project_for_this_process(pid);
+		/* Process is not in shutdown list and died during normal operation.
+		 * Restart the process if not too much startup failures
+		 */
+		if (projname)
 		{
-		    printlog("error: can not get number of startup failures, function call failed for project %s", projname);
-		    exit(EXIT_FAILURE);
+		    retval = db_get_startup_failures(projname);
+		    if ( 0 > retval )
+		    {
+			printlog("error: can not get number of startup failures, function call failed for project %s", projname);
+			exit(EXIT_FAILURE);
+		    }
+		    else if (max_nr_process_crashes > retval)
+		    {
+			project_manager_start_new_process_detached(1, projname, 0);
+		    }
+		    free(projname);
 		}
-		else if (max_nr_process_crashes > retval)
+		else
 		{
-		    project_manager_start_new_process_detached(1, projname, 0);
+		    printlog("warning: no project found for pid %d", pid);
 		}
-		free(projname);
-	    }
-	    else
-	    {
-		printlog("warning: no project found for pid %d", pid);
 	    }
 	}
 
