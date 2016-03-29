@@ -994,28 +994,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 
 int db_process_set_state_idle(pid_t pid)
 {
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	if (!proc)
-	{
-	    proc_list = qgis_project_get_init_process_list(project);
-	    assert(proc_list);
-	    proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-	}
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-	ret = qgis_process_set_state_idle(proc);
-    debug(1, "for process %d returned %d", pid, ret);
+    int ret = 0;
 
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
@@ -1027,22 +1006,7 @@ int db_process_set_state_idle(pid_t pid)
 
 int db_process_set_state_exit(pid_t pid)
 {
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-	ret = qgis_process_set_state_exit(proc);
-    debug(1, "for process %d returned %d", pid, ret);
+    int ret = 0;
 
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
@@ -1054,23 +1018,7 @@ int db_process_set_state_exit(pid_t pid)
 
 int db_process_set_state(pid_t pid, enum db_process_state_e state)
 {
-    // TODO !! extend api with ", pthread_t thread_id" to get a generic interface
-    int ret = -1;
-    struct qgis_process_s *proc = NULL;
-    struct qgis_project_s *project = qgis_proj_list_find_project_by_pid(projectlist, pid);
-    if (project)
-    {
-	struct qgis_process_list_s *proc_list = qgis_project_get_active_process_list(project);
-	assert(proc_list);
-	proc = qgis_process_list_find_process_by_pid(proc_list, pid);
-    }
-    else
-    {
-	proc = qgis_process_list_find_process_by_pid(shutdownlist, pid);
-    }
-    if (proc)
-	ret = qgis_process_set_state(proc, state);
-    debug(1, "set state %d for process %d returned %d", state, pid, ret);
+    int ret = 0;
 
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
