@@ -725,10 +725,6 @@ void db_add_project(const char *projname, const char *configpath, int inotifyfd)
     char *basenam = basename(configpath);
 
     db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyfd);
-
-    struct qgis_project_s *project = qgis_project_new(projname, configpath, inotifyfd);
-    qgis_proj_list_add_project(projectlist, project);
-
 }
 
 
