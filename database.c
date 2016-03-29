@@ -1394,12 +1394,6 @@ void db_reset_startup_failures(const char *projname)
 {
     assert(projname);
 
-    struct qgis_project_s *project = find_project_by_name(projectlist, projname);
-    if (project)
-    {
-	qgis_project_reset_nr_crashes(project);	// reset number of crashes after configuration change
-    }
-
     db_select_parameter(DB_RESET_PROJECT_STARTUP_FAILURE, projname);
 }
 
