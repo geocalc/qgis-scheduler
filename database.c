@@ -115,6 +115,7 @@ enum db_select_statement_id
     DB_GET_PROCESS_STATE,
     DB_GET_STATE_PROCESS,
     DB_GET_PROCESS_FROM_LIST,
+    DB_GET_NUM_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST,
     DB_UPDATE_PROCESS_LIST_PID,
     DB_UPDATE_PROCESS_LIST,
@@ -164,6 +165,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT pid FROM processes WHERE state = %i",
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
+	// DB_GET_NUM_PROCESS_FROM_LIST
+	"SELECT count(pid) FROM processes WHERE list = %d",
 	// DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST
 	"UPDATE processes SET list = %i WHERE projectname = %s AND list = %i",
 	// DB_UPDATE_PROCESS_LIST_PID
@@ -1322,14 +1325,14 @@ int db_get_num_shutdown_processes(void)
 	assert(1 == ncol);
 	assert(SQLITE_INTEGER == type[0]);
 
-	(*num)++;
+	*num = results[0].integer;
 
 	return 0;
     }
 
     int num_list = 0;
 
-    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
+    db_select_parameter_callback(DB_GET_NUM_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
 
     debug(1, "returned %d", num_list);
 
