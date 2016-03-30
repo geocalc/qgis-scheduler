@@ -491,8 +491,6 @@ void qgis_shutdown_add_all_process(const char *project_name)
 
 void qgis_shutdown_notify_changes(void)
 {
-    assert(!do_shutdown_thread);
-
     debug(1, "notify shutdown list about change");
 
     int retval = pthread_mutex_lock(&shutdownmutex);
