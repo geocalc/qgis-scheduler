@@ -600,6 +600,51 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 //}
 
 
+static pid_t db_nolock__get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
+{
+    assert(state < PROCESS_STATE_MAX);
+    assert(list < LIST_SELECTOR_MAX);
+
+    int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *proc = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*proc = results[0].integer;
+
+	return 0;
+    }
+
+    pid_t ret = -1;
+    int mylist = list;
+    int mystate = state;
+
+    db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
+
+    debug(1, "returned %d", ret);
+
+    return ret;
+}
+
+
+static int db_nolock__process_set_state(pid_t pid, enum db_process_state_e state, pthread_t threadid)
+{
+    int ret = 0;
+
+    // we need to type cast values to a "guaranteed" 64 bit value
+    // because the vararg parser assumes type "long long int" with "%l"
+    int mystate = state;
+    int mypid = pid;
+    long long int mythreadid = threadid;
+    db_select_parameter(DB_UPDATE_PROCESS_STATE, mystate, mythreadid, mypid);
+
+    return ret;
+}
+
+
+
 /* delete prepared statements */
 static void db_statements_finalize(void)
 {
@@ -899,33 +944,6 @@ char *db_get_project_for_this_process(pid_t pid)
 }
 
 
-static pid_t db_intern__get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
-{
-    assert(state < PROCESS_STATE_MAX);
-    assert(list < LIST_SELECTOR_MAX);
-
-    int get_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
-    {
-	int *proc = data;
-
-	assert(1 == ncol);
-	assert(SQLITE_INTEGER == type[0]);
-
-	*proc = results[0].integer;
-
-	return 0;
-    }
-
-    pid_t ret = -1;
-    int mylist = list;
-    int mystate = state;
-
-    db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
-
-    debug(1, "returned %d", ret);
-
-    return ret;
-}
 /* find a process in a certain list with a distinct state
  * Note:
  * Using the pid as key index value may create problems, if a process dies
@@ -942,7 +960,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 	exit(EXIT_FAILURE);
     }
 
-    pid_t ret = db_intern__get_process(projname, list, state);
+    pid_t ret = db_nolock__get_process(projname, list, state);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -966,11 +984,10 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname)
 	exit(EXIT_FAILURE);
     }
 
-    pid_t ret = db_intern__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
+    pid_t ret = db_nolock__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
 
-// TODO use db_process_set_state()
     if (0 < ret)
-	db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_BUSY, (long long)0, ret);
+	db_nolock__process_set_state(ret, PROC_STATE_BUSY, 0);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -1119,7 +1136,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 	exit(EXIT_FAILURE);
     }
 
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, threadid, (int)pid);
+    db_nolock__process_set_state(pid, PROC_STATE_INIT, threadid);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -1146,9 +1163,7 @@ int db_process_set_state_idle(pid_t pid)
 	exit(EXIT_FAILURE);
     }
 
-    // we need to type cast values to a "guaranteed" 64 bit value
-    // because the vararg parser assumes type "long long int" with "%l"
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_IDLE, (long long)0, pid);
+    db_nolock__process_set_state(pid, PROC_STATE_IDLE, 0);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -1174,9 +1189,7 @@ int db_process_set_state_exit(pid_t pid)
 	exit(EXIT_FAILURE);
     }
 
-    // we need to type cast values to a "guaranteed" 64 bit value
-    // because the vararg parser assumes type "long long int" with "%l"
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_EXIT, (long long)0, pid);
+    db_nolock__process_set_state(pid, PROC_STATE_EXIT, 0);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -1202,9 +1215,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
 	exit(EXIT_FAILURE);
     }
 
-    // we need to type cast values to a "guaranteed" 64 bit value
-    // because the vararg parser assumes type "long long int" with "%l"
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, state, (long long)0, pid);
+    db_nolock__process_set_state(pid, state, 0);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
