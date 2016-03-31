@@ -399,7 +399,7 @@ static void *thread_handle_connection(void *arg)
 	int i;
 	for (i=0; i<=max_wait_for_idle_process; i++)
 	{
-	    mypid = db_get_next_idle_process_for_work(request_project_name);
+	    mypid = db_get_next_idle_process_for_busy_work(request_project_name);
 	    if (mypid>=0 || i>=max_wait_for_idle_process)
 		break;
 	    else

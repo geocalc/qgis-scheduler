@@ -883,7 +883,7 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 }
 
 
-pid_t db_get_next_idle_process_for_work(const char *projname)
+pid_t db_get_next_idle_process_for_busy_work(const char *projname)
 {
     pid_t ret = db_get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
 
