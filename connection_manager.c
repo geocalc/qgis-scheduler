@@ -121,21 +121,11 @@ static void *thread_handle_connection(void *arg)
     int requestId;
     int role;
 
-    /* detach myself from the main thread. Doing this to collect resources after
-     * this thread ends. Because there is no join() waiting for this thread.
-     */
-    int retval = pthread_detach(thread_id);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error detaching thread");
-	exit(EXIT_FAILURE);
-    }
 
     debug(1, "start a new connection thread");
 
     struct timespec ts;
-    retval = qgis_timer_start(&ts);
+    int retval = qgis_timer_start(&ts);
     if (-1 == retval)
     {
 	logerror("clock_gettime(%d,..)", get_valid_clock_id());
@@ -852,18 +842,39 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
 	}
 
 
+	pthread_attr_t attr;
+	int retval = pthread_attr_init(&attr);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error init thread attributes");
+	    exit(EXIT_FAILURE);
+	}
+	/* detach connection thread from the main thread. Doing this to collect
+	 * resources after this thread ends. Because there is no join() waiting
+	 * for this thread.
+	 */
+	retval = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error setting attribute thread detached");
+	    exit(EXIT_FAILURE);
+	}
+
 	pthread_t thread;
-	int retval = pthread_create(&thread, NULL, thread_handle_connection, targs);
+	retval = pthread_create(&thread, &attr, thread_handle_connection, targs);
 	if (retval)
 	{
 	    errno = retval;
 	    logerror("error creating thread");
 	    exit(EXIT_FAILURE);
 	}
+	pthread_attr_destroy(&attr);
 
-	if (targs->hostname)
+
+	if ( !(ret < 0) )
 	{
 	    printlog("Accepted connection from host %s, port %s. Handle connection in thread [%lu]", hbuf, sbuf, thread);
 	}
-
 }
