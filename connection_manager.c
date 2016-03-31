@@ -783,8 +783,17 @@ static void *thread_handle_connection(void *arg)
 		debug(1, "wrote %d", writebytes);
 		if (-1 == writebytes)
 		{
-		    logerror("error: writing to network socket");
-		    exit(EXIT_FAILURE);
+		    if (ECONNRESET == errno)
+		    {
+			/* network client ended this connection. exit this thread */
+			debug(1, "errno %d, connection reset by peer, closing connection", errno);
+			break;
+		    }
+		    else
+		    {
+			logerror("error: writing to network socket");
+			exit(EXIT_FAILURE);
+		    }
 		}
 
 		can_read_unixsock = 0;
