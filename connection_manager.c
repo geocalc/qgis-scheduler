@@ -285,16 +285,19 @@ static void *thread_handle_connection(void *arg)
 
 				    /* Execute regular expression */
 				    retval = regexec(&regex, param, 0, NULL, 0);
-				    if( !retval ){
+				    if( !retval )
+				    {
 					// Match
 					regfree(&regex);
 					request_project_name = proj_name;
 					break;
 				    }
-				    else if( retval == REG_NOMATCH ){
+				    else if( retval == REG_NOMATCH )
+				    {
 					// No match, go on with next project
 				    }
-				    else{
+				    else
+				    {
 					size_t len = regerror(retval, &regex, NULL, 0);
 					char *buffer = malloc(len);
 					(void) regerror (retval, &regex, buffer, len);
@@ -859,69 +862,69 @@ static void *thread_handle_connection(void *arg)
 
 void connection_manager_handle_connection_request(int netfd, const struct sockaddr *addr, unsigned int length)
 {
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
-	 */
-	struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
-	{
-	    logerror("could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
-	targs->new_accepted_inet_fd = netfd;
+    /* NOTE: aside from the general rule
+     * "malloc() and free() within the same function"
+     * we transfer the responsibility for this memory
+     * to the thread itself.
+     */
+    struct thread_connection_handler_args *targs = malloc(sizeof(*targs));
+    assert(targs);
+    if ( !targs )
+    {
+	logerror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+    targs->new_accepted_inet_fd = netfd;
 
 
-	char hbuf[80], sbuf[10];
-	int ret = getnameinfo(addr, length, hbuf, sizeof(hbuf), sbuf,
-		sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
-	if (ret < 0)
-	{
-	    printlog("error: can not convert host address: %s", gai_strerror(ret));
-	    targs->hostname = NULL;
-	}
-	else
-	{
-	    //printlog("Accepted connection from host %s, port %s", hbuf, sbuf);
-	    targs->hostname = strdup(hbuf);
-	}
+    char hbuf[80], sbuf[10];
+    int ret = getnameinfo(addr, length, hbuf, sizeof(hbuf), sbuf,
+	    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+    if (ret < 0)
+    {
+	printlog("error: can not convert host address: %s", gai_strerror(ret));
+	targs->hostname = NULL;
+    }
+    else
+    {
+	//printlog("Accepted connection from host %s, port %s", hbuf, sbuf);
+	targs->hostname = strdup(hbuf);
+    }
 
 
-	pthread_attr_t attr;
-	int retval = pthread_attr_init(&attr);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error init thread attributes");
-	    exit(EXIT_FAILURE);
-	}
-	/* detach connection thread from the main thread. Doing this to collect
-	 * resources after this thread ends. Because there is no join() waiting
-	 * for this thread.
-	 */
-	retval = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error setting attribute thread detached");
-	    exit(EXIT_FAILURE);
-	}
+    pthread_attr_t attr;
+    int retval = pthread_attr_init(&attr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error init thread attributes");
+	exit(EXIT_FAILURE);
+    }
+    /* detach connection thread from the main thread. Doing this to collect
+     * resources after this thread ends. Because there is no join() waiting
+     * for this thread.
+     */
+    retval = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error setting attribute thread detached");
+	exit(EXIT_FAILURE);
+    }
 
-	pthread_t thread;
-	retval = pthread_create(&thread, &attr, thread_handle_connection, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("error creating thread");
-	    exit(EXIT_FAILURE);
-	}
-	pthread_attr_destroy(&attr);
+    pthread_t thread;
+    retval = pthread_create(&thread, &attr, thread_handle_connection, targs);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error creating thread");
+	exit(EXIT_FAILURE);
+    }
+    pthread_attr_destroy(&attr);
 
 
-	if ( !(ret < 0) )
-	{
-	    printlog("Accepted connection from host %s, port %s. Handle connection in thread [%lu]", hbuf, sbuf, thread);
-	}
+    if ( !(ret < 0) )
+    {
+	printlog("Accepted connection from host %s, port %s. Handle connection in thread [%lu]", hbuf, sbuf, thread);
+    }
 }
