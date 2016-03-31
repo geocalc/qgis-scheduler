@@ -725,8 +725,17 @@ static void *thread_handle_connection(void *arg)
 		    debug(1, "read %d, ", readbytes);
 		    if (-1 == readbytes)
 		    {
-			logerror("error: reading from network socket");
-			exit(EXIT_FAILURE);
+			if (ECONNRESET == errno)
+			{
+			    /* network client ended this connection. exit this thread */
+			    debug(1, "errno %d, connection reset by peer, closing connection", errno);
+			    break;
+			}
+			else
+			{
+			    logerror("error: reading from network socket (%d)", errno);
+			    exit(EXIT_FAILURE);
+			}
 		    }
 		    else if (0 == readbytes)
 		    {
