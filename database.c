@@ -101,6 +101,8 @@ static sqlite3 *dbhandler = NULL;
 
 static pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t idle_process_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 enum db_select_statement_id
@@ -721,7 +723,40 @@ void db_init(void)
     debug(1, "created memory db");
 
 
-//    debug(1, "db mutex init at %p", &db_lock);
+    /* initialize the condition variable timeout clock attribute with the same
+     * value we use in the clock measurements. Else if we don't we have
+     * different timeout values (clock module <-> pthread condition timeout)
+     */
+    pthread_condattr_t	condattr;
+    retval = pthread_condattr_init(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_setclock() id %d", get_valid_clock_id());
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_cond_init(&idle_process_condition, &condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_cond_init");
+	exit(EXIT_FAILURE);
+    }
+    retval = pthread_condattr_destroy(&condattr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: pthread_condattr_destroy");
+	exit(EXIT_FAILURE);
+    }
+
 
     /* setup all tables */
     db_select_parameter(DB_SELECT_CREATE_PROJECT_TABLE);
@@ -989,9 +1024,19 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 }
 
 
-pid_t db_get_next_idle_process_for_busy_work(const char *projname)
+pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutsec)
 {
-    int retval = pthread_mutex_lock(&db_lock);
+    pid_t ret = -1;
+
+    int retval = pthread_mutex_lock(&idle_process_mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not lock mutex");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = pthread_mutex_lock(&db_lock);
     if (retval)
     {
 	errno = retval;
@@ -999,12 +1044,88 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname)
 	exit(EXIT_FAILURE);
     }
 
-    pid_t ret = db_nolock__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
-
+    ret = db_nolock__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
     if (0 < ret)
+    {
 	db_nolock__process_set_state(ret, PROC_STATE_BUSY, 0);
 
-    retval = pthread_mutex_unlock(&db_lock);
+	retval = pthread_mutex_unlock(&db_lock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock mutex lock");
+	    exit(EXIT_FAILURE);
+	}
+    }
+    else
+    {
+	/* unsuccesful tried for idle process. conditional wait for some
+	 * process becoming idle.
+	 */
+	retval = pthread_mutex_unlock(&db_lock);
+	if (retval)
+	{
+	    errno = retval;
+	    logerror("error unlock mutex lock");
+	    exit(EXIT_FAILURE);
+	}
+
+	debug(1, "no active process found, wait on condition for %d sec", timeoutsec);
+	struct timespec mytimeout = { tv_sec: timeoutsec, tv_nsec: 0 };
+	struct timespec now;
+	retval = qgis_timer_start(&now);
+	if (-1 == retval)
+	{
+	    logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	    exit(EXIT_FAILURE);
+	}
+	qgis_timer_add(&mytimeout, &now);
+
+	retval = pthread_cond_timedwait(&idle_process_condition, &idle_process_mutex, &mytimeout);
+	if ( 0 != retval )
+	{
+	    /* error during condition wait */
+	    if (ETIMEDOUT != retval)
+	    {
+		errno = retval;
+		logerror("error: can not wait on condition");
+		exit(EXIT_FAILURE);
+	    }
+	    /* else timeout: just return -1 for pid as error value */
+	    else
+	    {
+		debug(1, "condition timed out");
+	    }
+	}
+	else
+	{
+	    /* got the condition within the timeout value
+	     * get the next idle process
+	     */
+	    retval = pthread_mutex_lock(&db_lock);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error acquire mutex lock");
+		exit(EXIT_FAILURE);
+	    }
+
+	    ret = db_nolock__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
+
+	    if (0 < ret)
+		db_nolock__process_set_state(ret, PROC_STATE_BUSY, 0);
+
+	    retval = pthread_mutex_unlock(&db_lock);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("error unlock mutex lock");
+		exit(EXIT_FAILURE);
+	    }
+	}
+    }
+
+    retval = pthread_mutex_unlock(&idle_process_mutex);
     if (retval)
     {
 	errno = retval;
@@ -1170,7 +1291,15 @@ int db_process_set_state_idle(pid_t pid)
 {
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&idle_process_mutex);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not lock mutex");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = pthread_mutex_lock(&db_lock);
     if (retval)
     {
 	errno = retval;
@@ -1181,6 +1310,23 @@ int db_process_set_state_idle(pid_t pid)
     db_nolock__process_set_state(pid, PROC_STATE_IDLE, 0);
 
     retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    /* send notification to waiting processes */
+    retval = pthread_cond_signal(&idle_process_condition);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error: can not wait on condition");
+	exit(EXIT_FAILURE);
+    }
+
+    retval = pthread_mutex_unlock(&idle_process_mutex);
     if (retval)
     {
 	errno = retval;
