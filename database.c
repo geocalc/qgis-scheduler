@@ -887,6 +887,9 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname)
 {
     pid_t ret = db_get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
 
+    if (0 < ret)
+	db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_BUSY, (long long)0, ret);
+
     return ret;
 }
 
