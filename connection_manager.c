@@ -345,6 +345,7 @@ static void *thread_handle_connection(void *arg)
 
 
     /* here we do point 5 */
+    pid_t mypid = -1;
     if (request_project_name)
     {
 
@@ -385,26 +386,26 @@ static void *thread_handle_connection(void *arg)
 	    debug(1, "not enough processes for project %s, start %d new process", projname, missing_processes);
 	    project_manager_start_new_process_detached(missing_processes, projname, 0);
 	}
+
+	/* find the next idling process, set its state to BUSY and attach a thread to it.
+	 * try at most 5 seconds long to find an idle process */
+	/* TODO: better use pthread_condition_signal with timeout */
+	{
+	    int i;
+	    for (i=0; i<=max_wait_for_idle_process; i++)
+	    {
+		mypid = db_get_next_idle_process_for_busy_work(request_project_name);
+		if (mypid>=0 || i>=max_wait_for_idle_process)
+		    break;
+		else
+		    // TODO: use pthreads condition variable to send a message to this thread
+		    sleep(1);
+	    }
+	}
     }
     else
     {
 	printlog("[%lu] Found no project for request from %s", thread_id, tinfo->hostname);
-    }
-
-    /* find the next idling process, set its state to BUSY and attach a thread to it.
-     * try at most 5 seconds long to find an idle process */
-    /* TODO: better use pthread_condition_signal with timeout */
-    pid_t mypid;
-    {
-	int i;
-	for (i=0; i<=max_wait_for_idle_process; i++)
-	{
-	    mypid = db_get_next_idle_process_for_busy_work(request_project_name);
-	    if (mypid>=0 || i>=max_wait_for_idle_process)
-		break;
-	    else
-		sleep(1);
-	}
     }
 
     if ( mypid<0 )
