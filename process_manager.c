@@ -153,7 +153,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
-	logerror("error: can not connect to child process");
+	logerror("error: init can not connect to child process");
 	exit(EXIT_FAILURE);
     }
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
