@@ -118,8 +118,8 @@ static void *thread_handle_connection(void *arg)
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
     const pthread_t thread_id = pthread_self();
-    int requestId;
-    int role;
+    int requestId = 0;
+    int role = 0;
 
 
     debug(1, "start a new connection thread");
@@ -165,9 +165,9 @@ static void *thread_handle_connection(void *arg)
     struct fcgi_data_list_s *datalist = fcgi_data_list_new();
 
     /* here we do point 1, 2, 3, 4 */
-	const char *request_project_name = NULL;
-    {
+    const char *request_project_name = NULL;
 
+    {
 
 	/* get the maximum read write socket buffer size */
 	int maxbufsize = default_max_transfer_buffer_size;
@@ -208,8 +208,17 @@ static void *thread_handle_connection(void *arg)
 		debug(1, "read %d", readbytes);
 		if (-1 == readbytes)
 		{
-		    logerror("error: reading from network socket");
-		    exit(EXIT_FAILURE);
+		    if (ECONNRESET == errno)
+		    {
+			/* network client ended this connection. exit this thread */
+			debug(1, "errno %d, connection reset by network peer, closing connection", errno);
+			break;
+		    }
+		    else
+		    {
+			logerror("error: reading from network socket");
+			exit(EXIT_FAILURE);
+		    }
 		}
 		else if (0 == readbytes)
 		{
@@ -324,8 +333,11 @@ static void *thread_handle_connection(void *arg)
 
 	}
 
-	requestId = fcgi_session_get_requestid(fcgi_session);
-	role = fcgi_session_get_role(fcgi_session);
+	if (request_project_name)
+	{
+	    requestId = fcgi_session_get_requestid(fcgi_session);
+	    role = fcgi_session_get_role(fcgi_session);
+	}
 
 	free(buffer);
 //	fcgi_session_print(fcgi_session);
@@ -438,8 +450,16 @@ static void *thread_handle_connection(void *arg)
 	    debug(1, "wrote %d btes to network socket", writebytes);
 	    if (-1 == writebytes)
 	    {
-		logerror("error: writing to network socket");
-		exit(EXIT_FAILURE);
+		if (ECONNRESET == errno)
+		{
+		    /* network client ended this connection. exit this thread */
+		    debug(1, "errno %d, connection reset by network peer, closing connection", errno);
+		}
+		else
+		{
+		    logerror("error: writing to network socket");
+		    exit(EXIT_FAILURE);
+		}
 	    }
 
 	    /* we are done with the connection. The status
@@ -688,8 +708,17 @@ static void *thread_handle_connection(void *arg)
 		    debug(1, "wrote %d", writebytes);
 		    if (-1 == writebytes)
 		    {
-			logerror("error: writing to child process socket");
-			exit(EXIT_FAILURE);
+			if (ECONNRESET == errno)
+			{
+			    /* child process ended this connection. exit this thread */
+			    debug(1, "errno %d, connection reset by child socket, closing connection", errno);
+			    break;
+			}
+			else
+			{
+			    logerror("error: writing to child process socket");
+			    exit(EXIT_FAILURE);
+			}
 		    }
 		    can_write_unixsock = 0;
 		}
@@ -707,7 +736,7 @@ static void *thread_handle_connection(void *arg)
 			if (ECONNRESET == errno)
 			{
 			    /* network client ended this connection. exit this thread */
-			    debug(1, "errno %d, connection reset by peer, closing connection", errno);
+			    debug(1, "errno %d, connection reset by network peer, closing connection", errno);
 			    break;
 			}
 			else
@@ -730,8 +759,17 @@ static void *thread_handle_connection(void *arg)
 		    debug(1, "wrote %d", writebytes);
 		    if (-1 == writebytes)
 		    {
-			logerror("error: writing to child process socket");
-			exit(EXIT_FAILURE);
+			if (ECONNRESET == errno)
+			{
+			    /* child process ended this connection. exit this thread */
+			    debug(1, "errno %d, connection reset by child socket, closing connection", errno);
+			    break;
+			}
+			else
+			{
+			    logerror("error: writing to child process socket");
+			    exit(EXIT_FAILURE);
+			}
 		    }
 		    can_read_networksock = 0;
 		    can_write_unixsock = 0;
@@ -745,8 +783,17 @@ static void *thread_handle_connection(void *arg)
 		debug(1, "read %d, ", readbytes);
 		if (-1 == readbytes)
 		{
-		    logerror("error: reading from child process socket");
-		    exit(EXIT_FAILURE);
+		    if (ECONNRESET == errno)
+		    {
+			/* child process ended this connection. exit this thread */
+			debug(1, "errno %d, connection reset by child socket, closing connection", errno);
+			break;
+		    }
+		    else
+		    {
+			logerror("error: reading from child process socket");
+			exit(EXIT_FAILURE);
+		    }
 		}
 		else if (0 == readbytes)
 		{
@@ -764,7 +811,7 @@ static void *thread_handle_connection(void *arg)
 		    if (ECONNRESET == errno)
 		    {
 			/* network client ended this connection. exit this thread */
-			debug(1, "errno %d, connection reset by peer, closing connection", errno);
+			debug(1, "errno %d, connection reset by network peer, closing connection", errno);
 			break;
 		    }
 		    else
