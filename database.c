@@ -1000,28 +1000,28 @@ char *db_get_project_for_this_process(pid_t pid)
  * and another process gets the same pid.
  * This should be handled by the manager which evaluates the SIGCHLD signal.
  */
-pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
-{
-    int retval = pthread_mutex_lock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    pid_t ret = db_nolock__get_process(projname, list, state);
-
-    retval = pthread_mutex_unlock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    return ret;
-}
+//pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
+//{
+//    int retval = pthread_mutex_lock(&db_lock);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error acquire mutex lock");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//    pid_t ret = db_nolock__get_process(projname, list, state);
+//
+//    retval = pthread_mutex_unlock(&db_lock);
+//    if (retval)
+//    {
+//	errno = retval;
+//	logerror("error unlock mutex lock");
+//	exit(EXIT_FAILURE);
+//    }
+//
+//    return ret;
+//}
 
 
 pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutsec)
