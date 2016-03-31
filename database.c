@@ -44,6 +44,7 @@
 #include <errno.h>
 
 #include "logger.h"
+#include "qgis_config.h"
 #include "qgis_shutdown_queue.h"
 #include "statistic.h"
 #include "timer.h"
@@ -322,12 +323,14 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
      * 5. Destroy the object using sqlite3_finalize().
      */
+#define BUFFERSIZE 32
     int retval;
+    char debug_buffer[BUFFERSIZE] = {0,};
+    const int loglevel = config_get_debuglevel();
 
     assert(dbhandler);
     assert(sid < DB_SELECT_ID_MAX);
     const char *sql = db_select_statement[sid];
-    debug(1, "db selected %d: '%s'", sid, sql);
 
     sqlite3_stmt *ppstmt;
     if ( !db_prepared_stmt[sid] )
@@ -358,6 +361,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
+                if (1 <= loglevel)
+                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %p", v);
 		break;
 	    }
 
@@ -372,6 +377,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
+                if (1 <= loglevel)
+                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %f", d);
 		break;
 	    }
 
@@ -386,6 +393,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
+                if (1 <= loglevel)
+                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %s", s);
 		break;
 	    }
 
@@ -401,6 +410,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
+                if (1 <= loglevel)
+                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %d", i);
 		break;
 	    }
 
@@ -415,6 +426,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
+                if (1 <= loglevel)
+                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %lld", l);
 		break;
 	    }
 
@@ -438,6 +451,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	}
     }
     va_end(args);
+    debug_buffer[BUFFERSIZE-1] = '\0';
+    debug(1, "db selected %d: '%s%s'", sid, db_select_statement[sid], debug_buffer);
 
     int try_num = 0;
     do {
