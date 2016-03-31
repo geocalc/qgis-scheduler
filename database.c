@@ -322,13 +322,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
      * 5. Destroy the object using sqlite3_finalize().
      */
-    int retval = pthread_mutex_lock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    int retval;
 
     assert(dbhandler);
     assert(sid < DB_SELECT_ID_MAX);
@@ -586,14 +580,6 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 //    if ( !db_prepared_stmt[sid] )
 //	db_statement_finalize(ppstmt);
 
-    retval = pthread_mutex_unlock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
     return 0;
 }
 
@@ -675,7 +661,7 @@ void db_init(void)
     debug(1, "created memory db");
 
 
-    debug(1, "db mutex init at %p", &db_lock);
+//    debug(1, "db mutex init at %p", &db_lock);
 
     /* setup all tables */
     db_select_parameter(DB_SELECT_CREATE_PROJECT_TABLE);
@@ -718,7 +704,23 @@ void db_add_project(const char *projname, const char *configpath, int inotifyfd)
 
     char *basenam = basename(configpath);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyfd);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -726,10 +728,6 @@ int db_get_names_project(char ***projname, int *len)
 {
     assert(projname);
     assert(len);
-
-    int retval = 0;
-    int num = 0;
-    char **array = NULL;
 
     struct namelist_s
     {
@@ -765,11 +763,30 @@ int db_get_names_project(char ***projname, int *len)
 	return 0;
     }
 
+    int ret = 0;
+    int num = 0;
+    char **array = NULL;
 
     struct namelist_s namelist;
     STAILQ_INIT(&namelist.head);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     struct nameiterator_s *it;
     STAILQ_FOREACH(it, &namelist.head, entries)
@@ -795,7 +812,7 @@ int db_get_names_project(char ***projname, int *len)
     }
 
 
-    return retval;
+    return ret;
 }
 
 
@@ -819,7 +836,23 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     assert(pid > 0);
     assert(process_socket_fd >= 0);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_INSERT_PROCESS_DATA, projname, LIST_INIT, PROC_STATE_START, pid, process_socket_fd);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -841,7 +874,24 @@ char *db_get_project_for_this_process(pid_t pid)
     }
 
     char *ret = NULL;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_SELECT_PROJECT_WITH_PID, get_projectname, &ret, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %s", ret);
 
@@ -849,13 +899,7 @@ char *db_get_project_for_this_process(pid_t pid)
 }
 
 
-/* find a process in a certain list with a distinct state
- * Note:
- * Using the pid as key index value may create problems, if a process dies
- * and another process gets the same pid.
- * This should be handled by the manager which evaluates the SIGCHLD signal.
- */
-pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
+static pid_t db_intern__get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
 {
     assert(state < PROCESS_STATE_MAX);
     assert(list < LIST_SELECTOR_MAX);
@@ -875,9 +919,22 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
     pid_t ret = -1;
     int mylist = list;
     int mystate = state;
+
     db_select_parameter_callback(DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE, get_process, &ret, projname, mylist, mystate);
 
     debug(1, "returned %d", ret);
+
+    return ret;
+}
+/* find a process in a certain list with a distinct state
+ * Note:
+ * Using the pid as key index value may create problems, if a process dies
+ * and another process gets the same pid.
+ * This should be handled by the manager which evaluates the SIGCHLD signal.
+ */
+pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
+{
+    pid_t ret = db_intern__get_process(projname, list, state);
 
     return ret;
 }
@@ -885,10 +942,27 @@ pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_
 
 pid_t db_get_next_idle_process_for_busy_work(const char *projname)
 {
-    pid_t ret = db_get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
+    pid_t ret = db_intern__get_process(projname, LIST_ACTIVE, PROC_STATE_IDLE);
+
+// TODO use db_process_set_state()
     if (0 < ret)
 	db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_BUSY, (long long)0, ret);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -911,7 +985,23 @@ int db_has_process(pid_t pid)
 
     int ret = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_PROCESS_STATE, has_process, &ret, (int)pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "pid = %d returned %d", pid, ret);
 
@@ -935,7 +1025,23 @@ int db_get_process_socket(pid_t pid)
 
     int ret = -1;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_PROCESS_SOCKET_FROM_PROCESS, get_process_socket, &ret, (int)pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -957,7 +1063,23 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 
     enum db_process_state_e ret = PROCESS_STATE_MAX ;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_PROCESS_STATE, get_process_state, &ret, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "for process %d returned %d", pid, ret);
 
@@ -972,7 +1094,24 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
     // we need to copy values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
     long long threadid = thread_id;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_INIT, threadid, (int)pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 
@@ -983,9 +1122,25 @@ int db_process_set_state_idle(pid_t pid)
 {
     int ret = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
     db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_IDLE, (long long)0, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -995,9 +1150,25 @@ int db_process_set_state_exit(pid_t pid)
 {
     int ret = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
     db_select_parameter(DB_UPDATE_PROCESS_STATE, PROC_STATE_EXIT, (long long)0, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -1007,9 +1178,25 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
 {
     int ret = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     // we need to type cast values to a "guaranteed" 64 bit value
     // because the vararg parser assumes type "long long int" with "%l"
     db_select_parameter(DB_UPDATE_PROCESS_STATE, state, (long long)0, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -1034,7 +1221,23 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 
     int ret = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, (int)state);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %d", ret);
 
@@ -1047,7 +1250,23 @@ int db_get_num_active_process(const char *projname)
 {
     assert(projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -1099,10 +1318,25 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     struct pidlist_s mypidlist;
     STAILQ_INIT(&mypidlist.head);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_pid_list, &mypidlist, (int)list);
 
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
-    int retval = 0;
+    int ret = 0;
     int num = 0;
     struct piditerator_s *it;
     STAILQ_FOREACH(it, &mypidlist.head, entries)
@@ -1127,7 +1361,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
 	free(it);
     }
 
-    return retval;
+    return ret;
 }
 
 
@@ -1143,7 +1377,23 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
     assert(LIST_SELECTOR_MAX > list);
     assert(0 < pid);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_LIST_PID, list, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -1164,7 +1414,23 @@ enum db_process_list_e db_get_process_list(pid_t pid)
 
     enum db_process_list_e ret = LIST_SELECTOR_MAX;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_LIST_FROM_PROCESS, get_list_pid, &ret, (int)pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %d", ret);
 
@@ -1179,10 +1445,25 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_ACTIVE, projname, LIST_INIT);
 
-    qgis_shutdown_notify_changes();
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
+    qgis_shutdown_notify_changes();
 }
 
 
@@ -1192,10 +1473,25 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_ACTIVE);
 
-    qgis_shutdown_notify_changes();
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
+    qgis_shutdown_notify_changes();
 }
 
 
@@ -1205,7 +1501,23 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_INIT);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     qgis_shutdown_notify_changes();
 }
@@ -1216,8 +1528,24 @@ void db_move_all_process_to_list(enum db_process_list_e list)
     assert(LIST_SELECTOR_MAX > list);
 
     int mylist = list;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_LIST, mylist);
 
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 /* returns the next process (pid) which needs to be worked on.
@@ -1251,7 +1579,24 @@ int db_reset_signal_timer(pid_t pid)
     // because the vararg parser assumes type "long long int" with "%l"
     long long sec = ts.tv_sec;
     long long nsec = ts.tv_nsec;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, (int)pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -1277,10 +1622,27 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 	return 0;
     }
 
-    struct timespec retval = {0,0};
+    struct timespec timesp = {0,0};
 
-    db_select_parameter_callback(DB_SELECT_PROCESS_SIGNAL_TIMER, get_signal_timer, &retval, pid);
-    *ts = retval;
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_SELECT_PROCESS_SIGNAL_TIMER, get_signal_timer, &timesp, pid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    *ts = timesp;
 
     int ret = 0;
 
@@ -1308,11 +1670,27 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 	return 0;
     }
 
-    struct timespec retval = {0,0};
+    struct timespec timesp = {0,0};
 
-    db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, &retval);
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
-    *maxtimeval = retval;
+    db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, &timesp);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    *maxtimeval = timesp;
 
     debug(1, "returned value %ld,%03lds", maxtimeval->tv_sec, (maxtimeval->tv_nsec/(1000*1000)));
 }
@@ -1335,7 +1713,23 @@ int db_get_num_shutdown_processes(void)
 
     int num_list = 0;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_NUM_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %d", num_list);
 
@@ -1345,11 +1739,27 @@ int db_get_num_shutdown_processes(void)
 
 int db_remove_process_with_state_exit(void)
 {
-    int retval = 0;
+    int ret = 0;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     db_select_parameter(DB_DELETE_PROCESS_WITH_STATE, PROC_STATE_EXIT);
 
-    return retval;
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 
@@ -1357,7 +1767,23 @@ void db_inc_startup_failures(const char *projname)
 {
     assert(projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_INC_PROJECT_STARTUP_FAILURE, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -1379,7 +1805,24 @@ int db_get_startup_failures(const char *projname)
     }
 
     int ret = -1;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_SELECT_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %d", ret);
 
@@ -1391,7 +1834,23 @@ void db_reset_startup_failures(const char *projname)
 {
     assert(projname);
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter(DB_RESET_PROJECT_STARTUP_FAILURE, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -1414,7 +1873,23 @@ char *db_get_project_for_watchid(int watchid)
 
     char *ret = NULL;
 
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     db_select_parameter_callback(DB_GET_PROJECT_FROM_WATCHID, get_project_for_watchid, &ret, watchid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     debug(1, "returned %s", ret);
 
@@ -1461,6 +1936,12 @@ void db_dump(void)
 	return 0;
     }
 
+    struct callback_data_s data = {0};
+
+    data.bufferlen = buffer_increase;
+    data.buffer = malloc(data.bufferlen);
+    *data.buffer = '\0';	// empty string
+
     int retval = pthread_mutex_lock(&db_lock);
     if (retval)
     {
@@ -1468,12 +1949,6 @@ void db_dump(void)
 	logerror("error acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
-
-    struct callback_data_s data = {0};
-
-    data.bufferlen = buffer_increase;
-    data.buffer = malloc(data.bufferlen);
-    *data.buffer = '\0';	// empty string
 
     char *err;
     const char *sql = db_select_statement[DB_DUMP_PROJECT];
