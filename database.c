@@ -934,7 +934,23 @@ static pid_t db_intern__get_process(const char *projname, enum db_process_list_e
  */
 pid_t db_get_process(const char *projname, enum db_process_list_e list, enum db_process_state_e state)
 {
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
     pid_t ret = db_intern__get_process(projname, list, state);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 
     return ret;
 }
@@ -1250,23 +1266,10 @@ int db_get_num_active_process(const char *projname)
 {
     assert(projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
+    /* intentional no lock here,
+     * Lock aquired in db_get_num_process_by_status()
+     */
     int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
-
-    retval = pthread_mutex_unlock(&db_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("error unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
 
     return ret;
 }
