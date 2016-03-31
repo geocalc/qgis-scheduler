@@ -162,7 +162,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_PROCESS_STATE
 	"SELECT state FROM processes WHERE pid = %i",
 	// DB_GET_STATE_PROCESS
-	"SELECT pid FROM processes WHERE state = %i",
+	"SELECT pid FROM processes WHERE projectname = %s AND state = %i",
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
 	// DB_GET_NUM_PROCESS_FROM_LIST
@@ -1256,7 +1256,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 	exit(EXIT_FAILURE);
     }
 
-    db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, (int)state);
+    db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, projname, (int)state);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
