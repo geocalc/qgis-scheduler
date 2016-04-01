@@ -393,6 +393,8 @@ static void *thread_handle_connection(void *arg)
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones and add them to the existing processes */
+	    // start one process a time, else we flood the system with processes (fork bomb!)
+	    missing_processes = 1;
 	    debug(1, "not enough processes for project %s, start %d new process", projname, missing_processes);
 	    project_manager_start_new_process_detached(missing_processes, projname, 0);
 	}
