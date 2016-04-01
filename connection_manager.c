@@ -363,33 +363,11 @@ static void *thread_handle_connection(void *arg)
 	 * processes.
 	 * Then we can estimate how much new processes need to be started.
 	 */
-	/* NOTE: between the call to qgis_process_list_mutex_find_process_by_status()
-	 * and the last call to qgis_process_list_get_num_process_by_status()
-	 * the numbers may change (significant). Do we need a separate lock?
-	 * I think we do not. Because:
-	 * If the result number is too low we start too much new processes. But
-	 * these processes get killed some time afterwards if we don't need
-	 * them.
-	 * If the result number is too high we got not enough processes. But
-	 * this would mean the number of proc_state_start and proc_state_init
-	 * is too high, which is not the case. Because the processes transit
-	 * from PROC_START over PROC_INIT to PROC_IDLE. So if we have the
-	 * correct numbers of proc_state_start and proc_state_init during
-	 * a moment all these processes certainly become PROC_IDLE. If we
-	 * read_lock the process list during counting the state, there is
-	 * no count error (in transition from PROC_START to PROC_INIT).
-	 * We get the correct number if we first count PROC_INIT and then
-	 * PROC_START, not the other way around.
-	 */
 	const char *projname = request_project_name;
 	int min_free_processes = config_get_min_idle_processes(projname);
+	int proc_avail = db_get_num_start_init_idle_process(projname);
 
-	// TODO make a specialized call only once
-	int proc_state_idle = db_get_num_process_by_status(projname, PROC_STATE_IDLE);
-	int proc_state_init = db_get_num_process_by_status(projname, PROC_STATE_INIT);
-	int proc_state_start = db_get_num_process_by_status(projname, PROC_STATE_START);
-
-	int missing_processes = min_free_processes - (proc_state_idle + proc_state_init + proc_state_start);
+	int missing_processes = min_free_processes - proc_avail;
 	if (missing_processes > 0)
 	{
 	    /* not enough free processes, start new ones and add them to the existing processes */
