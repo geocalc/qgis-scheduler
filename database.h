@@ -102,6 +102,8 @@ int db_process_set_state_exit(pid_t pid);
 int db_process_set_state(pid_t pid, enum db_process_state_e state);
 int db_get_num_process_by_status(const char *projname, enum db_process_state_e state);
 int db_get_num_active_process(const char *projname);
+int db_get_num_start_init_idle_process(const char *projname);
+
 
 int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_e list);
 void db_free_list_process(pid_t *list, int len);

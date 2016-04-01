@@ -117,6 +117,7 @@ enum db_select_statement_id
     DB_UPDATE_PROCESS_STATE,
     DB_GET_PROCESS_STATE,
     DB_GET_STATE_PROCESS,
+    DB_GET_NUM_START_INIT_IDLE_PROCESS,
     DB_GET_PROCESS_FROM_LIST,
     DB_GET_NUM_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST,
@@ -166,6 +167,9 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT state FROM processes WHERE pid = %i",
 	// DB_GET_STATE_PROCESS
 	"SELECT pid FROM processes WHERE projectname = %s AND state = %i",
+	// DB_GET_NUM_START_INIT_IDLE_PROCESS
+	"SELECT pid FROM processes WHERE projectname = %s AND ( state = 0 OR state = 1 OR state = 2 )",
+//	"SELECT count(*) FROM processes WHERE (projectname = %s AND ( state = 0 OR state = 1 OR state = 2 ))", // NOTE: does not work! count() always returned 1
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
 	// DB_GET_NUM_PROCESS_FROM_LIST
@@ -1444,6 +1448,50 @@ int db_get_num_active_process(const char *projname)
     int ret = db_get_num_process_by_status(projname, PROC_STATE_BUSY);
 
     return ret;
+}
+
+
+int db_get_num_start_init_idle_process(const char *projname)
+{
+    assert(projname);
+
+    int get_num_start_init_idle_process(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *num = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	(*num)++;
+//	*num = type[0];
+
+	return 0;
+    }
+
+    int ret = 0;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_NUM_START_INIT_IDLE_PROCESS, get_num_start_init_idle_process, &ret, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %d", ret);
+
+    return ret;
+
 }
 
 
