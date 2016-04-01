@@ -266,48 +266,53 @@ static void *thread_handle_connection(void *arg)
 				const char *key = config_get_scan_parameter_key(proj_name);
 				if ( key )
 				{
-				    const char *param = fcgi_session_get_param(fcgi_session, key);
 				    const char *scanregex = config_get_scan_parameter_regex(proj_name);
 				    debug(1, "use regex %s", scanregex);
-				    regex_t regex;
-				    /* Compile regular expression */
-				    retval = regcomp(&regex, scanregex, REG_EXTENDED);
-				    if( retval )
+				    if (scanregex)
 				    {
-					size_t len = regerror(retval, &regex, NULL, 0);
-					char *buffer = malloc(len);
-					(void) regerror (retval, &regex, buffer, len);
+					regex_t regex;
+					/* Compile regular expression */
+					retval = regcomp(&regex, scanregex, REG_EXTENDED);
+					if( retval )
+					{
+					    size_t len = regerror(retval, &regex, NULL, 0);
+					    char *buffer = malloc(len);
+					    (void) regerror (retval, &regex, buffer, len);
 
-					debug(1, "Could not compile regular expression: %s", buffer);
-					free(buffer);
-					exit(EXIT_FAILURE);
-				    }
+					    debug(1, "Could not compile regular expression: %s", buffer);
+					    free(buffer);
+					    exit(EXIT_FAILURE);
+					}
 
-				    /* Execute regular expression */
-				    retval = regexec(&regex, param, 0, NULL, 0);
-				    if( !retval )
-				    {
-					// Match
+					/* Execute regular expression */
+					const char *param = fcgi_session_get_param(fcgi_session, key);
+					if (param)
+					{
+					    retval = regexec(&regex, param, 0, NULL, 0);
+					    if( !retval )
+					    {
+						// Match
+						regfree(&regex);
+						request_project_name = proj_name;
+						break;
+					    }
+					    else if( retval == REG_NOMATCH )
+					    {
+						// No match, go on with next project
+					    }
+					    else
+					    {
+						size_t len = regerror(retval, &regex, NULL, 0);
+						char *buffer = malloc(len);
+						(void) regerror (retval, &regex, buffer, len);
+
+						debug(1, "Could not match regular expression: %s", buffer);
+						free(buffer);
+						exit(EXIT_FAILURE);
+					    }
+					}
 					regfree(&regex);
-					request_project_name = proj_name;
-					break;
 				    }
-				    else if( retval == REG_NOMATCH )
-				    {
-					// No match, go on with next project
-				    }
-				    else
-				    {
-					size_t len = regerror(retval, &regex, NULL, 0);
-					char *buffer = malloc(len);
-					(void) regerror (retval, &regex, buffer, len);
-
-					debug(1, "Could not match regular expression: %s", buffer);
-					free(buffer);
-					exit(EXIT_FAILURE);
-				    }
-
-				    regfree(&regex);
 				}
 				else
 				{
