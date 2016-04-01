@@ -43,6 +43,7 @@
 #include <assert.h>
 #include <fastcgi.h>
 #include <pthread.h>
+#include <poll.h>
 
 #include "database.h"
 #include "fcgi_state.h"
@@ -83,6 +84,8 @@ struct thread_start_process_detached_args
 /* constants */
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int max_nr_process_crashes = 5;
+static const int init_read_timeout = 90*1000; // timeout in ms
+
 /* This global number is counted upwards, overflow included.
  * Every new unix socket gets this number attached creating a unique socket
  * path. In the very unlikely case the number is already given to an existing
@@ -94,7 +97,26 @@ static unsigned int socket_id = 0;
 static pthread_mutex_t socket_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
+static ssize_t read_timeout(int filedes, void *buffer, size_t size, int timeout_ms)
+{
+    ssize_t ret = -1;
 
+    struct pollfd pfd;
+
+    pfd.fd = filedes;
+    pfd.events = POLLIN;
+
+    int retval = poll(&pfd, 1, timeout_ms);
+    if (retval > 0)
+	// file descriptor ready, read from it
+	ret = read(filedes, buffer, size);
+    else if (!retval)
+	// timeout, mark as error with ETIMEDOUT and return -1
+	errno = ETIMEDOUT;
+    // else error happened, just return error with errno
+
+    return ret;
+}
 
 
 
@@ -291,15 +313,24 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     /* now read from socket into void until no more data
      * we do it to make sure that the child process has completed the request
      * and filled up its cache.
+     *
+     * Set a timeout of N seconds in case the program crashed during start. If
+     * the timeout catches move the process to the shutdown module and in the
+     * database mark the process as crashed.
      */
+    int has_timeout = 0;
     retval = 1;
     while (retval>0)
     {
-	retval = read(childunixsocketfd, buffer, maxbufferlen);
+	retval = read_timeout(childunixsocketfd, buffer, maxbufferlen, init_read_timeout);
 //	debug(1, "init project '%s' received:\n%.*s", projname, retval, buffer);
 	if (-1 == retval)
 	{
 	    logerror("error: read() from child process during init phase");
+	    if (ETIMEDOUT == errno)
+	    {
+		has_timeout = 1;
+	    }
 	}
     }
 
@@ -308,25 +339,34 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
      * there may be a race condition between the signal handler and this thread
      * so we test the existence of the child process after the read.
      */
-    retval = kill(pid, 0);
-    if (-1 == retval)
+    if (has_timeout)
     {
-	if (ESRCH == errno)
-	{
-	    /* child process died during initialization.
-	     * start a new one if possible
-	     */
-	    process_manager_process_died_during_init(pid, projname);
-	}
-	else
-	{
-	    logerror("error: kill(%d,0) returned", pid);
-	    exit(EXIT_FAILURE);
-	}
+	printlog("starting new process for project %s", projname);
+	qgis_shutdown_add_process(pid);
+	process_manager_process_died_during_init(pid, projname);
     }
     else
     {
-	db_process_set_state_idle(pid);
+	retval = kill(pid, 0);
+	if (-1 == retval)
+	{
+	    if (ESRCH == errno)
+	    {
+		/* child process died during initialization.
+		 * start a new one if possible
+		 */
+		process_manager_process_died_during_init(pid, projname);
+	    }
+	    else
+	    {
+		logerror("error: kill(%d,0) returned", pid);
+		exit(EXIT_FAILURE);
+	    }
+	}
+	else
+	{
+	    db_process_set_state_idle(pid);
+	}
     }
 
     /* ok, we did read each and every byte from child process.
