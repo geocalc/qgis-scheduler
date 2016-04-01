@@ -461,34 +461,61 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     }
 
 
+    /* preparation of data before fork() so we don't need to call functions with
+     * mutexes after fork() (see below for further reading).
+     */
+    int maxenv = 25;	// support 25 environment variables at max
+    const char **key = calloc(maxenv, sizeof(*key));
+    const char **value = calloc(maxenv, sizeof(*value));
+    int i;
+    for (i=0; i<maxenv; i++)
+    {
+	key[i] = config_get_env_key(project_name, i);
+	if ( !key[i] )
+	    break;
+	value[i] = config_get_env_value(project_name, i);
+	if ( !value[i] )
+	    break;
+
+	debug(1, "project %s: add %s = %s to environment", project_name, key[i], value[i]);
+    }
+    maxenv = i; // correct max to really used data
+
+    const char *working_directory = config_get_working_directory(project_name);
+
 
     pid_t pid = fork();
     if (0 == pid)
     {
 	/* child */
 
+	/* according to
+	 * http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them
+	 * we may only call async-safe functions in multithreaded programs (this!)
+	 * after calling fork() (here!).
+	 *
+	 * So we are not allowed to call ANY function with in turn calls locks
+	 * or mutexes. We should only call functions which are listed as async-safe
+	 * in signal(7).
+	 * NOTE: setenv() is not listed as async-safe. Unfortunately I don't see
+	 * any other safe way to prepare the environment for the child only?
+	 * Maybe kill all threads (except this) with a combination of
+	 * pthread_atfork() and pthread_cancel() ?
+	 */
 
 	/* Add the configured environment to the existing environment */
 	/* Note: shall we clean up before? */
-	int i;
-	static const int maxenv = 25;
 	for (i=0; i<maxenv; i++)
 	{
-	    const char *key = config_get_env_key(project_name, i);
-	    if ( !key )
-		break;
-	    const char *value = config_get_env_value(project_name, i);
-	    if ( !value )
-		break;
-
-	    debug(1, "project %s: add %s = %s to environment", project_name, key, value);
-	    retval = setenv(key, value, 1);
+//	    debug(1, "project %s: add %s = %s to environment", project_name, key, value); # no debug message allowed because of locking
+	    retval = setenv(key[i], value[i], 1);
 	    if (retval)
 	    {
-		logerror("error can not set environment with key='%s' and value='%s'", key, value);
+//		logerror("error can not set environment with key='%s' and value='%s'", key[i], value[i]); # no log message allowed because of locking
 		exit(EXIT_FAILURE);
 	    }
 	}
+	// no need to free() memory, is freed by exec()
 
 	/* change working dir
 	 * close file descriptor stdin = 0
@@ -496,17 +523,17 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	 * fork
 	 * exec
 	 */
-	retval = chdir(config_get_working_directory(project_name));
+	retval = chdir(working_directory);
 	if (-1 == retval)
 	{
-	    logerror("error calling chdir");
+//	    logerror("error calling chdir"); # no log message allowed because of locking
 	}
 
 
 	retval = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == retval)
 	{
-	    logerror("error calling dup2");
+//	    logerror("error calling dup2"); # no log message allowed because of locking
 	    exit(EXIT_FAILURE);
 	}
 
@@ -521,12 +548,14 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
 
 	execl(command, command, NULL);
-	logerror("could not execute '%s': ", command);
+//	logerror("could not execute '%s': ", command); # no log message allowed because of locking
 	exit(EXIT_FAILURE);
     }
     else if (0 < pid)
     {
 	/* parent */
+	free(key);
+	free(value);
 	debug(1, "project '%s' started new child process '%s', pid %d", project_name, command, pid);
 	db_add_process( project_name, pid, childsocket);
 
