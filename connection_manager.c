@@ -46,6 +46,7 @@
 #include <regex.h>
 #include <pthread.h>
 
+#include "common.h"
 #include "database.h"
 #include "logger.h"
 #include "timer.h"
@@ -56,10 +57,6 @@
 #include "project_manager.h"
 
 
-#define min(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a < _b ? _a : _b; })
 
 
 struct thread_connection_handler_args

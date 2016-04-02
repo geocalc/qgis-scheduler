@@ -42,16 +42,9 @@
 #include <fastcgi.h>
 #include <pthread.h>
 
+#include "common.h"
 #include "logger.h"
 
-
-#define min(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a < _b ? _a : _b; })
-
-#define _STR(x)	# x
-#define STR(x)	_STR(x)
 
 #define ASSEMBLE_FCGI_NUMBERS16(variable) \
     ( (( variable ## B1 ) << 8) + ( variable ## B0 ))

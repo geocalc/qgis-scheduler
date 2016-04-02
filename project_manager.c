@@ -40,17 +40,13 @@
 #include <unistd.h>
 #include <string.h>
 
+#include "common.h"
 #include "database.h"
 #include "qgis_config.h"
 #include "logger.h"
 #include "process_manager.h"
 #include "qgis_inotify.h"
 
-
-#define max(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a > _b ? _a : _b; })
 
 
 struct thread_start_project_processes_args

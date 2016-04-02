@@ -124,6 +124,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include "common.h"
 #include "fcgi_state.h"
 #include "fcgi_data.h"
 #include "qgis_config.h"
@@ -138,14 +139,6 @@
 #include "connection_manager.h"
 
 
-#define min(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a < _b ? _a : _b; })
-#define max(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a > _b ? _a : _b; })
 
 
 //#define PRINT_NETWORK_DATA
@@ -154,7 +147,6 @@
 # define DEFAULT_CONFIG_PATH	"/etc/qgis-scheduler/qgis-scheduler.conf"
 #endif
 
-#define UNUSED_PARAMETER(x)	((void)(x))
 
 
 

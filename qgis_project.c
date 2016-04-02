@@ -48,6 +48,7 @@
 #include <libgen.h>	// used for dirname(), we need glibc >= 2.2.1 !!
 #include <limits.h>
 
+#include "common.h"
 #include "qgis_process_list.h"
 #include "qgis_config.h"
 #include "qgis_inotify.h"
@@ -62,11 +63,6 @@
 //#define DISABLED_INIT
 #define MIN_PROCESS_RUNTIME_SEC		5
 #define MIN_PROCESS_RUNTIME_NANOSEC	0
-
-#define max(a,b) \
-   ({ __typeof__ (a) _a = (a); \
-       __typeof__ (b) _b = (b); \
-     _a > _b ? _a : _b; })
 
 
 struct qgis_project_s

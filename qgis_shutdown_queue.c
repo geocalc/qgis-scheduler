@@ -39,6 +39,7 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include "common.h"
 #include "logger.h"
 #include "timer.h"
 #include "database.h"
@@ -46,7 +47,6 @@
 #include "qgis_config.h"
 
 
-#define UNUSED_PARAMETER(x)	((void)(x))
 
 
 static pthread_t shutdownthread = 0;

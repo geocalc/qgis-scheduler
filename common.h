@@ -32,5 +32,32 @@
 #define COMMON_H_
 
 
+/* return minimal value of a,b.
+ * evaluate a and b only once.
+ */
+#define min(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a < _b ? _a : _b; })
+
+/* return maximal value of a,b.
+ * evaluate a and b only once.
+ */
+#define max(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
+
+/* stringify x
+ * x may be a definition or a code line, too
+ * #define MYDEF 0.1.abc
+ * i.e. STR(MYDEF) => "0.1.abc", STR(a+b) => "a+b"
+ */
+#define _STR(x)	# x
+#define STR(x)	_STR(x)
+
+/* avoid compiler warning about unused parameter */
+#define UNUSED_PARAMETER(x)	((void)(x))
+
 
 #endif /* COMMON_H_ */

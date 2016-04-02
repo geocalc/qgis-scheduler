@@ -45,12 +45,11 @@
 #include <string.h>
 #include <libgen.h>	// used for dirname(), we need glibc >= 2.2.1 !!
 
+#include "common.h"
 #include "qgis_config.h"
 #include "logger.h"
 #include "project_manager.h"
 
-
-#define UNUSED_PARAMETER(x)	((void)(x))
 
 
 struct inotify_watch
