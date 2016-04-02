@@ -2120,6 +2120,53 @@ char *db_get_project_for_watchid(int watchid)
 }
 
 
+/* Like strncat() appends a string to an exiting string buffer. If the string
+ * does not fit into the buffer it is resized to a new size. The new buffer is
+ * stored into "buffer" and "len" is updated.
+ */
+void strnbcat(char **buffer, int *len, const char *str)
+{
+    int appendlen = strlen(str);
+    int bufferlen = strlen(*buffer);
+    int newlen = *len;
+
+    static const int max_resize_iteration = 10;
+    int i;
+    for (i=0; i<max_resize_iteration; i++)
+    {
+	if ((appendlen + bufferlen) > newlen)
+	{
+	    /* "str" doesn't fit into "buffer". need to resize it
+	     * Just double the size of the buffer */
+	    newlen += newlen;
+	}
+	else
+	{
+	    break;
+	}
+    }
+    if (i >= max_resize_iteration)
+    {
+	/* possible endless loop. exit with error */
+	printlog("error: possible endless loop in resize() algorithm. exit");
+	exit(EXIT_FAILURE);
+    }
+    if ( newlen != *len )
+    {
+	*len = newlen;
+	*buffer = realloc(*buffer, newlen);
+	if ( !*buffer )
+	{
+	    /* realloc failed. exit */
+	    logerror("error: realloc failed");
+	    exit(EXIT_FAILURE);
+	}
+    }
+    strcat(*buffer, str);
+}
+
+
+
 void db_dump(void)
 {
     struct callback_data_s {
@@ -2127,8 +2174,6 @@ void db_dump(void)
 	int bufferlen;
 	char *buffer;
     };
-
-    static const int buffer_increase = 8192;
 
     int dump_tabledata(void *data, int ncol, char **results, char **cols)
     {
@@ -2138,30 +2183,31 @@ void db_dump(void)
 	{
 	    for (i=0; i<ncol; i++)
 	    {
-		strcat(val->buffer, cols[i]);
-		strcat(val->buffer, ",\t");
+		strnbcat(&val->buffer, &val->bufferlen, cols[i]);
+		strnbcat(&val->buffer, &val->bufferlen, ",\t");
 	    }
 	    val->has_printed_headline = 1;
 	}
-	strcat(val->buffer, "\n");
+	strnbcat(&val->buffer, &val->bufferlen, "\n");
 
 	for (i=0; i<ncol; i++)
 	{
 	    if (results[i])
-		strcat(val->buffer, results[i]);
+		strnbcat(&val->buffer, &val->bufferlen, results[i]);
 	    else
-		strcat(val->buffer, "NULL");
-	    strcat(val->buffer, ",\t");
+		strnbcat(&val->buffer, &val->bufferlen, "NULL");
+	    strnbcat(&val->buffer, &val->bufferlen, ",\t");
 	}
-	strcat(val->buffer, "\n");
+	strnbcat(&val->buffer, &val->bufferlen, "\n");
 
 
 	return 0;
     }
 
+    static const int buffer_size = 1024;
     struct callback_data_s data = {0};
 
-    data.bufferlen = buffer_increase;
+    data.bufferlen = buffer_size;
     data.buffer = malloc(data.bufferlen);
     *data.buffer = '\0';	// empty string
 
@@ -2175,14 +2221,14 @@ void db_dump(void)
 
     char *err;
     const char *sql = db_select_statement[DB_DUMP_PROJECT];
-    strcat(data.buffer, "PROJECTS:\n");
+    strnbcat(&data.buffer, &data.bufferlen, "PROJECTS:\n");
     sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
     printlog("%s", data.buffer);
 
     data.has_printed_headline = 0;
     *data.buffer = '\0';	// empty string
     sql = db_select_statement[DB_DUMP_PROCESS];
-    strcat(data.buffer, "PROCESSES:\n");
+    strnbcat(&data.buffer, &data.bufferlen, "PROCESSES:\n");
     sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
     printlog("%s", data.buffer);
 
