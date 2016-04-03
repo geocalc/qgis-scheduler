@@ -228,21 +228,9 @@ static void *thread_handle_connection(void *arg)
 #endif
 
 		{
-		    /* allocate data storage here,
-		     * delete it in fcgi_data_list_delete()
-		     */
-		    char *data = malloc(readbytes);
-		    assert(data);
-		    if ( !data )
-		    {
-			logerror("could not allocate memory");
-			exit(EXIT_FAILURE);
-		    }
+		    fcgi_data_add_data(datalist, buffer, readbytes);
 
-		    memcpy(data, buffer, readbytes);
-		    fcgi_data_add_data(datalist, data, readbytes);
-
-		    fcgi_session_parse(fcgi_session, data, readbytes);
+		    fcgi_session_parse(fcgi_session, buffer, readbytes);
 
 		    enum fcgi_session_state_e session_state = fcgi_session_get_state(fcgi_session);
 		    switch (session_state)

@@ -95,7 +95,7 @@ void fcgi_data_list_delete(struct fcgi_data_list_s *datalist)
 }
 
 
-void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len)
+void fcgi_data_add_data(struct fcgi_data_list_s *datalist, const char *data, int len)
 {
     assert(datalist);
     if(datalist)
@@ -108,7 +108,13 @@ void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len)
 	    exit(EXIT_FAILURE);
 	}
 
-	entry->data.data = data;
+	entry->data.data = malloc(len);
+	if ( !entry->data.data )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(entry->data.data, data, len);
 	entry->data.len = len;
 
 	/* if list is empty we have to insert at beginning,

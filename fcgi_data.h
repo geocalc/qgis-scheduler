@@ -43,7 +43,7 @@ struct fcgi_data_list_iterator_s;
 struct fcgi_data_list_s *fcgi_data_list_new(void);
 void fcgi_data_list_delete(struct fcgi_data_list_s *datalist);
 
-void fcgi_data_add_data(struct fcgi_data_list_s *datalist, char *data, int len);
+void fcgi_data_add_data(struct fcgi_data_list_s *datalist, const char *data, int len);
 const char *fcgi_data_get_data(const struct fcgi_data_s *data);
 int fcgi_data_get_datalen(const struct fcgi_data_s *data);
 
