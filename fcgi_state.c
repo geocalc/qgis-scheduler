@@ -557,7 +557,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 	if (copylen > 0)
 	{
 	    memcpy(&message->message.beginrequestbody, data, copylen);
-	    message->bytes_read += copylen;	// this is the amount we virtually read in this function call
+	    message->bytes_read += copylen;	// this is the amount we read in this function call
 	    dataread += copylen;
 	    len -= copylen;
 	}
@@ -580,10 +580,16 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 	assert(content_read >= 0);
 	if (content_read > 0)
 	{
-	    memcpy(message->content, data, content_read);	// copy content into message buffer
-	    message->bytes_read += content_read;	// this is the amount we virtually read in this function call
-	    dataread += content_read;	// this is the amount we virtually read in this function call
-	    len -= content_read;
+	    assert(message->bytes_read >= sizeof(message->message.header));
+	    if (message->bytes_read >= sizeof(message->message.header))
+	    {
+		const int previous_read = message->bytes_read-sizeof(message->message.header);
+		assert((previous_read+content_read) <= message->contentLength); // prevent writing behind buffer
+		memcpy(message->content+previous_read, data, content_read);	// copy content into message buffer
+		message->bytes_read += content_read;	// this is the amount of data we read in this function call
+		dataread += content_read;	// this is the amount of data we read in this function call
+		len -= content_read;
+	    }
 	}
 	break;
     }
@@ -1137,6 +1143,8 @@ int fcgi_session_parse(struct fcgi_session_s *session, const char *data, int len
 		//fcgi_message_print(message);
 		fcgi_session_evaluate_message_done(session, message);
 	    }
+
+	    assert(0 == len);	// consume all data, leave nothing behind
 	}
 
 	/* change fcgi session state to running */
