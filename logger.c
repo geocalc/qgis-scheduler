@@ -79,7 +79,7 @@ int my_vdprintf(int fd, const char *format, va_list ap)
 	if (newbuffersize <= retval)
 	    // according to man page the output was truncated
 	    retval = newbuffersize-1;
-	retval = write(STDERR_FILENO, newbuffer, retval);
+	retval = write(fd, newbuffer, retval);
     }
 #endif
 
@@ -194,7 +194,7 @@ int printlog(const char *format, ...)
 
     {
 	strsize += strlen(format);	// add size of 'format'
-	strsize +=1;			// add size of "\n"
+	strsize += 1;			// add size of "\n"
 
 	// print string
 	char strbuffer[strsize+1];
