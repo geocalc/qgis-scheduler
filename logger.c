@@ -93,26 +93,7 @@ int my_dprintf(int fd, const char *format, ...)
     int retval;
 
     va_start(args, format);
-#ifdef HAVE_GLIBC_VERSION_2_21	/* glibc >= 2.21 */
-    retval = vdprintf(fd, format, args);
-#else
-    /* workaround for glibc bug which does not handle
-     * dprintf() and fork() properly.
-     * Solved in glibc-2.21
-     */
-    {
-	static const int newbuffersize = 256;
-	char newbuffer[newbuffersize];
-
-	retval = vsnprintf(newbuffer, newbuffersize, format, args);
-	if (-1 == retval)
-	    return retval;
-	if (newbuffersize <= retval)
-	    // according to man page the output was truncated
-	    retval = newbuffersize-1;
-	retval = write(STDERR_FILENO, newbuffer, retval);
-    }
-#endif
+    retval = my_vdprintf(fd, format, args);
     va_end(args);
 
     return retval;
