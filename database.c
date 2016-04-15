@@ -2134,7 +2134,8 @@ void strnbcat(char **buffer, int *len, const char *str)
     int i;
     for (i=0; i<max_resize_iteration; i++)
     {
-	if ((appendlen + bufferlen) > newlen)
+	// need newlen >=  (appendlen + bufferlen + 1) to fit into buffer
+	if ((appendlen + bufferlen) >= newlen)
 	{
 	    /* "str" doesn't fit into "buffer". need to resize it
 	     * Just double the size of the buffer */
