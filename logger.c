@@ -70,16 +70,51 @@ int my_vdprintf(int fd, const char *format, va_list ap)
      * see https://sourceware.org/bugzilla/show_bug.cgi?id=12847
      */
     {
-	static const int newbuffersize = 256;
-	char newbuffer[newbuffersize];
+	static const int buffersize = 256;
+	char *buffer = malloc(buffersize);
+	assert(buffer);
+	if ( !buffer )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 
-	retval = vsnprintf(newbuffer, newbuffersize, format, ap);
-	if (-1 == retval)
-	    return retval;
-	if (newbuffersize <= retval)
-	    // according to man page the output was truncated
-	    retval = newbuffersize-1;
-	retval = write(fd, newbuffer, retval);
+	// copy va list just in case we need to call vsnprintf twice
+	va_list aq;
+	va_copy(aq, ap);
+	retval = vsnprintf(buffer, buffersize, format, aq);
+	va_end(aq);
+	if (-1 != retval)
+	{
+	    if (buffersize <= retval)
+	    {
+		// according to man page the output was truncated
+		// try to resize the buffer to correct size and try again
+		int newbuffersize = retval+1;
+		buffer = realloc(buffer, newbuffersize);
+		assert(buffer);
+		if ( !buffer )
+		{
+		    // reallocation failed, old buffer still available, continue printing with old buffer
+		    logerror("could not reallocate memory");
+		    retval = buffersize-1;
+		}
+		else
+		{
+		    retval = vsnprintf(buffer, newbuffersize, format, ap);
+		    if (newbuffersize <= retval)
+		    {
+			// according to man page the output was truncated
+			retval = newbuffersize-1;
+		    }
+		}
+	    }
+	    if (-1 != retval)
+	    {
+		retval = write(fd, buffer, retval);
+	    }
+	}
+	free(buffer);
     }
 #endif
 
