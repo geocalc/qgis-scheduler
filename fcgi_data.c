@@ -36,6 +36,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/queue.h>
 #include <assert.h>
 
