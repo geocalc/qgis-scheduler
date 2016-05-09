@@ -118,6 +118,7 @@ enum db_select_statement_id
     DB_GET_PROCESS_STATE,
     DB_GET_STATE_PROCESS,
     DB_GET_NUM_START_INIT_IDLE_PROCESS,
+    DB_GET_ALL_PROCESS,
     DB_GET_PROCESS_FROM_LIST,
     DB_GET_NUM_PROCESS_FROM_LIST,
     DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST,
@@ -170,6 +171,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_NUM_START_INIT_IDLE_PROCESS
 	"SELECT pid FROM processes WHERE projectname = %s AND ( state = 0 OR state = 1 OR state = 2 )",
 //	"SELECT count(*) FROM processes WHERE (projectname = %s AND ( state = 0 OR state = 1 OR state = 2 ))", // NOTE: does not work! count() always returned 1
+	// DB_GET_ALL_PROCESS
+	"SELECT pid FROM processes",
 	// DB_GET_PROCESS_FROM_LIST
 	"SELECT pid FROM processes WHERE list = %d",
 	// DB_GET_NUM_PROCESS_FROM_LIST
@@ -1492,6 +1495,98 @@ int db_get_num_start_init_idle_process(const char *projname)
 
     return ret;
 
+}
+
+
+int db_get_complete_list_process(pid_t **pidlist, int *len)
+{
+    assert(pidlist);
+    assert(len);
+
+    struct pidlist_s
+    {
+	STAILQ_HEAD(listhead, piditerator_s) head;	/* Linked list head */
+    };
+
+    struct piditerator_s
+    {
+        STAILQ_ENTRY(piditerator_s) entries;          /* Linked list prev./next entry */
+        pid_t pid;
+    };
+
+
+    int get_pid_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct pidlist_s *list = data;
+
+	struct piditerator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	entry->pid = results[0].integer;
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
+
+    struct pidlist_s mypidlist;
+    STAILQ_INIT(&mypidlist.head);
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_ALL_PROCESS, get_pid_list, &mypidlist);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int ret = 0;
+    int num = 0;
+    struct piditerator_s *it;
+    STAILQ_FOREACH(it, &mypidlist.head, entries)
+    {
+	num++;
+    }
+    debug(1, "select found %d processes", num);
+
+    /* aquire the pointer array */
+    *len = num;
+    pid_t *array = calloc(num, sizeof(*array));
+    *pidlist = array;
+
+    num = 0;
+    while( !STAILQ_EMPTY(&mypidlist.head) )
+    {
+	assert(num < *len);
+	it = STAILQ_FIRST(&mypidlist.head);
+	array[num++] = it->pid;
+
+	STAILQ_REMOVE_HEAD(&mypidlist.head, entries);
+	free(it);
+    }
+
+    return ret;
 }
 
 

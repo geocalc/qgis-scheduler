@@ -105,6 +105,7 @@ int db_get_num_active_process(const char *projname);
 int db_get_num_start_init_idle_process(const char *projname);
 
 
+int db_get_complete_list_process(pid_t **pidlist, int *len);
 int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_e list);
 void db_free_list_process(pid_t *list, int len);
 
