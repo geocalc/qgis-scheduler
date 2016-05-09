@@ -319,14 +319,8 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	syncfs(STDERR_FILENO);
 	syncfs(STDOUT_FILENO);
 	/* reinstall default handler and fire signal again */
-	{
-	    struct sigaction action;
-	    memset(&action, 0, sizeof(action));
-	    action.sa_handler = SIG_DFL;
-	    sigaction(SIGSEGV, &action, NULL);
-//	    signal(SIGSEGV, SIG_DFL);
-	    raise(SIGSEGV);
-	}
+	/* update: reinstalled upon entry by action.flag SA_RESETHAND */
+	raise(SIGSEGV);
 	break;
 
     default:
@@ -588,7 +582,8 @@ int main(int argc, char **argv)
 	 * different from linux the SIGCHLD signal may not be delivered
 	 * if SA_NOCLDWAIT is set and the child process ends.
 	 */
-	action.sa_flags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
+	static const int stdactionflags = SA_SIGINFO|SA_NOCLDSTOP|SA_NOCLDWAIT;
+	action.sa_flags = stdactionflags;
 	sigemptyset(&action.sa_mask);
 	sigaddset(&action.sa_mask, SIGCHLD);
 	sigaddset(&action.sa_mask, SIGUSR1);
@@ -620,18 +615,20 @@ int main(int argc, char **argv)
 	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
-	retval = sigaction(SIGCHLD, &action, NULL);
-	if (retval)
-	{
-	    logerror("error: can not install signal handler");
-	    exit(EXIT_FAILURE);
-	}
 	retval = sigaction(SIGINT, &action, NULL);
 	if (retval)
 	{
 	    logerror("error: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
+	retval = sigaction(SIGCHLD, &action, NULL);
+	if (retval)
+	{
+	    logerror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	action.sa_flags = stdactionflags;
+	action.sa_flags |= SA_RESETHAND; // only one notification of sigsegv
 	retval = sigaction(SIGSEGV, &action, NULL);
 	if (retval)
 	{
