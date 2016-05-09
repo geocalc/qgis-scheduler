@@ -6,4 +6,4 @@ qgis_schedulerd_SOURCES=qgis-schedulerd.c common.h \
 	qgis_process.h qgis_process_list.h fcgi_state.h fcgi_data.h qgis_config.h qgis_project.h qgis_project_list.h logger.h timer.h qgis_inotify.h qgis_shutdown_queue.h statistic.h database.h process_manager.h connection_manager.h project_manager.h
 
 sysconf_DATA = qgis-scheduler.conf
-EXTRA_DIST = qgis-scheduler.conf init/README init/gentoo/qgis-scheduler.init init/ubuntu/qgis-scheduler.init
+EXTRA_DIST = qgis-scheduler.conf init/README init/gentoo/qgis-scheduler.init init/ubuntu/qgis-schedulerd.init
