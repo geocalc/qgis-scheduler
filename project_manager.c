@@ -184,13 +184,6 @@ void project_manager_startup_projects(void)
 }
 
 
-void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes)
-{
-    process_manager_start_new_process_detached(num, projectname, do_exchange_processes);
-}
-
-
-
 /* restarts all processes.
  * I.e. evaluate current number of processes for this project,
  * start num processes, init them,

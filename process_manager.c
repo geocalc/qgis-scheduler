@@ -848,7 +848,7 @@ void process_manager_process_died(void)
 			    }
 			    else if (max_nr_process_crashes > retval)
 			    {
-				project_manager_start_new_process_detached(1, projname, 0);
+				process_manager_start_new_process_detached(1, projname, 0);
 			    }
 			    free(projname);
 			}

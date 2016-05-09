@@ -54,7 +54,7 @@
 #include "fcgi_state.h"
 #include "qgis_config.h"
 #include "statistic.h"
-#include "project_manager.h"
+#include "process_manager.h"
 
 
 
@@ -359,7 +359,7 @@ static void *thread_handle_connection(void *arg)
 	    // start one process a time, else we flood the system with processes (fork bomb!)
 	    missing_processes = 1;
 	    debug(1, "not enough processes for project %s, start %d new process", projname, missing_processes);
-	    project_manager_start_new_process_detached(missing_processes, projname, 0);
+	    process_manager_start_new_process_detached(missing_processes, projname, 0);
 	}
 
 	/* find the next idling process, set its state to BUSY and attach a thread to it.
