@@ -795,11 +795,21 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
  * to us. Either way in this case we don't need to take action.
  * Else look for the number of idle processes and restart a new process if
  * needed.
+ *
+ * This function is called from the signal handler.
+ * If the signal handler receives a SIGCHLD there may be more than one child
+ * process having send a signal. We have to test all programs if they still
+ * exist in RAM.
  */
-void process_manager_process_died(pid_t pid)
+void process_manager_process_died(void)
 {
-    int retval = db_has_process(pid);
-    if (retval)
+    int retval;
+    pid_t *pidlist;
+    int listlen;
+    int i;
+
+    retval = db_get_complete_list_process(&pidlist, &listlen);
+    for(i=0; i<listlen; i++)
     {
 	/* check if we are during shutdown sequence. if not then restart the
 	 * process.
@@ -809,47 +819,65 @@ void process_manager_process_died(pid_t pid)
 	 * Refrain from restarting if too much processes have died during the
 	 * initialization.
 	 */
-	retval = get_program_shutdown();
-	if (!retval)
+	const pid_t pid = pidlist[i];
+
+	retval = kill(pid, 0);
+	if (-1 == retval)
 	{
-	    enum db_process_list_e proclist = db_get_process_list(pid);
-	    if (LIST_SHUTDOWN != proclist)
+	    if (ESRCH == errno)
 	    {
-		char *projname = db_get_project_for_this_process(pid);
-		/* Process is not in shutdown list and died during normal operation.
-		 * Restart the process if not too much startup failures
+		/* child process died.
 		 */
-		if (projname)
+		retval = get_program_shutdown();
+		if (!retval)
 		{
-		    retval = db_get_startup_failures(projname);
-		    if ( 0 > retval )
+		    enum db_process_list_e proclist = db_get_process_list(pid);
+		    if (LIST_SHUTDOWN != proclist)
 		    {
-			printlog("error: can not get number of startup failures, function call failed for project %s", projname);
-			exit(EXIT_FAILURE);
+			char *projname = db_get_project_for_this_process(pid);
+			/* Process is not in shutdown list and died during normal operation.
+			 * Restart the process if not too much startup failures
+			 */
+			if (projname)
+			{
+			    retval = db_get_startup_failures(projname);
+			    if ( 0 > retval )
+			    {	// too much dying processes during init phase, do not start new processes
+				printlog("error: can not get number of startup failures, function call failed for project %s", projname);
+				exit(EXIT_FAILURE);
+			    }
+			    else if (max_nr_process_crashes > retval)
+			    {
+				project_manager_start_new_process_detached(1, projname, 0);
+			    }
+			    free(projname);
+			}
+			else
+			{
+			    printlog("warning: no project found for pid %d", pid);
+			}
 		    }
-		    else if (max_nr_process_crashes > retval)
-		    {
-			project_manager_start_new_process_detached(1, projname, 0);
-		    }
-		    free(projname);
 		}
-		else
-		{
-		    printlog("warning: no project found for pid %d", pid);
-		}
+
+		/* change state of the process to STATE_EXIT
+		 * and move the entry to the shutdown list
+		 */
+		process_manager_cleanup_process(pid);
+		qgis_shutdown_add_process(pid);
+	    }
+	    else
+	    {
+		logerror("error: kill(%d,0) returned", pid);
+		exit(EXIT_FAILURE);
 	    }
 	}
+	else
+	{
+	    // process still exists, do not akt on it
+	}
+    }
 
-	/* change state of the process to STATE_EXIT
-	 * and move the entry to the shutdown list
-	 */
-	process_manager_cleanup_process(pid);
-	qgis_shutdown_add_process(pid);
-    }
-    else
-    {
-	printlog("got signal SIGCHLD but pid %d does not belong to us", pid);
-    }
+    db_free_list_process(pidlist, listlen);
 }
 
 

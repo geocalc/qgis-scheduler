@@ -35,7 +35,7 @@
 #include <sys/types.h>
 
 
-void process_manager_process_died(pid_t pid);
+void process_manager_process_died(void);
 void process_manager_process_died_during_init(pid_t pid, const char *projname);
 void process_manager_start_new_process_wait(int num, const char *projname, int do_exchange_processes);
 void process_manager_start_new_process_detached(int num, const char *projname, int do_exchange_processes);

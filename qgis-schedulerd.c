@@ -739,7 +739,7 @@ int main(int argc, char **argv)
 		    case SIGCHLD:
 		    {
 			/* child process died, rearrange the project list */
-			process_manager_process_died(sigdata.pid);
+			process_manager_process_died();
 			break;
 		    }
 		    case SIGUSR1:
