@@ -84,7 +84,7 @@ struct thread_start_process_detached_args
 /* constants */
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int max_nr_process_crashes = 5;
-static const int init_read_timeout = 90*1000; // timeout in ms
+static const int init_read_timeout = 270*1000; // timeout in ms, TODO: make this config a entry
 
 /* This global number is counted upwards, overflow included.
  * Every new unix socket gets this number attached creating a unique socket
