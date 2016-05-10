@@ -368,13 +368,16 @@ int main(int argc, char **argv)
     test_set_valid_clock_id();
     statistic_init();
 
-
-    int retval = config_load(config_path);
+    char **sectionnew, **sectionchange, **sectiondelete;
+    int retval = config_load(config_path, &sectionnew, &sectionchange, &sectiondelete);
     if (retval)
     {
 	logerror("can not load config file");
 	exit(EXIT_FAILURE);
     }
+    free(sectionnew);
+    free(sectionchange);
+    free(sectiondelete);
 
 
     logger_init();

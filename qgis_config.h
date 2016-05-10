@@ -35,7 +35,7 @@
 
 extern const struct timespec default_signal_timeout;
 
-int config_load(const char *path);
+int config_load(const char *path, char ***sectionnew, char ***sectionchanged, char ***sectiondelete);
 void config_shutdown(void);
 int config_get_num_projects(void);
 const char *config_get_name_project(int num);

@@ -383,7 +383,15 @@ static int iniparser_load_with_include(const char *configpath)
  * The included configuration sections are written to a temporary file, which
  * in turn is read in a final pass from the "iniparser" library.
  */
-int config_load(const char *path)
+/* Rereads a new config file with includes if being called a second time.
+ * Scans the configuration (global and projects) for differences to the
+ * existing configuration.
+ * If global variables differ, then all projects are reloaded.
+ * If a project specific variable changed only that project is reloaded.
+ * The sections which the caller need to act upon are returned in "sectionnew",
+ * "sectionchanged" and "sectiondelete".
+ */
+int config_load(const char *path, char ***sectionnew, char ***sectionchanged, char ***sectiondelete)
 {
     /* load the config file into the dictionary
      * return: 0 if all is well, -1 if not and errno is set
@@ -416,6 +424,20 @@ int config_load(const char *path)
     }
     if (!config_opts)
 	return -1;
+
+    {
+	const int n = iniparser_getnsec(config_opts);
+
+	*sectionnew = calloc(n, sizeof(**sectionnew));
+
+	int i;
+	for (i=0; i<n; i++)
+	{
+	    (*sectionnew)[i] = iniparser_getsecname(config_opts, i);
+	}
+
+	*sectionchanged = *sectiondelete = NULL;
+    }
 
     return 0;
 }
