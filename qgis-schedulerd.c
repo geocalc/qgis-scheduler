@@ -298,6 +298,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
     switch (sig)
     {
     case SIGCHLD:	// fall through
+    case SIGHUP:	// fall through
     case SIGUSR1:	// fall through
     case SIGUSR2:	// fall through
     case SIGTERM:	// fall through
@@ -589,6 +590,7 @@ int main(int argc, char **argv)
 	action.sa_flags = stdactionflags;
 	sigemptyset(&action.sa_mask);
 	sigaddset(&action.sa_mask, SIGCHLD);
+	sigaddset(&action.sa_mask, SIGHUP);
 	sigaddset(&action.sa_mask, SIGUSR1);
 	sigaddset(&action.sa_mask, SIGUSR2);
 	sigaddset(&action.sa_mask, SIGTERM);
@@ -613,6 +615,12 @@ int main(int argc, char **argv)
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGQUIT, &action, NULL);
+	if (retval)
+	{
+	    logerror("error: can not install signal handler");
+	    exit(EXIT_FAILURE);
+	}
+	retval = sigaction(SIGHUP, &action, NULL);
 	if (retval)
 	{
 	    logerror("error: can not install signal handler");
@@ -769,6 +777,13 @@ int main(int argc, char **argv)
 			qgis_shutdown_wait_empty();
 
 			// TODO restore default signal handler over here not below
+			break;
+		    case SIGHUP:
+			/* hang up signal, reload configuration */
+			config_load(config_path, &sectionnew, &sectionchange, &sectiondelete);
+			free(sectionnew);
+			free(sectionchange);
+			free(sectiondelete);
 			break;
 		    case 0:
 			if (sigdata.is_shutdown)
