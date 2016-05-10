@@ -79,7 +79,7 @@ static void inotify_check_watchlist_for_watch(struct inotify_event *inotifyevent
 	    int retval = strcmp(inotifyevent->name, watchlist[i].filename);
 	    if (0 == retval)
 	    {
-		project_manager_inotify_configfile_changed(i);
+		project_manager_project_configfile_changed(i);
 	    }
 	}
     }

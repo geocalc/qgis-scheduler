@@ -207,7 +207,7 @@ static void project_manager_restart_processes(const char *proj_name)
 /* A configuration with this watch descriptor has changed. Get the project
  * belonging to this descriptor and restart the project.
  */
-void project_manager_inotify_configfile_changed(int wd)
+void project_manager_project_configfile_changed(int wd)
 {
     assert(wd >= 0);
 
