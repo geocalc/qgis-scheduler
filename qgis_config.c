@@ -374,10 +374,10 @@ static int iniparser_load_with_include(const char *configpath)
 /* Read the configuration files with one include value.
  * If the first configuration file has an entry "include" in the global section
  * (section without a name, i.e. key ":include") it reads the given
- * configuration file(s), too.
- * The include may contain wildcards (like "/etc/config/ *.conf" or even
- * "/etc/ *qgis/ *.conf".
- * The included file may contain a global section, which is being ignored. This
+ * configuration file(s), too. */
+// The include may contain wildcards (like "/etc/config/*.conf" or even
+// "/etc/*qgis/*.conf".
+/* The included file may contain a global section, which is being ignored. This
  * includes any further include values as well. So there can only one include
  * value be set.
  * The included configuration sections are written to a temporary file, which
