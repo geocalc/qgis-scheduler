@@ -398,6 +398,63 @@ static int iniparser_load_with_include(const char *configpath)
 }
 
 
+/* tests for differences in "section" of both dictionaries
+ * return 0 if equal, 1 otherwise
+ */
+static int config_test_for_section_change(dictionary *oldconfig, dictionary *newconfig, char *section)
+{
+    const int n = iniparser_getsecnkeys(oldconfig, section);
+    int i = iniparser_getsecnkeys(newconfig, section);
+    if (n != i)
+	// different count of keys in configs
+	return 1;
+
+    /* section count equals in both dictionaries.
+     * check for differences in key names or key values.
+     */
+    int k;
+    char **oldkeys = iniparser_getseckeys(oldconfig, section);
+    char **newkeys = iniparser_getseckeys(newconfig, section);
+    for (i=0; i<n; i++)
+    {
+	const char *oldkey = oldkeys[i];
+	/* try to find equal key in new keys */
+	const char *newkey = NULL;
+	for (k=0; k<n; k++)
+	{
+	    if (! strcmp(oldkey, newkeys[k]))
+	    {
+		// keys are equal
+		newkey = newkeys[k];
+		break;
+	    }
+	}
+
+	if (newkey)
+	{
+	    /* keys are equal. values as well? */
+	    const char *oldvalue = iniparser_getstring(oldconfig, oldkey, "");
+	    const char *newvalue = iniparser_getstring(newconfig, newkey, "");
+	    if (strcmp(oldvalue, newvalue))
+		// values differ
+		return 1;
+	}
+	else
+	{
+	    /* found no equal key in new config?
+	     * configs differ, return 1
+	     */
+	    debug(1, "did not find key '%s' in new dictionary. dictionaries differ", oldkey);
+	    return 1;
+	}
+    }
+    free(oldkeys);
+    free(newkeys);
+
+    return 0;
+}
+
+
 /* =======================================================
  * public API
  */
