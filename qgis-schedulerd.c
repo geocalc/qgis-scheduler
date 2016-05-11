@@ -389,9 +389,9 @@ int main(int argc, char **argv)
 	logerror("can not load config file");
 	exit(EXIT_FAILURE);
     }
-    free(sectionnew);
-    free(sectionchange);
-    free(sectiondelete);
+    config_delete_section_change_list(sectionnew);
+    config_delete_section_change_list(sectionchange);
+    config_delete_section_change_list(sectiondelete);
 
 
     logger_init();
@@ -795,9 +795,9 @@ int main(int argc, char **argv)
 			/* hang up signal, reload configuration */
 			printlog("received SIGHUP, reloading configuration");
 			config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
-			free(sectionnew);
-			free(sectionchange);
-			free(sectiondelete);
+			config_delete_section_change_list(sectionnew);
+			config_delete_section_change_list(sectionchange);
+			config_delete_section_change_list(sectiondelete);
 			break;
 		    case 0:
 			if (sigdata.is_shutdown)

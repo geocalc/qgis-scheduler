@@ -106,6 +106,15 @@
 #define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
 
 
+#define STAILQ_APPEND_LIST_ENTRY(listpointer, elm, field)	\
+    do {	\
+	if (STAILQ_EMPTY(&(listpointer)->head))	\
+	    STAILQ_INSERT_HEAD(&(listpointer)->head, elm, field);	\
+	else	\
+	    STAILQ_INSERT_TAIL(&(listpointer)->head, elm, field);	\
+    } while(0)
+
+
 struct sectionlist_s
 {
     STAILQ_HEAD(listhead, sectioniterator_s) head;	/* Linked list head */
@@ -528,9 +537,17 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    if (retval)
 	    {
 		/* section differs from old to new config.
-		 * restart project
 		 */
-#warning code fehlt
+		debug(1, "config differ section '%s' changed", secname);
+		struct sectioniterator_s *element = malloc(sizeof(*element));
+		assert(element);
+		if ( !element )
+		{
+		    logerror("could not allocate memory");
+		    exit(EXIT_FAILURE);
+		}
+		element->section = strdup(secname);
+		STAILQ_APPEND_LIST_ENTRY(sectionchanged, element, entries);
 	    }
 	}
 	else
@@ -538,7 +555,16 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    /* section exist in old config only.
 	     * shutdown project.
 	     */
-#warning code fehlt
+	    debug(1, "config differ section '%s' deleted", secname);
+	    struct sectioniterator_s *element = malloc(sizeof(*element));
+	    assert(element);
+	    if ( !element )
+	    {
+		logerror("could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    element->section = strdup(secname);
+	    STAILQ_APPEND_LIST_ENTRY(sectiondelete, element, entries);
 	}
     }
 
@@ -566,7 +592,16 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    /* section exist in new config only.
 	     * startup project.
 	     */
-#warning code fehlt
+	    debug(1, "config differ section '%s' new", secname);
+	    struct sectioniterator_s *element = malloc(sizeof(*element));
+	    assert(element);
+	    if ( !element )
+	    {
+		logerror("could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    element->section = strdup(secname);
+	    STAILQ_APPEND_LIST_ENTRY(sectionnew, element, entries);
 	}
     }
 
@@ -696,7 +731,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 		int i;
 		for (i=0; i<n; i++)
 		{
-		    (*sectionnew)[i] = iniparser_getsecname(config_opts, i);
+		    (*sectionnew)[i] = strdup(iniparser_getsecname(config_opts, i));
 		}
 
 		*sectionchanged = *sectiondelete = NULL;
