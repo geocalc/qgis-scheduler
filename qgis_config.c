@@ -43,6 +43,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <sys/queue.h>
 
 #include "logger.h"
 
@@ -103,6 +104,17 @@
 #define DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC	10
 #define DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC	0
 
+
+struct sectionlist_s
+{
+    STAILQ_HEAD(listhead, sectioniterator_s) head;	/* Linked list head */
+};
+
+struct sectioniterator_s
+{
+    STAILQ_ENTRY(sectioniterator_s) entries;          /* Linked list prev./next entry */
+    char *section;
+};
 
 
 
@@ -450,6 +462,94 @@ static int config_test_for_section_change(dictionary *oldconfig, dictionary *new
     }
     free(oldkeys);
     free(newkeys);
+
+    return 0;
+}
+
+
+/* Scans the configuration (global and projects) for differences to the
+ * existing configuration.
+ * If global variables differ, then all projects are reloaded.
+ * If a project specific variable changed only that project is reloaded.
+ *
+ * return 0 if config does not differ, 1 otherwise
+ */
+static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, struct sectionlist_s *sectionnew, struct sectionlist_s *sectionchanged, struct sectionlist_s *sectiondelete)
+{
+    int retval;
+    /* check the globals */
+    /* TODO: test known values for changes and react specific upon changes.
+     *       If "min_proc" or "max_proc" change then start or shutdown
+     *       individual processes.
+     *       If "process" changed, then restart all processes. If "envkey"
+     *       or "envvalue" changed as well.
+     */
+
+    /* check the projects */
+    /* scan all old projects if the still exist in the new config.
+     * if not then shutdown the old project.
+     * if its configuration has changed reload the project.
+     */
+    int n = iniparser_getnsec(oldconfig);
+    int i;
+    for (i=0; i<n; i++)
+    {
+	char *secname = iniparser_getsecname(oldconfig, i);
+	/* test if section exists in the new config.
+	 * NOTE: iniparser_find_entry() expects the section name to contain the
+	 *       name only (like "rwe") with no colon appended.
+	 */
+	retval = iniparser_find_entry(newconfig, secname);
+	if (retval)
+	{
+	    /* section exist in old and new config.
+	     * test for differences.
+	     */
+	    retval = config_test_for_section_change(oldconfig, newconfig, secname);
+	    if (retval)
+	    {
+		/* section differs from old to new config.
+		 * restart project
+		 */
+#warning code fehlt
+	    }
+	}
+	else
+	{
+	    /* section exist in old config only.
+	     * shutdown project.
+	     */
+#warning code fehlt
+	}
+    }
+
+    /* scan the new config if it contains a new section.
+     * if it does startup a new project
+     */
+    n = iniparser_getnsec(newconfig);
+    for (i=0; i<n; i++)
+    {
+	const char *secname = iniparser_getsecname(newconfig, i);
+	/* test if section exists in the old config.
+	 * NOTE: iniparser_find_entry() expects the section name to contain the
+	 *       name only (like "rwe") with no colon appended.
+	 */
+	retval = iniparser_find_entry(oldconfig, secname);
+	if (retval)
+	{
+	    /* section exist in old and new config.
+	     * has been handled before, no action needed.
+	     */
+	    ;
+	}
+	else
+	{
+	    /* section exist in new config only.
+	     * startup project.
+	     */
+#warning code fehlt
+	}
+    }
 
     return 0;
 }
