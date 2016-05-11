@@ -369,8 +369,21 @@ int main(int argc, char **argv)
     test_set_valid_clock_id();
     statistic_init();
 
+    /* convert relative path given to an absolute path */
+    char *configuration_path = realpath(config_path, NULL);
+    if (configuration_path)
+    {
+	config_path = configuration_path;
+    }
+    else
+    {
+	logerror("can not canonicalize path '%s'", config_path);
+	exit(EXIT_FAILURE);
+    }
+
+
     char **sectionnew, **sectionchange, **sectiondelete;
-    int retval = config_load(config_path, &sectionnew, &sectionchange, &sectiondelete);
+    int retval = config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
     if (retval)
     {
 	logerror("can not load config file");
@@ -780,7 +793,8 @@ int main(int argc, char **argv)
 			break;
 		    case SIGHUP:
 			/* hang up signal, reload configuration */
-			config_load(config_path, &sectionnew, &sectionchange, &sectiondelete);
+			printlog("received SIGHUP, reloading configuration");
+			config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
 			free(sectionnew);
 			free(sectionchange);
 			free(sectiondelete);
@@ -887,6 +901,8 @@ int main(int argc, char **argv)
     close(signalpipe_rd);
     close(signalpipe_wr);
     signalpipe_rd = signalpipe_wr = -1;
+    /* delete remaining memory */
+    free(configuration_path);
 
     printlog("shut down %s", basename(argv[0]));
 
