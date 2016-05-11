@@ -555,6 +555,38 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 }
 
 
+/* take a single linked list and converts it to an array of string pointers.
+ * the content of "list" is deleted during the call, the head of "list" is not.
+ * returns the array in "*array", the array is NULL terminated.
+ */
+static void config_convert_list_to_array(char ***array, struct sectionlist_s *list)
+{
+    assert(array);
+    assert(list);
+
+    int n = 0;
+    struct sectioniterator_s *it;
+    STAILQ_FOREACH(it, &list->head, entries)
+    {
+	n++;
+    }
+
+    *array = calloc(n+1, sizeof(**array)); // last entry is NULL terminator
+    int i = 0;
+    while( !STAILQ_EMPTY(&list->head) )
+    {
+	assert(i < n);
+	it = STAILQ_FIRST(&list->head);
+	(*array)[i] = it->section;
+
+	STAILQ_REMOVE_HEAD(&list->head, entries);
+	free(it);
+    }
+
+}
+
+
+
 /* =======================================================
  * public API
  */
