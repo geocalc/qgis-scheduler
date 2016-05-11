@@ -135,7 +135,7 @@ enum db_select_statement_id
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
     DB_GET_LIST_FROM_PROCESS,
     DB_GET_PROCESS_SOCKET_FROM_PROCESS,
-    DB_GET_PROJECT_FROM_WATCHID,
+    DB_GET_PROJECT_FROM_INOTIFYID,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
 
@@ -148,7 +148,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_ID_NULL
 	"",
 	// DB_SELECT_CREATE_PROJECT_TABLE
-	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyfd INTEGER, nr_crashs INTEGER DEFAULT 0)",
+	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyid INTEGER, nr_crashs INTEGER DEFAULT 0)",
 	// DB_SELECT_CREATE_PROCESS_TABLE
 	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
 	    "list INTEGER NOT NULL, state INTEGER NOT NULL, "
@@ -159,7 +159,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
-	"INSERT INTO projects (name, configpath, configbasename, inotifyfd) VALUES (%s,%s,%s,%i)",
+	"INSERT INTO projects (name, configpath, configbasename, inotifyid) VALUES (%s,%s,%s,%i)",
 	// DB_INSERT_PROCESS_DATA
 	"INSERT INTO processes (projectname, list, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
@@ -206,7 +206,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_PROCESS_SOCKET_FROM_PROCESS
 	"SELECT process_socket_fd FROM processes WHERE pid = %d",
 	// DB_GET_PROJECT_FROM_WATCHID
-	"SELECT name FROM projects WHERE inotifyfd = %d",
+	"SELECT name FROM projects WHERE inotifyid = %d",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects",
 	// DB_DUMP_PROCESS
@@ -799,7 +799,7 @@ void db_delete(void)
 }
 
 
-void db_add_project(const char *projname, const char *configpath, int inotifyfd)
+void db_add_project(const char *projname, const char *configpath, int inotifyid)
 {
     assert(projname);
     assert(configpath);
@@ -814,7 +814,7 @@ void db_add_project(const char *projname, const char *configpath, int inotifyfd)
 	exit(EXIT_FAILURE);
     }
 
-    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyfd);
+    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyid);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)
@@ -2172,11 +2172,11 @@ void db_reset_startup_failures(const char *projname)
 }
 
 
-char *db_get_project_for_watchid(int watchid)
+char *db_get_project_for_inotifyid(int inotifyid)
 {
-    assert(watchid >= 0);
+    assert(inotifyid >= 0);
 
-    int get_project_for_watchid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    int get_project_for_inotifyid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	const char **val = data;
 
@@ -2199,7 +2199,7 @@ char *db_get_project_for_watchid(int watchid)
 	exit(EXIT_FAILURE);
     }
 
-    db_select_parameter_callback(DB_GET_PROJECT_FROM_WATCHID, get_project_for_watchid, &ret, watchid);
+    db_select_parameter_callback(DB_GET_PROJECT_FROM_INOTIFYID, get_project_for_inotifyid, &ret, inotifyid);
 
     retval = pthread_mutex_unlock(&db_lock);
     if (retval)

@@ -207,11 +207,11 @@ static void project_manager_restart_processes(const char *proj_name)
 /* A configuration with this watch descriptor has changed. Get the project
  * belonging to this descriptor and restart the project.
  */
-void project_manager_project_configfile_changed(int wd)
+void project_manager_project_configfile_changed(int inotifyid)
 {
-    assert(wd >= 0);
+    assert(inotifyid >= 0);
 
-    char *projname = db_get_project_for_watchid(wd);
+    char *projname = db_get_project_for_inotifyid(inotifyid);
     if (projname)
     {
 	printlog("Project '%s' config change. Restart processes", projname);
@@ -219,7 +219,7 @@ void project_manager_project_configfile_changed(int wd)
     }
     else
     {
-	printlog("error: got config change request for watch id %d but no project responsible?", wd);
+	printlog("error: got config change request for inotify id %d but no project responsible?", inotifyid);
 	exit(EXIT_FAILURE);
     }
     free(projname);

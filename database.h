@@ -126,7 +126,7 @@ void db_inc_startup_failures(const char *projname);
 int db_get_startup_failures(const char *projname);
 void db_reset_startup_failures(const char *projname);
 
-char *db_get_project_for_watchid(int watchid);
+char *db_get_project_for_inotifyid(int watchid);
 void db_dump(void);
 
 
