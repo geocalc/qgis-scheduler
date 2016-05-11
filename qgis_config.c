@@ -1577,7 +1577,18 @@ clockid_t get_valid_clock_id(void)
 }
 
 
-
+/* delete the array of string pointers returned by config_load()
+ */
+void config_delete_section_change_list(char **array)
+{
+    char **aptr = array;
+    char *chrptr;
+    while ((chrptr = *aptr++))
+    {
+	free(chrptr);
+    }
+    free(array);
+}
 
 
 

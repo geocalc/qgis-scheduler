@@ -68,5 +68,6 @@ void test_set_valid_clock_id(void);
 void set_valid_clock_id(clockid_t clk_id);
 clockid_t get_valid_clock_id(void);
 
+void config_delete_section_change_list(char **array);
 
 #endif /* QGIS_CONFIG_H_ */
