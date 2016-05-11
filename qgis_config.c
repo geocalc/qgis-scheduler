@@ -1581,13 +1581,16 @@ clockid_t get_valid_clock_id(void)
  */
 void config_delete_section_change_list(char **array)
 {
-    char **aptr = array;
-    char *chrptr;
-    while ((chrptr = *aptr++))
+    if (array)
     {
-	free(chrptr);
+	char **aptr = array;
+	char *chrptr;
+	while ((chrptr = *aptr++))
+	{
+	    free(chrptr);
+	}
+	free(array);
     }
-    free(array);
 }
 
 
