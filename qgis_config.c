@@ -553,7 +553,6 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	else
 	{
 	    /* section exist in old config only.
-	     * shutdown project.
 	     */
 	    debug(1, "config differ section '%s' deleted", secname);
 	    struct sectioniterator_s *element = malloc(sizeof(*element));
@@ -590,7 +589,6 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	else
 	{
 	    /* section exist in new config only.
-	     * startup project.
 	     */
 	    debug(1, "config differ section '%s' new", secname);
 	    struct sectioniterator_s *element = malloc(sizeof(*element));
@@ -656,8 +654,8 @@ static void config_convert_list_to_array(char ***array, struct sectionlist_s *li
  * value be set.
  * The included configuration sections are written to a temporary file, which
  * in turn is read in a final pass from the "iniparser" library.
- */
-/* Rereads a new config file with includes if being called a second time.
+ *
+ * Rereads a new config file with includes if being called a second time.
  * Scans the configuration (global and projects) for differences to the
  * existing configuration.
  * If global variables differ, then all projects are reloaded.
