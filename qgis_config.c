@@ -272,11 +272,11 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
     switch (retval)
     {
     case GLOB_ABORTED:
-	printlog("WARNING: file globbing aborted for include '%s'", includepattern);
+	printlog("WARNING: file globbing aborted for configuration include '%s'", includepattern);
 	break;
 
     case GLOB_NOMATCH:
-	printlog("WARNING: no file found for include '%s'", includepattern);
+	printlog("WARNING: no file found for configuration include '%s'", includepattern);
 	break;
 
     case GLOB_NOSPACE:
