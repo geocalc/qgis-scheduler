@@ -125,19 +125,7 @@ static int debuglevel = DEFAULT_CONFIG_DEBUGLEVEL; // cache debuglevel, so we do
 /* Copy content of s1 and s2 into a new allocated string.
  * You have to free() the resulting string yourself.
  */
-static char *astrcat(const char *s1, const char *s2)
-{
-    assert(s1);
-    assert(s2);
-    int len1 = strlen(s1);
-    int len2 = strlen(s2);
-
-    char *astr = malloc(len1+len2+1);
-    strcpy(astr, s1);
-    strcat(astr, s2);
-
-    return astr;
-}
+#define astrcat(s1,s2)	anstrcat(2,s1,s2)
 
 
 /* Copy content of s1, s2, ... into a new allocated string.
