@@ -44,6 +44,7 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <sys/queue.h>
+#include <libgen.h>
 
 #include "logger.h"
 
@@ -323,20 +324,25 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
 }
 
 
-static int iniparser_load_with_include(const char *configpath)
+/* load the configuration file specified with "configpath" and all config files
+ * specified in the main config file with "include=" setting.
+ * returnes the new configuration.
+ */
+static dictionary *iniparser_load_with_include(const char *configpath)
 {
     int retval;
+    dictionary *config;
 
     assert(configpath);
     /* read in config file */
-    config_opts = iniparser_load(configpath);
-    if (config_opts)
+    config = iniparser_load(configpath);
+    if (config)
     {
 	/* make a first attempt to get the configured debug level, second is in config_load() */
-	debuglevel = iniparser_getint(config_opts, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
+	debuglevel = iniparser_getint(config, CONFIG_DEBUGLEVEL, DEFAULT_CONFIG_DEBUGLEVEL);
 
 	/* test configuration for include setting */
-	const char *includepathpattern = iniparser_getstring(config_opts, CONFIG_INCLUDE, DEFAULT_CONFIG_INCLUDE);
+	const char *includepathpattern = iniparser_getstring(config, CONFIG_INCLUDE, DEFAULT_CONFIG_INCLUDE);
 	if (DEFAULT_CONFIG_INCLUDE != includepathpattern)
 	{
 	    /* got include setting.
@@ -374,7 +380,21 @@ static int iniparser_load_with_include(const char *configpath)
 	    /* copy included configuration files sections only to the temporary
 	     * file.
 	     */
-	    retval = glob_find_file(tmpf, includepathpattern);
+	    if ('/' == *includepathpattern)
+	    {
+		// absolute path
+		retval = glob_find_file(tmpf, includepathpattern);
+	    }
+	    else
+	    {
+		// relative path
+		char *pathcopy = strdup(configpath);
+		char *dir = dirname(pathcopy);
+		char *abspathpattern = anstrcat(3, dir, "/", includepathpattern);
+		retval = glob_find_file(tmpf, abspathpattern);
+		free(abspathpattern);
+		free(pathcopy);
+	    }
 
 	    retval = fclose(tmpf);
 	    if (EOF == retval)
@@ -383,9 +403,9 @@ static int iniparser_load_with_include(const char *configpath)
 		exit(EXIT_FAILURE);
 	    }
 
-	    iniparser_freedict(config_opts);
-	    config_opts = iniparser_load(tmpfilename);
-	    if (config_opts)
+	    iniparser_freedict(config);
+	    config = iniparser_load(tmpfilename);
+	    if (config)
 	    {
 		retval = unlink(tmpfilename);
 		if (-1 == retval)
@@ -400,13 +420,12 @@ static int iniparser_load_with_include(const char *configpath)
     }
 
 
-    if (!config_opts)
+    if (!config)
     {
 	logerror("can not load configuration from '%s'", configpath);
-	return -1;
     }
 
-    return 0;
+    return config;
 }
 
 
@@ -609,7 +628,7 @@ static void config_convert_list_to_array(char ***array, struct sectionlist_s *li
  * If global variables differ, then all projects are reloaded.
  * If a project specific variable changed only that project is reloaded.
  * The sections which the caller need to act upon are returned in "sectionnew",
- * "sectionchanged" and "sectiondelete".
+ * "sectionchanged" and "sectiondelete". All arrays are NULL terminated.
  */
 int config_load(const char *path, char ***sectionnew, char ***sectionchanged, char ***sectiondelete)
 {
@@ -626,10 +645,63 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 	exit(EXIT_FAILURE);
     }
 
-    retval = iniparser_load_with_include(path);
-    if (-1 == retval)
+    /* load the config file(s) */
     {
-	logerror("WARNING could no load configuration file");
+	dictionary *newconfig = iniparser_load_with_include(path);
+	/* different handling if previously a configuration has been loaded:
+	 * if no previous config exists and this load attempt did not succeed exit with error.
+	 * if no previous config exists and this load has succeeded set the new config.
+	 * if a previous config exists and this load attempt did not succeed print a warning and continue.
+	 * if a previous config exists and this load has succeeded scan for differences and act upon.
+	 */
+	if (config_opts)
+	{
+	    if (NULL == newconfig)
+	    {
+		logerror("WARNING could not load configuration file '%s'", path);
+		*sectionnew = *sectionchanged = *sectiondelete = NULL;
+	    }
+	    else
+	    {
+		struct sectionlist_s listnew, listchanged, listdelete;
+		STAILQ_INIT(&listnew.head);
+		STAILQ_INIT(&listchanged.head);
+		STAILQ_INIT(&listdelete.head);
+
+		config_has_changed(config_opts, newconfig, &listnew, &listchanged, &listdelete);
+		iniparser_freedict(config_opts);
+		config_opts = newconfig;
+
+		config_convert_list_to_array(sectionnew, &listnew);
+		config_convert_list_to_array(sectionchanged, &listchanged);
+		config_convert_list_to_array(sectiondelete, &listdelete);
+	    }
+
+	}
+	else
+	{
+	    if (NULL == newconfig)
+	    {
+		logerror("ERROR could not load configuration file '%s'", path);
+		exit(EXIT_FAILURE);
+	    }
+	    else
+	    {
+		config_opts = newconfig;
+
+		const int n = iniparser_getnsec(config_opts);
+
+		*sectionnew = calloc(n+1, sizeof(**sectionnew));
+
+		int i;
+		for (i=0; i<n; i++)
+		{
+		    (*sectionnew)[i] = iniparser_getsecname(config_opts, i);
+		}
+
+		*sectionchanged = *sectiondelete = NULL;
+	    }
+	}
     }
 
     /* make a second attempt to get the configured debug level, first is in iniparser_load_with_include() */
@@ -645,19 +717,6 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
     if (!config_opts)
 	return -1;
 
-    {
-	const int n = iniparser_getnsec(config_opts);
-
-	*sectionnew = calloc(n, sizeof(**sectionnew));
-
-	int i;
-	for (i=0; i<n; i++)
-	{
-	    (*sectionnew)[i] = iniparser_getsecname(config_opts, i);
-	}
-
-	*sectionchanged = *sectiondelete = NULL;
-    }
 
     return 0;
 }
