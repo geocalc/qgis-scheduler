@@ -850,6 +850,12 @@ void process_manager_process_died(void)
 			    {
 				process_manager_start_new_process_detached(1, projname, 0);
 			    }
+			    else
+			    {
+				printlog("warning: max number (%d) of startup failures in project %s reached."
+					" Stoppped creating new processes until new qgis configuration file is set",
+					max_nr_process_crashes, projname);
+			    }
 			    free(projname);
 			}
 			else
