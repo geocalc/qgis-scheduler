@@ -547,25 +547,53 @@ int main(int argc, char **argv)
     }
 
 
-    if ( !no_daemon )
+    /* we need to exit the program before calling daemon() with
+     * exit(EXIT_FAILURE) if we can not write to the pid file. So the init
+     * script gets a failure return value and is able to show it to the user.
+     *
+     * But we need to write the pid value _after_ calling daemon(), so the pid
+     * contains the real pid value.
+     *
+     * Combine both we need to open the pid file before calling daemon() and
+     * write to the file after calling daemon().
+     */
+
     {
-	retval = daemon(daemon_no_change_dir,daemon_no_close_streams);
-	if (retval)
+	FILE *pidfile = NULL;
+	const char *pidpath = config_get_pid_path();
+	if (pidpath)
 	{
-	    logerror("error: can not become daemon");
-	    exit(EXIT_FAILURE);
+	    // TODO try to create a path in basename(pidfile) with root permissions?
+	    pidfile = fopen(pidpath, "w");
+	    if (NULL == pidfile)
+	    {
+		logerror("error: can not open pidfile '%s': ", pidpath);
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+	if ( !no_daemon )
+	{
+	    retval = daemon(daemon_no_change_dir,daemon_no_close_streams);
+	    if (retval)
+	    {
+		logerror("error: can not become daemon");
+		exit(EXIT_FAILURE);
+	    }
+
+	}
+
+	if (pidpath)
+	{
+	    pid_t pid = getpid();
+	    retval = fprintf(pidfile, "%d", pid);
+	    if (0 > retval)
+	    {
+		logerror("error: can not write to pidfile '%s': ", pidpath);
+	    }
+	    fclose(pidfile);
 	}
     }
-
-
-    {
-	const char *pidfile = config_get_pid_path();
-	if (pidfile)
-	{
-	    write_pid_file(pidfile);
-	}
-    }
-
 
     /* prepare the signal reception.
      * This way we can start a new child if one has exited on its own,
