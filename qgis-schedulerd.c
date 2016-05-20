@@ -389,9 +389,6 @@ int main(int argc, char **argv)
 	logerror("can not load config file");
 	exit(EXIT_FAILURE);
     }
-    config_delete_section_change_list(sectionnew);
-    config_delete_section_change_list(sectionchange);
-    config_delete_section_change_list(sectiondelete);
 
 
     logger_init();
@@ -691,7 +688,11 @@ int main(int argc, char **argv)
     qgis_shutdown_init(signalpipe_wr);
 
     /* start the child processes */
-    project_manager_startup_projects();
+//    project_manager_startup_projects();
+    project_manager_manage_project_changes((const char **)sectionnew, (const char **)sectionchange, (const char **)sectiondelete);
+    config_delete_section_change_list(sectionnew);
+    config_delete_section_change_list(sectionchange);
+    config_delete_section_change_list(sectiondelete);
 
 
 
@@ -818,10 +819,12 @@ int main(int argc, char **argv)
 			/* hang up signal, reload configuration */
 			printlog("received SIGHUP, reloading configuration");
 			config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
+			project_manager_manage_project_changes((const char **)sectionnew, (const char **)sectionchange, (const char **)sectiondelete);
 			config_delete_section_change_list(sectionnew);
 			config_delete_section_change_list(sectionchange);
 			config_delete_section_change_list(sectiondelete);
 			break;
+
 		    case 0:
 			if (sigdata.is_shutdown)
 			{
