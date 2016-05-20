@@ -87,6 +87,7 @@ void db_delete(void);
 void db_add_project(const char *projname, const char *configpath, int inotifyfd);
 int db_get_names_project(char ***projname, int *len);
 void db_free_names_project(char **projname, int len);
+void db_remove_project(const char *projname);
 
 void db_add_process(const char *projname, pid_t pid, int process_socket_fd);
 int db_get_num_idle_process(const char *projname);
@@ -126,7 +127,14 @@ void db_inc_startup_failures(const char *projname);
 int db_get_startup_failures(const char *projname);
 void db_reset_startup_failures(const char *projname);
 
-char *db_get_project_for_inotifyid(int watchid);
+int db_add_new_inotifyid(const char *path, int watchd);
+void db_remove_inotifyid(int inotifyid);
+int db_get_num_of_similar_watches_for_inotifyid(int inotifyid);
+void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd);
+int db_get_watchd_for_inotifyid(int inotifyid);
+char *db_get_project_for_inotifyid(int inotifyid);
+int db_get_inotifyid_for_project(const char *projectname);
+
 void db_dump(void);
 
 

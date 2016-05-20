@@ -105,14 +105,34 @@ static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t idle_process_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
+/* This is a serial type analogue to the INTEGER PRIMARY KEY NOT NULL.
+ * Normally this serial is better handled by the database engine.
+ * But in the table inotify we need to insert a dataset and return the index
+ * to the caller. But we can not INSERT new data and SELECT the data within one
+ * single statement. So if we already have two data rows with the same data
+ * only distinguished by the inotifyid being different we can not get the
+ * correct inotifyid. Because we don't know on the inotifyid which one has been
+ * added at last.
+ * Thus we create the inotifyid from an external serial type
+ * (db_inotifyid_serial) and provide this value to both the table row INSERT
+ * statement and the caller as well.
+ *
+ * caution: this value shall only be read and incremented within the protection
+ *          of "db_lock".
+ */
+int db_inotifyid_serial = 0;
+
+
 enum db_select_statement_id
 {
     DB_SELECT_ID_NULL = 0,
     // from this id on we can use prepared statements
     DB_SELECT_CREATE_PROJECT_TABLE,
     DB_SELECT_CREATE_PROCESS_TABLE,
+    DB_SELECT_CREATE_INOTIFY_TABLE,
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
+    DB_DELETE_PROJECT_DATA,
     DB_INSERT_PROCESS_DATA,
     DB_UPDATE_PROCESS_STATE,
     DB_GET_PROCESS_STATE,
@@ -135,9 +155,17 @@ enum db_select_statement_id
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
     DB_GET_LIST_FROM_PROCESS,
     DB_GET_PROCESS_SOCKET_FROM_PROCESS,
+    DB_ADD_NEW_INOTIFYID,
+    DB_DELETE_INOTIFYID,
+    DB_GET_NUM_SIMILAR_WATCHES,
+    DB_GET_INOTIFYID_FROM_WATCHD,
+    DB_GET_WATCHD_FROM_INOTIFYID,
     DB_GET_PROJECT_FROM_INOTIFYID,
+    DB_GET_INOTIFYID_FROM_PROJECT,
+    DB_GET_UNUSED_INOTIFYID,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
+    DB_DUMP_INOTIFY,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -156,10 +184,14 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	    "process_socket_fd INTEGER UNIQ NOT NULL, client_socket_fd INTEGER DEFAULT -1, "
 	    "starttime_sec INTEGER DEFAULT 0, starttime_nsec INTEGER DEFAULT 0, "
 	    "signaltime_sec INTEGER DEFAULT 0, signaltime_nsec INTEGER DEFAULT 0 )",
+	// DB_SELECT_CREATE_INOTIFY_TABLE
+	"CREATE TABLE inotify ("/*"projectname TEXT REFERENCES projects (name),"*/" configpath TEXT NOT NULL, inotifyid INTEGER UNIQ NOT NULL, watchd INTEGER NOT NULL)",
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
 	"INSERT INTO projects (name, configpath, configbasename, inotifyid) VALUES (%s,%s,%s,%i)",
+	// DB_DELETE_PROJECT_DATA
+	"DELETE FROM projects WHERE name = %s",
 	// DB_INSERT_PROCESS_DATA
 	"INSERT INTO processes (projectname, list, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
@@ -205,13 +237,28 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT list FROM processes WHERE pid = %d",
 	// DB_GET_PROCESS_SOCKET_FROM_PROCESS
 	"SELECT process_socket_fd FROM processes WHERE pid = %d",
-	// DB_GET_PROJECT_FROM_WATCHID
+	// DB_ADD_NEW_INOTIFYID
+	"INSERT INTO inotify (configpath, inotifyid, watchd) VALUES (%s,%i,%i)",
+	// DB_DELETE_INOTIFYID
+	"DELETE FROM inotify WHERE inotifyid = %i",
+	// DB_GET_NUM_SIMILAR_WATCHES
+	"SELECT count(inotifyid) FROM inotify WHERE watchd = (SELECT watchd FROM inotify WHERE inotifyid = %d)",
+	// DB_GET_INOTIFYID_FROM_WATCHD
+	"SELECT inotifyid FROM inotify WHERE watchd = %i",
+	// DB_GET_WATCHD_FROM_INOTIFYID
+	"SELECT watchd FROM inotify WHERE inotifyid = %i",
+	// DB_GET_PROJECT_FROM_INOTIFYID
 	"SELECT name FROM projects WHERE inotifyid = %d",
+	// DB_GET_INOTIFYID_FROM_PROJECT
+	"SELECT inotifyid FROM projects WHERE name = %s",
+	// DB_GET_UNUSED_INOTIFYID
+	"SELECT min(inotifyid+1) FROM (SELECT 0 AS inotifyid UNION ALL SELECT MIN(inotifyid + 1) FROM inotify) AS T1 WHERE inotifyid+1 NOT IN (SELECT inotifyid FROM inotify)",
 	// DB_DUMP_PROJECT
-	"SELECT * FROM projects",
+	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
-	"SELECT * FROM processes",
-
+	"SELECT * FROM processes ORDER BY projectname ASC, pid ASC",
+	// DB_DUMP_INOTIFY
+	"SELECT * FROM inotify ORDER BY inotifyid ASC",
 
 };
 
@@ -770,6 +817,8 @@ void db_init(void)
 
     db_select_parameter(DB_SELECT_CREATE_PROCESS_TABLE);
 
+    db_select_parameter(DB_SELECT_CREATE_INOTIFY_TABLE);
+
     /* prepare further statements */
 //    db_statements_prepare();
 }
@@ -929,6 +978,31 @@ void db_free_names_project(char **projname, int len)
 	free(projname[i]);
     }
     free(projname);
+}
+
+
+void db_remove_project(const char *projname)
+{
+    assert(projname);
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter(DB_DELETE_PROJECT_DATA, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
 }
 
 
@@ -2172,6 +2246,246 @@ void db_reset_startup_failures(const char *projname)
 }
 
 
+int db_add_new_inotifyid(const char *path, int watchd)
+{
+    assert(path);
+
+    int get_free_inotifyid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_NULL == type[0] || SQLITE_INTEGER == type[0]);
+
+	*val = results[0].integer;
+	debug(1, "returned value %d", *val);
+
+	return 0;
+    }
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int inotifyid = -1;
+
+    db_select_parameter_callback(DB_GET_UNUSED_INOTIFYID, get_free_inotifyid, &inotifyid);
+
+    if (0 > inotifyid)
+    {
+	printlog("error: can not set uniq id for inotify handler (%d)", inotifyid);
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter(DB_ADD_NEW_INOTIFYID, path, inotifyid, watchd);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return inotifyid;
+}
+
+
+void db_remove_inotifyid(int inotifyid)
+{
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter(DB_DELETE_INOTIFYID, inotifyid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+}
+
+
+int db_get_num_of_similar_watches_for_inotifyid(int inotifyid)
+{
+    int get_num_similar_watches(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *num = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*num = results[0].integer;
+
+	return 0;
+    }
+
+    int num_list = 0;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_NUM_SIMILAR_WATCHES, get_num_similar_watches, &num_list, inotifyid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %d", num_list);
+
+    return num_list;
+}
+
+
+int db_get_watchd_for_inotifyid(int inotifyid)
+{
+    int get_watchd(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *num = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*num = results[0].integer;
+
+	return 0;
+    }
+
+    int num_list = 0;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_NUM_SIMILAR_WATCHES, get_watchd, &num_list, inotifyid);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %d", num_list);
+
+    return num_list;
+}
+
+
+void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd)
+{
+    assert(inotifyidlist);
+    assert(len);
+
+    struct inotifylist_s
+    {
+	STAILQ_HEAD(listhead, inotifyiterator_s) head;	/* Linked list head */
+    };
+
+    struct inotifyiterator_s
+    {
+        STAILQ_ENTRY(inotifyiterator_s) entries;          /* Linked list prev./next entry */
+        int inotifyid;
+    };
+
+
+    int get_inotify_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct inotifylist_s *list = data;
+
+	struct inotifyiterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+	entry->inotifyid = results[0].integer;
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
+
+    struct inotifylist_s myinotifyidlist;
+    STAILQ_INIT(&myinotifyidlist.head);
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_INOTIFYID_FROM_WATCHD, get_inotify_list, &myinotifyidlist, watchd);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int num = 0;
+    struct inotifyiterator_s *it;
+    STAILQ_FOREACH(it, &myinotifyidlist.head, entries)
+    {
+	num++;
+    }
+    debug(1, "select found %d processes", num);
+
+    /* aquire the pointer array */
+    *len = num;
+    int *array = calloc(num, sizeof(*array));
+    *inotifyidlist = array;
+
+    num = 0;
+    while( !STAILQ_EMPTY(&myinotifyidlist.head) )
+    {
+	assert(num < *len);
+	it = STAILQ_FIRST(&myinotifyidlist.head);
+	array[num++] = it->inotifyid;
+
+	STAILQ_REMOVE_HEAD(&myinotifyidlist.head, entries);
+	free(it);
+    }
+}
+
+
 char *db_get_project_for_inotifyid(int inotifyid)
 {
     assert(inotifyid >= 0);
@@ -2210,6 +2524,49 @@ char *db_get_project_for_inotifyid(int inotifyid)
     }
 
     debug(1, "returned %s", ret);
+
+    return ret;
+}
+
+
+int db_get_inotifyid_for_project(const char *projectname)
+{
+    assert(projectname);
+
+    int get_project_for_inotifyid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*val = results[0].integer;
+	debug(1, "returned value %d", *val);
+
+	return 0;
+    }
+
+    int ret = -1;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_INOTIFYID_FROM_PROJECT, get_project_for_inotifyid, &ret, projectname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %d", ret);
 
     return ret;
 }
@@ -2325,6 +2682,13 @@ void db_dump(void)
     *data.buffer = '\0';	// empty string
     sql = db_select_statement[DB_DUMP_PROCESS];
     strnbcat(&data.buffer, &data.bufferlen, "PROCESSES:\n");
+    sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
+    printlog("%s", data.buffer);
+
+    data.has_printed_headline = 0;
+    *data.buffer = '\0';	// empty string
+    sql = db_select_statement[DB_DUMP_INOTIFY];
+    strnbcat(&data.buffer, &data.bufferlen, "INOTIFY:\n");
     sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
     printlog("%s", data.buffer);
 
