@@ -377,3 +377,26 @@ void project_manager_restart_project(const char *proj)
 }
 
 
+/* receives a set of projects being new or deleted or having changed.
+ * new projects are started according to their settings.
+ * deleted projects are shut down, i.e. the processes are killed from memory.
+ * changed projects are restarted, analog to being a deleted and new project in series.
+ */
+void project_manager_manage_project_changes(const char **newproj, const char **changedproj, const char **deletedproj)
+{
+    const char *proj;
+
+    if (deletedproj)
+	while ((proj = *deletedproj++))
+	    project_manager_shutdown_project(proj);
+
+    if (changedproj)
+	while ((proj = *changedproj++))
+	    project_manager_restart_project(proj);
+
+    if (newproj)
+	while ((proj = *newproj++))
+	    project_manager_start_project(proj);
+}
+
+
