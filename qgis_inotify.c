@@ -46,11 +46,12 @@
 #include <libgen.h>	// used for dirname(), we need glibc >= 2.2.1 !!
 
 #include "common.h"
+#include "database.h"
 #include "qgis_config.h"
 #include "logger.h"
 #include "project_manager.h"
 
-
+//#define OLD_STRUCT
 
 struct inotify_watch
 {
@@ -61,16 +62,19 @@ struct inotify_watch
 
 
 static int inotifyfd = -1;
+#ifdef OLD_STRUCT
 static struct inotify_watch *watchlist = NULL;
 static int watchlistlen = 0;
 static int lastusedwatch = 0;
+#endif
 static pthread_rwlock_t inotifyrwlock = PTHREAD_RWLOCK_INITIALIZER;
 static pthread_t inotifythread = -1;
 
 
-static void inotify_check_watchlist_for_watch(struct inotify_event *inotifyevent)
+static void inotify_check_watchlist_for_watch(const struct inotify_event *inotifyevent)
 {
     int i;
+#ifdef OLD_STRUCT
     int len = lastusedwatch; // make local copy of global variable just in case the variable changes
     for (i=0; i<len; i++)
     {
@@ -83,6 +87,16 @@ static void inotify_check_watchlist_for_watch(struct inotify_event *inotifyevent
 	    }
 	}
     }
+#else
+    int len;
+    int *list;
+    db_get_inotifyid_for_watchd(&list, &len, inotifyevent->wd);
+    for (i=0; i<len; i++)
+    {
+	project_manager_project_configfile_changed(list[i]);
+    }
+    free(list);
+#endif
 }
 
 
@@ -216,6 +230,7 @@ static void *inotify_thread_watch(void *arg)
 
 void qgis_inotify_init(void)
 {
+#ifdef OLD_STRUCT
     /* NOTE: if we handle configuration reload without restarting this program
      * we need to care for this allocation as well!
      */
@@ -226,6 +241,7 @@ void qgis_inotify_init(void)
 	logerror("calloc, can not get memory for inotify service");
 	exit(EXIT_FAILURE);
     }
+#endif
 
     int retval = inotify_init1(IN_CLOEXEC);
     if (-1 == retval)
@@ -249,6 +265,7 @@ void qgis_inotify_init(void)
 void qgis_inotify_delete(void)
 {
     int retval;
+#ifdef OLD_STRUCT
     int i;
     for (i=0; i<watchlistlen; i++)
     {
@@ -261,6 +278,7 @@ void qgis_inotify_delete(void)
 	}
 	free(watchlist[i].filename);
     }
+#endif
 
     retval = pthread_join(inotifythread, NULL);
     if (retval)
@@ -278,7 +296,9 @@ void qgis_inotify_delete(void)
 	// intentional no exit() call
     }
 
+#ifdef OLD_STRUCT
     free(watchlist);
+#endif
 }
 
 
@@ -348,7 +368,9 @@ int qgis_inotify_watch_file(const char *path)
 		 * directory. This case may expose some bugs though..
 		 */
 
+#ifdef OLD_STRUCT
 		assert(lastusedwatch < watchlistlen);
+#endif
 
 		char *directoryname = strdup(path);
 		assert(directoryname);
@@ -368,6 +390,7 @@ int qgis_inotify_watch_file(const char *path)
 		    exit(EXIT_FAILURE);
 		}
 
+#ifdef OLD_STRUCT
 		const char *configbasename = basename((char *)path);
 		watchlist[lastusedwatch].filename = strdup(configbasename);
 		if ( !watchlist[lastusedwatch].filename )
@@ -375,18 +398,24 @@ int qgis_inotify_watch_file(const char *path)
 		    logerror("could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
-
+#endif
+		/* NOTE: if we call inotify_add_watch() multiple times with the
+		 *       same 'directoryname' then it returns the same value.
+		 */
 		retval = inotify_add_watch(inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO|IN_IGNORED);
 		if (-1 == retval)
 		{
 		    logerror("inotify_add_watch");
 		    exit(EXIT_FAILURE);
 		}
+#ifdef OLD_STRUCT
 		watchlist[lastusedwatch].watchfd = retval;
-
 		ret = lastusedwatch;
 
 		lastusedwatch++;
+#endif
+
+		ret = db_add_new_inotifyid(path, retval);
 
 		retval = pthread_rwlock_unlock(&inotifyrwlock);
 		if (retval)
@@ -410,6 +439,29 @@ int qgis_inotify_watch_file(const char *path)
     return ret;
 }
 
+
+/* deletes the inotify watch for the file which is identified by "watchid".
+ */
+void qgis_inotify_delete_watch(int inotifyid)
+{
+    /* check the number of inotifyids which also got this watch descriptor.
+     * if the number is <= 1 we can remove the watch from this file.
+     */
+    int watchnum = db_get_num_of_similar_watches_for_inotifyid(inotifyid);
+    debug(1, "number of projects %d are watching with same watchd as inotify id %d", watchnum, inotifyid);
+    if (watchnum <= 1)
+    {
+	int watchd = db_get_watchd_for_inotifyid(inotifyid);
+	debug(1, "remove inotify watchd %d", watchd);
+	int retval = inotify_rm_watch(inotifyfd, watchd);
+	if (-1 == retval)
+	{
+	    logerror("can not remove inotify watch for watch descriptor %d", watchd);
+	    exit(EXIT_FAILURE);
+	}
+    }
+    db_remove_inotifyid(inotifyid);
+}
 
 
 

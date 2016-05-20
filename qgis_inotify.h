@@ -38,6 +38,7 @@
 void qgis_inotify_init(void);
 void qgis_inotify_delete(void);
 int qgis_inotify_watch_file(const char *path);
+void qgis_inotify_delete_watch(int inotifyid);
 
 
 #endif /* QGIS_INOTIFY_H_ */
