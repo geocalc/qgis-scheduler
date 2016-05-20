@@ -229,8 +229,19 @@ void project_manager_project_configfile_changed(int inotifyid)
 void project_manager_shutdown_project(const char *project_name)
 {
 //    debug(1, "shutdown project '%s'", project_name);
+    printlog("shutdown project '%s'", project_name);
+    int inotifyid = db_get_inotifyid_for_project(project_name);
+    if (0 <= inotifyid)
+    {
+	qgis_inotify_delete_watch(inotifyid);
+    }
+    else
+    {
+	printlog("warning: got shutdown request for '%s' but no inotify id stored?", project_name);
+    }
     db_move_all_process_from_init_to_shutdown_list(project_name);
     db_move_all_process_from_active_to_shutdown_list(project_name);
+    db_remove_project(project_name);
 }
 
 
