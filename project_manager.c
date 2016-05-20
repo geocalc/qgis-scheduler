@@ -248,7 +248,20 @@ void project_manager_shutdown_project(const char *project_name)
 void project_manager_shutdown(void)
 {
     debug(1, "");
-    db_move_all_process_to_list(LIST_SHUTDOWN);
+
+    char **projects;
+    int len;
+    db_get_names_project(&projects, &len);
+
+    int i;
+    for (i=0; i<len; i++)
+    {
+	project_manager_shutdown_project(projects[i]);
+    }
+
+    db_free_names_project(projects, len);
+
+//    db_move_all_process_to_list(LIST_SHUTDOWN);
 }
 
 

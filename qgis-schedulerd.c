@@ -799,19 +799,21 @@ int main(int argc, char **argv)
 			debug(1, "got termination signal, exit program");
 			set_program_shutdown(1);
 
-			/* close the inotify module, so no processes are recreated afterwards
-			 * because of a change in the configuration.
-			 */
-			qgis_inotify_delete();
-
+			/* shut down all projects */
 			project_manager_shutdown();
 
 			/* wait for the shutdown module so it has closed all its processes
 			 * Then clean up the module */
 			qgis_shutdown_wait_empty();
 
+			/* close the inotify module, so no processes are recreated afterwards
+			 * because of a change in the configuration.
+			 */
+			qgis_inotify_delete();
+
 			// TODO restore default signal handler over here not below
 			break;
+
 		    case SIGHUP:
 			/* hang up signal, reload configuration */
 			printlog("received SIGHUP, reloading configuration");
