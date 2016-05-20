@@ -204,6 +204,13 @@ static void project_manager_restart_processes(const char *proj_name)
 }
 
 
+void project_manager_projectname_configfile_changed(const char *projname)
+{
+    printlog("Project '%s' config change. Restart processes", projname);
+    project_manager_restart_processes(projname);
+}
+
+
 /* A configuration with this watch descriptor has changed. Get the project
  * belonging to this descriptor and restart the project.
  */
@@ -214,8 +221,7 @@ void project_manager_project_configfile_changed(int inotifyid)
     char *projname = db_get_project_for_inotifyid(inotifyid);
     if (projname)
     {
-	printlog("Project '%s' config change. Restart processes", projname);
-	project_manager_restart_processes(projname);
+	project_manager_projectname_configfile_changed(projname);
     }
     else
     {
