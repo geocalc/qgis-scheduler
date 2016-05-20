@@ -265,3 +265,109 @@ void project_manager_shutdown(void)
 }
 
 
+void project_manager_start_project(const char *projname)
+{
+    int inotifyfd = 0;
+    int retval;
+    const char *configpath = config_get_project_config_path(projname);
+    /* if the path to a configuration file has been given and the path
+     * is correct (stat()), then watch the file with inotify for changes
+     * If the file changed, kill all processes and restart them anew.
+     */
+    if (configpath)
+    {
+	struct stat statbuf;
+	retval = stat(configpath, &statbuf);
+	if (-1 == retval)
+	{
+	    switch(errno)
+	    {
+	    case EACCES:
+	    case ELOOP:
+	    case EFAULT:
+	    case ENAMETOOLONG:
+	    case ENOENT:
+	    case ENOTDIR:
+	    case EOVERFLOW:
+		logerror("error accessing file '%s': ", configpath);
+		debug(1, "file is not watched for changes");
+		break;
+
+	    default:
+		logerror("error accessing file '%s': ", configpath);
+		exit(EXIT_FAILURE);
+	    }
+	}
+	else
+	{
+	    if (S_ISREG(statbuf.st_mode))
+	    {
+		/* if I can stat the file I assume we can read it.
+		 * Now setup the inotify descriptor.
+		 */
+		retval = qgis_inotify_watch_file(configpath);
+		inotifyfd = retval;
+	    }
+	    else
+	    {
+		debug(1, "error '%s' is no regular file", configpath);
+	    }
+	}
+    }
+
+    db_add_project(projname, configpath, inotifyfd);
+
+    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
+    printlog("startup project '%s', starting %d processes", projname, nr_of_childs_during_startup);
+
+
+    struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
+    assert(targs);
+    if ( !targs )
+    {
+	logerror("could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+    targs->project_name = strdup(projname);
+    targs->num = nr_of_childs_during_startup;
+
+    pthread_attr_t attr;
+    retval = pthread_attr_init(&attr);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error init thread attributes");
+	exit(EXIT_FAILURE);
+    }
+    /* detach connection thread from the main thread. Doing this to collect
+     * resources after this thread ends. Because there is no join() waiting
+     * for this thread.
+     */
+    retval = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error setting attribute thread detached");
+	exit(EXIT_FAILURE);
+    }
+
+    pthread_t thread;
+    retval = pthread_create(&thread, &attr, project_manager_thread_start_project_processes, targs);
+    if (retval)
+    {
+	errno = retval;
+	logerror("error creating thread");
+	exit(EXIT_FAILURE);
+    }
+    pthread_attr_destroy(&attr);
+
+}
+
+
+void project_manager_restart_project(const char *proj)
+{
+    project_manager_shutdown_project(proj);
+    project_manager_start_project(proj);
+}
+
+
