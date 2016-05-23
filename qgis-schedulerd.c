@@ -480,10 +480,9 @@ int main(int argc, char **argv)
 	{
 	    /* check if the user can break out of the chroot jail */
 	    /* TODO linux: check capability CAP_SYS_CHROOT */
-	    uid_t uid = getuid();
-	    uid_t euid = geteuid();
-	    if ( !uid || !euid )
-		printlog("WARNING: chroot requested but did not set (effective) userid different from root. This renders the chroot useless. Did you forget to set 'chuser'?");
+	    const char *chuser = config_get_chuser();
+	    if (!chuser)
+		printlog("WARNING: chroot requested but did not configure a different userid. This renders the chroot useless. Did you forget to set 'chuser'?");
 
 	    retval = chroot(chrootpath);
 	    if (retval)
