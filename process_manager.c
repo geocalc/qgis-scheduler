@@ -84,7 +84,6 @@ struct thread_start_process_detached_args
 /* constants */
 static const char base_socket_desc[] = "qgis-schedulerd-socket";
 static const int max_nr_process_crashes = 5;
-static const int init_read_timeout = 270*1000; // timeout in ms, TODO: make this config a entry
 
 /* This global number is counted upwards, overflow included.
  * Every new unix socket gets this number attached creating a unique socket
@@ -318,6 +317,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
      * the timeout catches move the process to the shutdown module and in the
      * database mark the process as crashed.
      */
+    const int init_read_timeout = config_get_read_timeout(projname);
     int has_timeout = 0;
     retval = 1;
     while (retval>0)
