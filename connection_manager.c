@@ -125,7 +125,7 @@ static void *thread_handle_connection(void *arg)
     int retval = qgis_timer_start(&ts);
     if (-1 == retval)
     {
-	logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
 	exit(EXIT_FAILURE);
     }
 
@@ -186,7 +186,7 @@ static void *thread_handle_connection(void *arg)
 	assert(buffer);
 	if ( !buffer )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
@@ -581,7 +581,7 @@ static void *thread_handle_connection(void *arg)
 	assert(buffer);
 	if ( !buffer )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -812,7 +812,7 @@ static void *thread_handle_connection(void *arg)
     retval = qgis_timer_stop(&ts);
     if (-1 == retval)
     {
-	logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
 	exit(EXIT_FAILURE);
     }
     printlog("[%lu] done connection, %ld.%03ld sec", thread_id, ts.tv_sec, ts.tv_nsec/(1000*1000));
@@ -841,7 +841,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     assert(targs);
     if ( !targs )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     targs->new_accepted_inet_fd = netfd;

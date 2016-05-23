@@ -155,7 +155,7 @@ void project_manager_startup_projects(void)
 	    assert(targs);
 	    if ( !targs )
 	    {
-		logerror("could not allocate memory");
+		logerror("ERROR: could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 	    targs->project_name = strdup(projname);
@@ -331,7 +331,7 @@ void project_manager_start_project(const char *projname)
     assert(targs);
     if ( !targs )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     targs->project_name = strdup(projname);

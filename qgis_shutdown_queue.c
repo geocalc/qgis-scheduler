@@ -223,7 +223,7 @@ static void *qgis_shutdown_thread(void *arg)
 		qgis_timer_add(&proc_timer, &default_signal_timeout);
 		if ( qgis_timer_isgreaterthan(&current_time, &proc_timer) )
 		{
-		    printlog("timeout (%dsec) for process %d. Could not kill process, please look after it", (int)default_signal_timeout.tv_sec, pid);
+		    printlog("INFO: timeout (%dsec) for process %d. Could not kill process, please look after it", (int)default_signal_timeout.tv_sec, pid);
 		    process_manager_cleanup_process(pid);
 		}
 		break;
@@ -235,7 +235,7 @@ static void *qgis_shutdown_thread(void *arg)
 		break;
 
 	    case PROCESS_STATE_MAX:
-		printlog("can not find process %d during shutdown, db changed inbetween data selects. ignoring process", pid);
+		printlog("INFO: can not find process %d during shutdown, db changed inbetween data selects. ignoring process", pid);
 		break;
 
 	    default:
@@ -366,7 +366,7 @@ static void *qgis_shutdown_thread(void *arg)
     int retval = write(shutdown_main_pipe_wr, &sigdata, sizeof(sigdata));
     if (-1 == retval)
     {
-	logerror("write signal data");
+	logerror("ERROR: write signal data");
 	exit(EXIT_FAILURE);
     }
     debug(1, "wrote %d bytes to sig pipe", retval);

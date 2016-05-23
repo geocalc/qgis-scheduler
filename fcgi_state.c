@@ -220,7 +220,7 @@ struct fcgi_param_list_s *fcgi_param_list_new(void)
     assert(list);
     if ( !list )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     TAILQ_INIT(&list->head);
@@ -256,7 +256,7 @@ void fcgi_param_list_add_param(struct fcgi_param_list_s *paramlist, struct fcgi_
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -442,7 +442,7 @@ struct fcgi_message_s *fcgi_message_new(void)
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -515,7 +515,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 		assert(message->content);
 		if ( !message->content )
 		{
-		    logerror("could not allocate memory");
+		    logerror("ERROR: could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -869,7 +869,7 @@ struct fcgi_message_list_s *fcgi_message_list_new(void)
     assert(messlist);
     if ( !messlist )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     TAILQ_INIT(&messlist->head);
@@ -908,7 +908,7 @@ void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct 
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1030,7 +1030,7 @@ struct fcgi_session_s *fcgi_session_new(int keep_messages)
     assert(session);
     if ( !session )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1261,7 +1261,7 @@ struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role,
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1289,7 +1289,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1303,7 +1303,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1322,7 +1322,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1336,7 +1336,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1355,7 +1355,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -1369,7 +1369,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
 	message->content = malloc(len);
 	if ( !message->content )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1388,7 +1388,7 @@ struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t 
     assert(message);
     if ( !message )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 

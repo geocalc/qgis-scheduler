@@ -69,7 +69,7 @@ struct fcgi_data_list_s *fcgi_data_list_new(void)
     assert(list);
     if ( !list )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     TAILQ_INIT(&list->head);
@@ -105,14 +105,14 @@ void fcgi_data_add_data(struct fcgi_data_list_s *datalist, const char *data, int
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
 	entry->data.data = malloc(len);
 	if ( !entry->data.data )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	memcpy(entry->data.data, data, len);

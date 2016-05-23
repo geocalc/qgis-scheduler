@@ -336,7 +336,7 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
 	    default:
 		/* unknown character found. exit */
 		srcsql--;
-		printlog("unknown character found in sql string '%s', position %ld: '%c'", db_select_statement[sid], (long int)(srcsql - db_select_statement[sid]), *srcsql);
+		printlog("ERROR: unknown character found in sql string '%s', position %ld: '%c'", db_select_statement[sid], (long int)(srcsql - db_select_statement[sid]), *srcsql);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -501,7 +501,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
 	    default:
 		/* unknown character found. exit */
-		printlog("unknown character found in sql string '%s', position %ld: %c", db_select_statement[sid], (long int)(sql - db_select_statement[sid]), *sql);
+		printlog("ERROR: unknown character found in sql string '%s', position %ld: %c", db_select_statement[sid], (long int)(sql - db_select_statement[sid]), *sql);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -899,7 +899,7 @@ int db_get_names_project(char ***projname, int *len)
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	assert(1 == ncol);
@@ -1157,7 +1157,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	retval = qgis_timer_start(&now);
 	if (-1 == retval)
 	{
-	    logerror("clock_gettime(%d,..)", get_valid_clock_id());
+	    logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
 	    exit(EXIT_FAILURE);
 	}
 	qgis_timer_add(&mytimeout, &now);
@@ -1597,7 +1597,7 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1690,7 +1690,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -2422,7 +2422,7 @@ void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd)
 	assert(entry);
 	if ( !entry )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 

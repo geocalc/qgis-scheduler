@@ -189,7 +189,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     assert(buffer);
     if ( !buffer )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -393,7 +393,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
     if (NULL == command || 0 == strlen(command))
     {
-	printlog("project '%s' ERROR: no process path specified. Not starting any process", project_name);
+	printlog("ERROR: no process path specified. Not starting any process for project '%s'", project_name);
 	return 0;
     }
 
@@ -404,7 +404,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     int retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	logerror("can not create socket for fcgi program");
+	logerror("ERROR: can not create socket for fcgi program");
 	exit(EXIT_FAILURE);
     }
     const int childsocket = retval;
@@ -496,7 +496,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     retval = listen(childsocket, 1);
     if (-1 == retval)
     {
-	logerror("can not listen to socket connecting fast cgi application");
+	logerror("ERROR: can not listen to socket connecting fast cgi application");
 	exit(EXIT_FAILURE);
     }
 
@@ -588,7 +588,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
 
 	execl(command, command, NULL);
-//	logerror("could not execute '%s': ", command); # no log message allowed because of locking
+//	logerror("ERROR: could not execute '%s': ", command); # no log message allowed because of locking
 	exit(EXIT_FAILURE);
     }
     else if (0 < pid)
@@ -604,7 +604,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     else
     {
 	/* error */
-	logerror("can not fork");
+	logerror("ERROR: can not fork");
 	exit(EXIT_FAILURE);
     }
 
@@ -669,7 +669,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	assert(targs);
 	if ( !targs )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 	targs->project_name = strdup(projname);
@@ -767,7 +767,7 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
     assert(targs);
     if ( !targs )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     targs->num = num;

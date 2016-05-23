@@ -42,7 +42,7 @@ struct qgis_project_list_s *qgis_proj_list_new(void)
     assert(list);
     if ( !list )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     LIST_INIT(&list->head);	// same as calloc(), should we remove this?
@@ -111,7 +111,7 @@ void qgis_proj_list_add_project(struct qgis_project_list_s *list, struct qgis_pr
 	    assert(entry);
 	    if ( !entry )
 	    {
-		logerror("could not allocate memory");
+		logerror("ERROR: could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 

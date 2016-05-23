@@ -431,7 +431,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 
     if (!config)
     {
-	logerror("can not load configuration from '%s'", configpath);
+	logerror("ERROR: can not load configuration from '%s'", configpath);
     }
 
     return config;
@@ -543,7 +543,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 		assert(element);
 		if ( !element )
 		{
-		    logerror("could not allocate memory");
+		    logerror("ERROR: could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 		element->section = strdup(secname);
@@ -559,7 +559,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    assert(element);
 	    if ( !element )
 	    {
-		logerror("could not allocate memory");
+		logerror("ERROR: could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 	    element->section = strdup(secname);
@@ -595,7 +595,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    assert(element);
 	    if ( !element )
 	    {
-		logerror("could not allocate memory");
+		logerror("ERROR: could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 	    element->section = strdup(secname);
@@ -1367,7 +1367,7 @@ const char *config_get_init_key(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITVAR, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITVAR);
@@ -1412,7 +1412,7 @@ const char *config_get_init_value(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITDATA, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITDATA);
@@ -1457,7 +1457,7 @@ const char *config_get_env_key(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVVAR, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
@@ -1470,7 +1470,7 @@ const char *config_get_env_key(const char *project, int num)
 	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVVAR, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVVAR);
@@ -1515,7 +1515,7 @@ const char *config_get_env_value(const char *project, int num)
 	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVDATA, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
@@ -1528,7 +1528,7 @@ const char *config_get_env_value(const char *project, int num)
 	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVDATA, num);
 	if (-1 == retval)
 	{
-	    logerror("asprintf");
+	    logerror("ERROR: asprintf");
 	    exit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVDATA);

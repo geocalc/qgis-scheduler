@@ -116,7 +116,7 @@ static void *inotify_thread_watch(void *arg)
     assert(inotifyevent);
     if ( !inotifyevent )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -135,7 +135,7 @@ static void *inotify_thread_watch(void *arg)
 		break;
 
 	    default:
-		logerror("read() inotify_event");
+		logerror("ERROR: read() inotify_event");
 		exit(EXIT_FAILURE);
 		// no break needed
 	    }
@@ -238,7 +238,7 @@ void qgis_inotify_init(void)
     watchlist = calloc(watchlistlen, sizeof(*watchlist));
     if (NULL == watchlist)
     {
-	logerror("calloc, can not get memory for inotify service");
+	logerror("ERROR: calloc, can not get memory for inotify service");
 	exit(EXIT_FAILURE);
     }
 #endif
@@ -246,7 +246,7 @@ void qgis_inotify_init(void)
     int retval = inotify_init1(IN_CLOEXEC);
     if (-1 == retval)
     {
-	logerror("inotify_init1");
+	logerror("ERROR: inotify_init1");
 	exit(EXIT_FAILURE);
     }
     inotifyfd = retval;
@@ -273,7 +273,7 @@ void qgis_inotify_delete(void)
 	retval = inotify_rm_watch(inotifyfd, watchlist[i].watchfd);
 	if (-1 == retval)
 	{
-	    logerror("can not remove inotify watch for watchfd %d", watchlist[i].watchfd);
+	    logerror("ERROR: can not remove inotify watch for watchfd %d", watchlist[i].watchfd);
 	    // intentional no exit() call
 	}
 	free(watchlist[i].filename);
@@ -292,7 +292,7 @@ void qgis_inotify_delete(void)
     debug(1, "closed inotify fd %d, retval %d, errno %d", inotifyfd, retval, errno);
     if (-1 == retval)
     {
-	logerror("can not close inotify fd");
+	logerror("ERROR: can not close inotify fd");
 	// intentional no exit() call
     }
 
@@ -376,7 +376,7 @@ int qgis_inotify_watch_file(const char *path)
 		assert(directoryname);
 		if ( !directoryname )
 		{
-		    logerror("could not allocate memory");
+		    logerror("ERROR: could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -395,7 +395,7 @@ int qgis_inotify_watch_file(const char *path)
 		watchlist[lastusedwatch].filename = strdup(configbasename);
 		if ( !watchlist[lastusedwatch].filename )
 		{
-		    logerror("could not allocate memory");
+		    logerror("ERROR: could not allocate memory");
 		    exit(EXIT_FAILURE);
 		}
 #endif
@@ -405,7 +405,7 @@ int qgis_inotify_watch_file(const char *path)
 		retval = inotify_add_watch(inotifyfd, directoryname, IN_CLOSE_WRITE|IN_DELETE|IN_MOVED_TO|IN_IGNORED);
 		if (-1 == retval)
 		{
-		    logerror("inotify_add_watch");
+		    logerror("ERROR: inotify_add_watch");
 		    exit(EXIT_FAILURE);
 		}
 #ifdef OLD_STRUCT
@@ -456,7 +456,7 @@ void qgis_inotify_delete_watch(int inotifyid)
 	int retval = inotify_rm_watch(inotifyfd, watchd);
 	if (-1 == retval)
 	{
-	    logerror("can not remove inotify watch for watch descriptor %d", watchd);
+	    logerror("ERROR: can not remove inotify watch for watch descriptor %d", watchd);
 	    exit(EXIT_FAILURE);
 	}
     }

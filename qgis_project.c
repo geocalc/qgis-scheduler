@@ -96,7 +96,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     assert(proj);
     if ( !proj )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     proj->initproclist = qgis_process_list_new();

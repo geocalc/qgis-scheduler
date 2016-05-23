@@ -75,7 +75,7 @@ int my_vdprintf(int fd, const char *format, va_list ap)
 	assert(buffer);
 	if ( !buffer )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -96,7 +96,7 @@ int my_vdprintf(int fd, const char *format, va_list ap)
 		if ( !buffer )
 		{
 		    // reallocation failed, old buffer still available, continue printing with old buffer
-		    logerror("could not reallocate memory");
+		    logerror("ERROR: could not reallocate memory");
 		    retval = buffersize-1;
 		}
 		else
@@ -147,7 +147,7 @@ int logger_init(void)
 	int retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 	if (-1 == retval)
 	{
-	    logerror("can not open log file '%s': ", logfilename);
+	    logerror("ERROR: can not open log file '%s': ", logfilename);
 	    exit(EXIT_FAILURE);
 	}
 	int logfd = retval;
@@ -157,14 +157,14 @@ int logger_init(void)
 	retval = dup3(logfd, STDOUT_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    logerror("can not dup to stdout");
+	    logerror("ERROR: can not dup to stdout");
 	    exit(EXIT_FAILURE);
 	}
 
 	retval = dup3(logfd, STDERR_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
-	    logerror("can not dup to stderr");
+	    logerror("ERROR: can not dup to stderr");
 	    exit(EXIT_FAILURE);
 	}
 

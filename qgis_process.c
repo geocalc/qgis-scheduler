@@ -95,7 +95,7 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     assert(proc);
     if ( !proc )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
 
@@ -112,7 +112,7 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     retval = qgis_timer_start(&proc->starttime);
     if (-1 == retval)
     {
-	logerror("clock_gettime()");
+	logerror("ERROR: clock_gettime()");
 	exit(EXIT_FAILURE);
     }
 
@@ -363,7 +363,7 @@ static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
 	retval = qgis_timer_start(&proc->signaltime);
 	if (-1 == retval)
 	{
-	    logerror("clock_gettime()");
+	    logerror("ERROR: clock_gettime()");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -407,7 +407,7 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	retval = qgis_timer_sub(&proc->signaltime, &tm);
 	if (-1 == retval)
 	{
-	    logerror("clock_gettime()");
+	    logerror("ERROR: clock_gettime()");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -437,7 +437,7 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	retval = qgis_timer_sub(&proc->signaltime, &tm);
 	if (-1 == retval)
 	{
-	    logerror("clock_gettime()");
+	    logerror("ERROR: clock_gettime()");
 	    exit(EXIT_FAILURE);
 	}
 

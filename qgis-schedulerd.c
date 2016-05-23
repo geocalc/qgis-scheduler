@@ -194,7 +194,7 @@ void write_pid_file(const char *path)
     FILE *f = fopen(path, "w");
     if (NULL == f)
     {
-	logerror("can not open pidfile '%s': ", path);
+	logerror("ERROR: can not open pidfile '%s': ", path);
 	exit(EXIT_FAILURE);
     }
 
@@ -209,7 +209,7 @@ void remove_pid_file(const char *path)
     int retval = unlink(path);
     if (-1 == retval)
     {
-	logerror("can not remove pidfile '%s': ", path);
+	logerror("ERROR: can not remove pidfile '%s': ", path);
 	// intentionally no exit() call
     }
 }
@@ -309,14 +309,14 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	retval = write(signalpipe_wr, &sigdata, sizeof(sigdata));
 	if (-1 == retval)
 	{
-	    logerror("write signal data");
+	    logerror("ERROR: write signal data");
 	    exit(EXIT_FAILURE);
 	}
 	debug(1, "wrote %d bytes to sig pipe", retval);
 	break;
 
     case SIGSEGV:
-	printlog("Got SIGSEGV! exiting..");
+	printlog("INFO: Got SIGSEGV! exiting..");
 	syncfs(STDERR_FILENO);
 	syncfs(STDOUT_FILENO);
 	/* reinstall default handler and fire signal again */
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
     }
     else
     {
-	logerror("can not canonicalize path '%s'", config_path);
+	logerror("ERROR: can not canonicalize path '%s'", config_path);
 	exit(EXIT_FAILURE);
     }
 
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
     int retval = config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
     if (retval)
     {
-	logerror("can not load config file");
+	logerror("ERROR: can not load config file");
 	exit(EXIT_FAILURE);
     }
 
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
 	    if (serversocketfd == -1)
 	    {
 		//printf(" could not create socket\n");
-		logerror(" could not create socket for network data");
+		logerror("ERROR: could not create socket for network data");
 		continue;
 	    }
 
@@ -442,21 +442,21 @@ int main(int argc, char **argv)
 	    int retval = setsockopt(serversocketfd, SOL_SOCKET, SO_REUSEPORT, &value, sizeof(value));
 	    if (-1 == retval)
 	    {
-		logerror(" could not set socket to SOL_SOCKET");
+		logerror("ERROR: could not set socket to SOL_SOCKET");
 	    }
 
 	    if (bind(serversocketfd, rp->ai_addr, rp->ai_addrlen) == 0)
 		break; /* Success */
 
 	    //printf(" could not bind to socket\n");
-	    logerror(" could not bind to network socket");
+	    logerror("ERROR: could not bind to network socket");
 	    close(serversocketfd);
 	}
 
 	if (rp == NULL)
 	{ /* No address succeeded */
 	    //debug(1, "Could not bind"); // TODO better message
-	    logerror("could not create network socket");
+	    logerror("ERROR: could not create network socket");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -522,9 +522,9 @@ int main(int argc, char **argv)
 	    else
 	    {
 		if (errno)
-		    logerror("can not get the id of user '%s'", chuser);
+		    logerror("ERROR: can not get the id of user '%s'", chuser);
 		else
-		    printlog("can not get the id of user '%s'. exiting", chuser);
+		    printlog("ERROR: can not get the id of user '%s'. exiting", chuser);
 		exit(EXIT_FAILURE);
 	    }
 	}

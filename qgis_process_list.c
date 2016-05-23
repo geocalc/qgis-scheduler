@@ -61,7 +61,7 @@ struct qgis_process_list_s *qgis_process_list_new(void)
     assert(list);
     if ( !list )
     {
-	logerror("could not allocate memory");
+	logerror("ERROR: could not allocate memory");
 	exit(EXIT_FAILURE);
     }
     LIST_INIT(&list->head);	// same as calloc(), should we remove this?
@@ -127,7 +127,7 @@ void qgis_process_list_add_process(struct qgis_process_list_s *list, struct qgis
 	    assert(entry);
 	    if ( !entry )
 	    {
-		logerror("could not allocate memory");
+		logerror("ERROR: could not allocate memory");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -804,7 +804,7 @@ int qgis_process_list_get_pid_list(struct qgis_process_list_s *list, pid_t **pid
 	assert(pidp);
 	if ( !pidp )
 	{
-	    logerror("could not allocate memory");
+	    logerror("ERROR: could not allocate memory");
 	    exit(EXIT_FAILURE);
 	}
 
