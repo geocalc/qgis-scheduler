@@ -50,7 +50,7 @@ struct qgis_project_list_s *qgis_proj_list_new(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error init read-write lock");
+	logerror("ERROR: init read-write lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -66,7 +66,7 @@ void qgis_proj_list_delete(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -82,7 +82,7 @@ void qgis_proj_list_delete(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -90,7 +90,7 @@ void qgis_proj_list_delete(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error delete read-write lock");
+	    logerror("ERROR: delete read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -121,7 +121,7 @@ void qgis_proj_list_add_project(struct qgis_project_list_s *list, struct qgis_pr
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error acquire read-write lock");
+		logerror("ERROR: acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -131,7 +131,7 @@ void qgis_proj_list_add_project(struct qgis_project_list_s *list, struct qgis_pr
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error unlock read-write lock");
+		logerror("ERROR: unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -153,7 +153,7 @@ void qgis_proj_list_remove_project(struct qgis_project_list_s *list, struct qgis
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error acquire read-write lock");
+		logerror("ERROR: acquire read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -171,7 +171,7 @@ void qgis_proj_list_remove_project(struct qgis_project_list_s *list, struct qgis
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error unlock read-write lock");
+		logerror("ERROR: unlock read-write lock");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -192,7 +192,7 @@ struct qgis_project_s *find_project_by_name(struct qgis_project_list_s *list, co
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -211,7 +211,7 @@ struct qgis_project_s *find_project_by_name(struct qgis_project_list_s *list, co
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -233,7 +233,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -278,7 +278,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_pid(struct qgis_project_li
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -300,7 +300,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_inotifyid(struct qgis_proj
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -323,7 +323,7 @@ struct qgis_project_s *qgis_proj_list_find_project_by_inotifyid(struct qgis_proj
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -341,7 +341,7 @@ struct qgis_project_iterator *qgis_proj_list_get_iterator(struct qgis_project_li
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -378,7 +378,7 @@ void qgis_proj_list_return_iterator(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -396,7 +396,7 @@ void qgis_proj_list_print(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire read-write lock");
+	    logerror("ERROR: acquire read-write lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -410,7 +410,7 @@ void qgis_proj_list_print(struct qgis_project_list_s *list)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock read-write lock");
+	    logerror("ERROR: unlock read-write lock");
 	    exit(EXIT_FAILURE);
 	}
     }

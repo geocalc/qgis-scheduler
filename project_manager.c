@@ -120,12 +120,12 @@ void project_manager_startup_projects(void)
 		    case ENOENT:
 		    case ENOTDIR:
 		    case EOVERFLOW:
-			logerror("error accessing file '%s': ", configpath);
+			logerror("ERROR: accessing file '%s': ", configpath);
 			debug(1, "file is not watched for changes");
 			break;
 
 		    default:
-			logerror("error accessing file '%s': ", configpath);
+			logerror("ERROR: accessing file '%s': ", configpath);
 			exit(EXIT_FAILURE);
 		    }
 		}
@@ -141,7 +141,7 @@ void project_manager_startup_projects(void)
 		    }
 		    else
 		    {
-			debug(1, "error '%s' is no regular file", configpath);
+			debug(1, "ERROR: '%s' is no regular file", configpath);
 		    }
 		}
 	    }
@@ -165,7 +165,7 @@ void project_manager_startup_projects(void)
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error creating thread");
+		logerror("ERROR: creating thread");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -176,7 +176,7 @@ void project_manager_startup_projects(void)
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error joining thread");
+		logerror("ERROR: joining thread");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -225,7 +225,7 @@ void project_manager_project_configfile_changed(int inotifyid)
     }
     else
     {
-	printlog("error: got config change request for inotify id %d but no project responsible?", inotifyid);
+	printlog("ERROR: got config change request for inotify id %d but no project responsible?", inotifyid);
 	exit(EXIT_FAILURE);
     }
     free(projname);
@@ -295,12 +295,12 @@ void project_manager_start_project(const char *projname)
 	    case ENOENT:
 	    case ENOTDIR:
 	    case EOVERFLOW:
-		logerror("error accessing file '%s': ", configpath);
+		logerror("ERROR: accessing file '%s': ", configpath);
 		debug(1, "file is not watched for changes");
 		break;
 
 	    default:
-		logerror("error accessing file '%s': ", configpath);
+		logerror("ERROR: accessing file '%s': ", configpath);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -316,7 +316,7 @@ void project_manager_start_project(const char *projname)
 	    }
 	    else
 	    {
-		debug(1, "error '%s' is no regular file", configpath);
+		debug(1, "ERROR: '%s' is no regular file", configpath);
 	    }
 	}
     }
@@ -342,7 +342,7 @@ void project_manager_start_project(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error init thread attributes");
+	logerror("ERROR: init thread attributes");
 	exit(EXIT_FAILURE);
     }
     /* detach connection thread from the main thread. Doing this to collect
@@ -353,7 +353,7 @@ void project_manager_start_project(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error setting attribute thread detached");
+	logerror("ERROR: setting attribute thread detached");
 	exit(EXIT_FAILURE);
     }
 
@@ -362,7 +362,7 @@ void project_manager_start_project(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error creating thread");
+	logerror("ERROR: creating thread");
 	exit(EXIT_FAILURE);
     }
     pthread_attr_destroy(&attr);

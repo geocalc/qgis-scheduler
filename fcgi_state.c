@@ -321,7 +321,7 @@ int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
 	    int retval = debug(1, "%s=%s", it->param.name, it->param.value);
 	    if (-1 == retval)
 	    {
-		logerror("error fprintf");
+		logerror("ERROR: fprintf");
 		exit(EXIT_FAILURE);
 	    }
 	    bytes_printed += retval;
@@ -526,7 +526,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
 	default:
-	    debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
+	    debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	    exit(EXIT_FAILURE);
 
 	}
@@ -597,7 +597,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_GET_VALUES_RESULT:
 //	case FCGI_UNKNOWN_TYPE:
     default:
-	debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
+	debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
 
     }
@@ -761,7 +761,7 @@ int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *messa
 //    case FCGI_GET_VALUES_RESULT:
 //    case FCGI_UNKNOWN_TYPE:
     default:
-	debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
+	debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
 	exit(EXIT_FAILURE);
     }
 
@@ -800,7 +800,7 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 		    bytes_printed += debug(1, "FCGI_FILTER");
 		    break;
 		default:
-		    debug(1, "error: unknown role %d", role);
+		    debug(1, "ERROR: unknown role %d", role);
 		    break;
 		}
 		bytes_printed += debug(1, ", 0x%02x}}", message->message.beginrequestbody.flags);
@@ -828,7 +828,7 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 		    bytes_printed += debug(1, "FCGI_UNKNOWN_ROLE}}");
 		    break;
 		default:
-		    debug(1, "error: unknown protocol status %d", message->message.endrequestbody.protocolStatus);
+		    debug(1, "ERROR: unknown protocol status %d", message->message.endrequestbody.protocolStatus);
 		    break;
 		}
 		break;
@@ -853,7 +853,7 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 	//    case FCGI_GET_VALUES_RESULT:
 	//    case FCGI_UNKNOWN_TYPE:
 	    default:
-		debug(1, "error: unknown request id in message: %d", fcgi_message_get_requestid(message));
+		debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
 		exit(EXIT_FAILURE);
 	    }
 

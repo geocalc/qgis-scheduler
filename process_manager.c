@@ -142,7 +142,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 //    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 //    if (-1 == debugfd)
 //    {
-//	debug(1, "error can not open file '%s': ", debugfile);
+//	debug(1, "ERROR: can not open file '%s': ", debugfile);
 //	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
@@ -157,7 +157,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
     if (-1 == retval)
     {
-	logerror("error retrieving the name of child process socket %d", childunixsocketfd);
+	logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
 	exit(EXIT_FAILURE);
     }
     /* leave the original child socket and create a new one on the opposite
@@ -168,14 +168,14 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
     if (-1 == retval)
     {
-	logerror("error: can not create socket to child process");
+	logerror("ERROR: can not create socket to child process");
 	exit(EXIT_FAILURE);
     }
     childunixsocketfd = retval;	// refers to the socket this program connects to the child process
     retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (-1 == retval)
     {
-	logerror("error: init can not connect to child process");
+	logerror("ERROR: init can not connect to child process");
 	exit(EXIT_FAILURE);
     }
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
@@ -206,7 +206,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	logerror("error: can not write to child process");
+	logerror("ERROR: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
@@ -262,7 +262,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	logerror("error: can not write to child process");
+	logerror("ERROR: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -279,7 +279,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	logerror("error: can not write to child process");
+	logerror("ERROR: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -296,7 +296,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	logerror("error: can not write to child process");
+	logerror("ERROR: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     // write stdin = "" twice
@@ -304,7 +304,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
-	logerror("error: can not write to child process");
+	logerror("ERROR: can not write to child process");
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
@@ -326,7 +326,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 //	debug(1, "init project '%s' received:\n%.*s", projname, retval, buffer);
 	if (-1 == retval)
 	{
-	    logerror("error: read() from child process during init phase");
+	    logerror("ERROR: read() from child process during init phase");
 	    if (ETIMEDOUT == errno)
 	    {
 		has_timeout = 1;
@@ -359,7 +359,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	    }
 	    else
 	    {
-		logerror("error: kill(%d,0) returned", pid);
+		logerror("ERROR: kill(%d,0) returned", pid);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -393,7 +393,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
     if (NULL == command || 0 == strlen(command))
     {
-	printlog("project '%s' error: no process path specified. Not starting any process", project_name);
+	printlog("project '%s' ERROR: no process path specified. Not starting any process", project_name);
 	return 0;
     }
 
@@ -426,7 +426,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex");
+	logerror("ERROR: acquire mutex");
 	exit(EXIT_FAILURE);
     }
     unsigned int socket_suffix_start = socket_id-1;
@@ -434,7 +434,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex");
+	logerror("ERROR: unlock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -444,7 +444,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire mutex");
+	    logerror("ERROR: acquire mutex");
 	    exit(EXIT_FAILURE);
 	}
 	unsigned int socket_suffix = socket_id++;
@@ -452,7 +452,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex");
+	    logerror("ERROR: unlock mutex");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -462,7 +462,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	     * exit here, because we can not get any more numbers.
 	     * Or we have a programmers error here..
 	     */
-	    debug(1, "error: out of numbers to create socket name. exit");
+	    debug(1, "ERROR: out of numbers to create socket name. exit");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -471,7 +471,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	retval = snprintf( childsockaddr.sun_path, sizeof(childsockaddr.sun_path), "%c%s%u", '\0', base_socket_desc, socket_suffix );
 	if (-1 == retval)
 	{
-	    logerror("error calling string format function snprintf");
+	    logerror("ERROR: calling string format function snprintf");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -484,7 +484,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	    }
 	    else
 	    {
-		logerror("error calling bind");
+		logerror("ERROR: calling bind");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -551,7 +551,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	    retval = setenv(key[i], value[i], 1);
 	    if (retval)
 	    {
-//		logerror("error can not set environment with key='%s' and value='%s'", key[i], value[i]); # no log message allowed because of locking
+//		logerror("ERROR: can not set environment with key='%s' and value='%s'", key[i], value[i]); # no log message allowed because of locking
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -566,14 +566,14 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	retval = chdir(working_directory);
 	if (-1 == retval)
 	{
-//	    logerror("error calling chdir"); # no log message allowed because of locking
+//	    logerror("ERROR: calling chdir"); # no log message allowed because of locking
 	}
 
 
 	retval = dup2(childsocket, FCGI_LISTENSOCK_FILENO);
 	if (-1 == retval)
 	{
-//	    logerror("error calling dup2"); # no log message allowed because of locking
+//	    logerror("ERROR: calling dup2"); # no log message allowed because of locking
 	    exit(EXIT_FAILURE);
 	}
 
@@ -678,7 +678,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error creating thread");
+	    logerror("ERROR: creating thread");
 	    exit(EXIT_FAILURE);
 	}
 	debug(1, "[%lu] started thread %lu", pthread_self(), threads[i]);
@@ -691,7 +691,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error joining thread");
+	    logerror("ERROR: joining thread");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -736,7 +736,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
     if (retval)
     {
 	errno = retval;
-	logerror("error detaching thread");
+	logerror("ERROR: detaching thread");
 	exit(EXIT_FAILURE);
     }
 
@@ -779,7 +779,7 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_create");
+	logerror("ERROR: pthread_create");
 	exit(EXIT_FAILURE);
     }
 
@@ -843,7 +843,7 @@ void process_manager_process_died(void)
 			    retval = db_get_startup_failures(projname);
 			    if ( 0 > retval )
 			    {	// too much dying processes during init phase, do not start new processes
-				printlog("error: can not get number of startup failures, function call failed for project %s", projname);
+				printlog("ERROR: can not get number of startup failures, function call failed for project %s", projname);
 				exit(EXIT_FAILURE);
 			    }
 			    else if (max_nr_process_crashes > retval)
@@ -873,7 +873,7 @@ void process_manager_process_died(void)
 	    }
 	    else
 	    {
-		logerror("error: kill(%d,0) returned", pid);
+		logerror("ERROR: kill(%d,0) returned", pid);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -916,7 +916,7 @@ void process_manager_cleanup_process(pid_t pid)
 
     int fd = db_get_process_socket(pid);
     if (-1 == fd)
-	printlog("error: can not get socket fd from process %d during cleanup", pid);
+	printlog("ERROR: can not get socket fd from process %d during cleanup", pid);
     else
 	close(fd);
     db_process_set_state_exit(pid);

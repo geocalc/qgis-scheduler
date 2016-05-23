@@ -225,7 +225,7 @@ void check_ressource_limits(void)
     int retval = getrlimit(RLIMIT_NOFILE, &limits);
     if (retval)
     {
-	logerror("error: can not get ressource limits");
+	logerror("ERROR: can not get ressource limits");
 	exit(EXIT_FAILURE);
     }
 
@@ -261,7 +261,7 @@ void check_ressource_limits(void)
 	retval = setrlimit(RLIMIT_NOFILE, &limits);
 	if (retval)
 	{
-	    logerror("error: can not set ressource limits");
+	    logerror("ERROR: can not set ressource limits");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -468,7 +468,7 @@ int main(int argc, char **argv)
     retval = listen(serversocketfd, SOMAXCONN);
     if (retval)
     {
-	logerror("error: can not listen to socket");
+	logerror("ERROR: can not listen to socket");
 	exit(EXIT_FAILURE);
     }
 
@@ -487,7 +487,7 @@ int main(int argc, char **argv)
 	    retval = chroot(chrootpath);
 	    if (retval)
 	    {
-		logerror("error: can not change root directory to '%s'", chrootpath);
+		logerror("ERROR: can not change root directory to '%s'", chrootpath);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -507,7 +507,7 @@ int main(int argc, char **argv)
 		retval = setgid(gid);
 		if (retval)
 		{
-		    logerror("error: can not set gid to %d (%s)", gid, chuser);
+		    logerror("ERROR: can not set gid to %d (%s)", gid, chuser);
 		    exit(EXIT_FAILURE);
 		}
 
@@ -515,7 +515,7 @@ int main(int argc, char **argv)
 		retval = setuid(uid);
 		if (retval)
 		{
-		    logerror("error: can not set uid to %d (%s)", uid, chuser);
+		    logerror("ERROR: can not set uid to %d (%s)", uid, chuser);
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -538,7 +538,7 @@ int main(int argc, char **argv)
     retval = chdir("/");
     if (retval)
     {
-	logerror("error: can not change working directory to '/'");
+	logerror("ERROR: can not change working directory to '/'");
 	exit(EXIT_FAILURE);
     }
 
@@ -563,7 +563,7 @@ int main(int argc, char **argv)
 	    pidfile = fopen(pidpath, "w");
 	    if (NULL == pidfile)
 	    {
-		logerror("error: can not open pidfile '%s': ", pidpath);
+		logerror("ERROR: can not open pidfile '%s': ", pidpath);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -573,7 +573,7 @@ int main(int argc, char **argv)
 	    retval = daemon(daemon_no_change_dir,daemon_no_close_streams);
 	    if (retval)
 	    {
-		logerror("error: can not become daemon");
+		logerror("ERROR: can not become daemon");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -585,7 +585,7 @@ int main(int argc, char **argv)
 	    retval = fprintf(pidfile, "%d", pid);
 	    if (0 > retval)
 	    {
-		logerror("error: can not write to pidfile '%s': ", pidpath);
+		logerror("ERROR: can not write to pidfile '%s': ", pidpath);
 	    }
 	    fclose(pidfile);
 	}
@@ -604,7 +604,7 @@ int main(int argc, char **argv)
 	retval = pipe2(pipes, O_CLOEXEC|O_NONBLOCK);
 	if (retval)
 	{
-	    logerror("error: can not install signal pipe");
+	    logerror("ERROR: can not install signal pipe");
 	    exit(EXIT_FAILURE);
 	}
 	signalpipe_rd = pipes[0];
@@ -629,43 +629,43 @@ int main(int argc, char **argv)
 	retval = sigaction(SIGUSR1, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGUSR2, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGTERM, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGQUIT, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGHUP, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGINT, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGCHLD, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
 	action.sa_flags = stdactionflags;
@@ -673,7 +673,7 @@ int main(int argc, char **argv)
 	retval = sigaction(SIGSEGV, &action, NULL);
 	if (retval)
 	{
-	    logerror("error: can not install signal handler");
+	    logerror("ERROR: can not install signal handler");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -741,7 +741,7 @@ int main(int argc, char **argv)
 		break;
 
 	    default:
-		logerror("error: %s() calling poll", __FUNCTION__);
+		logerror("ERROR: %s() calling poll", __FUNCTION__);
 		exit(EXIT_FAILURE);
 		// no break needed
 	    }
@@ -768,7 +768,7 @@ int main(int argc, char **argv)
 		retval = read(signalpipe_rd, &sigdata, sizeof(sigdata));
 		if (-1 == retval)
 		{
-		    logerror("error: reading signal data");
+		    logerror("ERROR: reading signal data");
 		    exit(EXIT_FAILURE);
 		}
 		else
@@ -848,7 +848,7 @@ int main(int argc, char **argv)
 		    retval = accept(serversocketfd, &addr, &addrlen);
 		    if (-1 == retval)
 		    {
-			logerror("error: calling accept");
+			logerror("ERROR: calling accept");
 			exit(EXIT_FAILURE);
 		    }
 		    else
@@ -881,19 +881,19 @@ int main(int argc, char **argv)
 	    retval = sigaction(SIGTERM, &action, NULL);
 	    if (retval)
 	    {
-		logerror("error: can not install signal handler");
+		logerror("ERROR: can not install signal handler");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = sigaction(SIGQUIT, &action, NULL);
 	    if (retval)
 	    {
-		logerror("error: can not install signal handler");
+		logerror("ERROR: can not install signal handler");
 		exit(EXIT_FAILURE);
 	    }
 	    retval = sigaction(SIGINT, &action, NULL);
 	    if (retval)
 	    {
-		logerror("error: can not install signal handler");
+		logerror("ERROR: can not install signal handler");
 		exit(EXIT_FAILURE);
 	    }
 

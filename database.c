@@ -348,7 +348,7 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
     int retval = sqlite3_prepare(dbhandler, copysql, -1, &ppstmt, NULL);
     if (SQLITE_OK != retval)
     {
-	printlog("error: preparing sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	printlog("ERROR: preparing sql statement '%s': %s", sql, sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
 
@@ -363,7 +363,7 @@ static void db_statement_finalize(sqlite3_stmt *ppstmt)
     int retval = sqlite3_finalize(ppstmt);
     if (SQLITE_OK != retval)
     {
-	printlog("error: finalizing sql statement: %s", sqlite3_errstr(retval));
+	printlog("ERROR: finalizing sql statement: %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
 }
@@ -414,7 +414,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 retval = sqlite3_bind_blob(ppstmt, col++, v, -1, SQLITE_STATIC);
                 if ( SQLITE_OK != retval )
                 {
-                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
@@ -430,7 +430,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 retval = sqlite3_bind_double(ppstmt, col++, d);
                 if ( SQLITE_OK != retval )
                 {
-                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
@@ -446,7 +446,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 retval = sqlite3_bind_text(ppstmt, col++, s, -1, SQLITE_STATIC);
                 if ( SQLITE_OK != retval )
                 {
-                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
@@ -463,7 +463,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 retval = sqlite3_bind_int(ppstmt, col++, i);
                 if ( SQLITE_OK != retval )
                 {
-                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
@@ -479,7 +479,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 retval = sqlite3_bind_int64(ppstmt, col++, l);
                 if ( SQLITE_OK != retval )
                 {
-                    printlog("error: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
+                    printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
@@ -522,7 +522,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	    assert(callback);
 	    if ( !callback )
 	    {
-		printlog("error: data available but no callback function defined for sql '%s'", db_select_statement[sid]);
+		printlog("ERROR: data available but no callback function defined for sql '%s'", db_select_statement[sid]);
 		/* go on with the loop until no more data is available */
 	    }
 	    else
@@ -532,19 +532,19 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 		int *type = calloc(ncol_result, sizeof(*type));
 		if ( !type )
 		{
-		    printlog("error: not enough memory");
+		    printlog("ERROR: not enough memory");
 		    exit(EXIT_FAILURE);
 		}
 		union callback_result_t *results = calloc(ncol_result, sizeof(*results));
 		if ( !results )
 		{
-		    printlog("error: not enough memory");
+		    printlog("ERROR: not enough memory");
 		    exit(EXIT_FAILURE);
 		}
 		const char **cols = calloc(ncol_result, sizeof(*cols));
 		if ( !cols )
 		{
-		    printlog("error: not enough memory");
+		    printlog("ERROR: not enough memory");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -575,7 +575,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 			break;
 
 		    default:
-			printlog("error: unknown type %d", mytype);
+			printlog("ERROR: unknown type %d", mytype);
 			exit(EXIT_FAILURE);
 		    }
 		    cols[i] = sqlite3_column_name(ppstmt, i);
@@ -602,7 +602,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
     switch(retval)
     {
     case SQLITE_BUSY:
-	printlog("error: db busy! Exceeded max calls (%d) to fetch data", try_num);
+	printlog("ERROR: db busy! Exceeded max calls (%d) to fetch data", try_num);
 	break;
 
     case SQLITE_ROW:
@@ -616,22 +616,22 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	/* there has been a data error. Print out and reset() the statement */
     {
 	const char *sql = db_select_statement[sid];
-	printlog("error: stepping sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	printlog("ERROR: stepping sql statement '%s': %s", sql, sqlite3_errstr(retval));
 	retval = sqlite3_reset(ppstmt);
 	if (SQLITE_OK != retval)
 	{
-	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    printlog("ERROR: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
 	}
     }
     break;
 
     case SQLITE_MISUSE:
 	/* the statement has been incorrect */
-	printlog("error: misuse of prepared sql statement '%s'", db_select_statement[sid]);
+	printlog("ERROR: misuse of prepared sql statement '%s'", db_select_statement[sid]);
 	break;
 
     case SQLITE_ABORT:
-	printlog("error: abort in callback function during steps of sql '%s'", db_select_statement[sid]);
+	printlog("ERROR: abort in callback function during steps of sql '%s'", db_select_statement[sid]);
 	exit(EXIT_FAILURE);
 	break;
 
@@ -642,7 +642,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	if (SQLITE_OK != retval)
 	{
 	    const char *sql = db_select_statement[sid];
-	    printlog("error: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    printlog("ERROR: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
 	    exit(EXIT_FAILURE);
 	}
 	break;
@@ -747,7 +747,7 @@ void db_init(void)
     int retval = sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_config(): %s\n"
+	printlog("ERROR: calling sqlite3_config(): %s\n"
 		"Can not set thread safe access mode\n"
 		"Did you compile sqlite3 with 'SQLITE_THREADSAFE=1'?", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
@@ -756,7 +756,7 @@ void db_init(void)
     retval = sqlite3_config(SQLITE_CONFIG_LOG, db_log, NULL);
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_config(): %s\n"
+	printlog("ERROR: calling sqlite3_config(): %s\n"
 		"Can not set db log function", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
@@ -764,14 +764,14 @@ void db_init(void)
     retval = sqlite3_initialize();
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_initialize(): %s", sqlite3_errstr(retval));
+	printlog("ERROR: calling sqlite3_initialize(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
 
     retval = sqlite3_open(":memory:", &dbhandler);
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_open(): %s", sqlite3_errstr(retval));
+	printlog("ERROR: calling sqlite3_open(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
     debug(1, "created memory db");
@@ -786,28 +786,28 @@ void db_init(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_condattr_init");
+	logerror("ERROR: pthread_condattr_init");
 	exit(EXIT_FAILURE);
     }
     retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_condattr_setclock() id %d", get_valid_clock_id());
+	logerror("ERROR: pthread_condattr_setclock() id %d", get_valid_clock_id());
 	exit(EXIT_FAILURE);
     }
     retval = pthread_cond_init(&idle_process_condition, &condattr);
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_cond_init");
+	logerror("ERROR: pthread_cond_init");
 	exit(EXIT_FAILURE);
     }
     retval = pthread_condattr_destroy(&condattr);
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_condattr_destroy");
+	logerror("ERROR: pthread_condattr_destroy");
 	exit(EXIT_FAILURE);
     }
 
@@ -834,7 +834,7 @@ void db_delete(void)
     int retval = sqlite3_close(dbhandler);
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_close(): %s", sqlite3_errstr(retval));
+	printlog("ERROR: calling sqlite3_close(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
     dbhandler = NULL;
@@ -842,7 +842,7 @@ void db_delete(void)
     retval = sqlite3_shutdown();
     if (SQLITE_OK != retval)
     {
-	printlog("error: calling sqlite3_shutdown(): %s", sqlite3_errstr(retval));
+	printlog("ERROR: calling sqlite3_shutdown(): %s", sqlite3_errstr(retval));
 	exit(EXIT_FAILURE);
     }
 }
@@ -859,7 +859,7 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -869,7 +869,7 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -925,7 +925,7 @@ int db_get_names_project(char ***projname, int *len)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -935,7 +935,7 @@ int db_get_names_project(char ***projname, int *len)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -989,7 +989,7 @@ void db_remove_project(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -999,7 +999,7 @@ void db_remove_project(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1016,7 +1016,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1026,7 +1026,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -1055,7 +1055,7 @@ char *db_get_project_for_this_process(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1065,7 +1065,7 @@ char *db_get_project_for_this_process(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1087,7 +1087,7 @@ char *db_get_project_for_this_process(pid_t pid)
 //    if (retval)
 //    {
 //	errno = retval;
-//	logerror("error acquire mutex lock");
+//	logerror("ERROR: acquire mutex lock");
 //	exit(EXIT_FAILURE);
 //    }
 //
@@ -1097,7 +1097,7 @@ char *db_get_project_for_this_process(pid_t pid)
 //    if (retval)
 //    {
 //	errno = retval;
-//	logerror("error unlock mutex lock");
+//	logerror("ERROR: unlock mutex lock");
 //	exit(EXIT_FAILURE);
 //    }
 //
@@ -1113,7 +1113,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     if (retval)
     {
 	errno = retval;
-	logerror("error: can not lock mutex");
+	logerror("ERROR: can not lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -1121,7 +1121,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1134,7 +1134,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex lock");
+	    logerror("ERROR: unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1147,7 +1147,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex lock");
+	    logerror("ERROR: unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1169,7 +1169,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    if (ETIMEDOUT != retval)
 	    {
 		errno = retval;
-		logerror("error: can not wait on condition");
+		logerror("ERROR: can not wait on condition");
 		exit(EXIT_FAILURE);
 	    }
 	    /* else timeout: just return -1 for pid as error value */
@@ -1187,7 +1187,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error acquire mutex lock");
+		logerror("ERROR: acquire mutex lock");
 		exit(EXIT_FAILURE);
 	    }
 
@@ -1200,7 +1200,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    if (retval)
 	    {
 		errno = retval;
-		logerror("error unlock mutex lock");
+		logerror("ERROR: unlock mutex lock");
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -1210,7 +1210,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1239,7 +1239,7 @@ int db_has_process(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1249,7 +1249,7 @@ int db_has_process(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1279,7 +1279,7 @@ int db_get_process_socket(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1289,7 +1289,7 @@ int db_get_process_socket(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1317,7 +1317,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1327,7 +1327,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1349,7 +1349,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1359,7 +1359,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1376,7 +1376,7 @@ int db_process_set_state_idle(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error: can not lock mutex");
+	logerror("ERROR: can not lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -1384,7 +1384,7 @@ int db_process_set_state_idle(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1394,7 +1394,7 @@ int db_process_set_state_idle(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1403,7 +1403,7 @@ int db_process_set_state_idle(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error: can not wait on condition");
+	logerror("ERROR: can not wait on condition");
 	exit(EXIT_FAILURE);
     }
 
@@ -1411,7 +1411,7 @@ int db_process_set_state_idle(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1427,7 +1427,7 @@ int db_process_set_state_exit(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1437,7 +1437,7 @@ int db_process_set_state_exit(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1453,7 +1453,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1463,7 +1463,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1494,7 +1494,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1504,7 +1504,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1551,7 +1551,7 @@ int db_get_num_start_init_idle_process(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1561,7 +1561,7 @@ int db_get_num_start_init_idle_process(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1621,7 +1621,7 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1631,7 +1631,7 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1714,7 +1714,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1724,7 +1724,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1773,7 +1773,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1783,7 +1783,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -1810,7 +1810,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1820,7 +1820,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1841,7 +1841,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1851,7 +1851,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1869,7 +1869,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1879,7 +1879,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1897,7 +1897,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1907,7 +1907,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1925,7 +1925,7 @@ void db_move_all_process_to_list(enum db_process_list_e list)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1935,7 +1935,7 @@ void db_move_all_process_to_list(enum db_process_list_e list)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -1976,7 +1976,7 @@ int db_reset_signal_timer(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1986,7 +1986,7 @@ int db_reset_signal_timer(pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2020,7 +2020,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2030,7 +2030,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2068,7 +2068,7 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2078,7 +2078,7 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2109,7 +2109,7 @@ int db_get_num_shutdown_processes(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2119,7 +2119,7 @@ int db_get_num_shutdown_processes(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2137,7 +2137,7 @@ int db_remove_process_with_state_exit(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2147,7 +2147,7 @@ int db_remove_process_with_state_exit(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2163,7 +2163,7 @@ void db_inc_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2173,7 +2173,7 @@ void db_inc_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -2202,7 +2202,7 @@ int db_get_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2212,7 +2212,7 @@ int db_get_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2230,7 +2230,7 @@ void db_reset_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2240,7 +2240,7 @@ void db_reset_startup_failures(const char *projname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -2267,7 +2267,7 @@ int db_add_new_inotifyid(const char *path, int watchd)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2277,7 +2277,7 @@ int db_add_new_inotifyid(const char *path, int watchd)
 
     if (0 > inotifyid)
     {
-	printlog("error: can not set uniq id for inotify handler (%d)", inotifyid);
+	printlog("ERROR: can not set uniq id for inotify handler (%d)", inotifyid);
 	exit(EXIT_FAILURE);
     }
 
@@ -2287,7 +2287,7 @@ int db_add_new_inotifyid(const char *path, int watchd)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2301,7 +2301,7 @@ void db_remove_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2311,7 +2311,7 @@ void db_remove_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 }
@@ -2337,7 +2337,7 @@ int db_get_num_of_similar_watches_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2347,7 +2347,7 @@ int db_get_num_of_similar_watches_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2377,7 +2377,7 @@ int db_get_watchd_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2387,7 +2387,7 @@ int db_get_watchd_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2446,7 +2446,7 @@ void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2456,7 +2456,7 @@ void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2509,7 +2509,7 @@ char *db_get_project_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2519,7 +2519,7 @@ char *db_get_project_for_inotifyid(int inotifyid)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2552,7 +2552,7 @@ int db_get_inotifyid_for_project(const char *projectname)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2562,7 +2562,7 @@ int db_get_inotifyid_for_project(const char *projectname)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2601,7 +2601,7 @@ void strnbcat(char **buffer, int *len, const char *str)
     if (i >= max_resize_iteration)
     {
 	/* possible endless loop. exit with error */
-	printlog("error: possible endless loop in resize() algorithm. exit");
+	printlog("ERROR: possible endless loop in resize() algorithm. exit");
 	exit(EXIT_FAILURE);
     }
     if ( newlen != *len )
@@ -2611,7 +2611,7 @@ void strnbcat(char **buffer, int *len, const char *str)
 	if ( !*buffer )
 	{
 	    /* realloc failed. exit */
-	    logerror("error: realloc failed");
+	    logerror("ERROR: realloc failed");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -2668,7 +2668,7 @@ void db_dump(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -2696,7 +2696,7 @@ void db_dump(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 

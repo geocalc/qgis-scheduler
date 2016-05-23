@@ -205,7 +205,7 @@ static int load_include_file(FILE *f, const char *configpath)
     int retval = stat(configpath, &statbuff);
     if (-1 == retval)
     {
-	logerror("error calling stat() on '%s'", configpath);
+	logerror("ERROR: calling stat() on '%s'", configpath);
 	exit(EXIT_FAILURE);
     }
 
@@ -241,7 +241,7 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
     FILE *configfile = fopen(configpath, "r");
     if (NULL == configfile)
     {
-	logerror("error: can not open configuration file '%s'", configpath);
+	logerror("ERROR: can not open configuration file '%s'", configpath);
 	exit(EXIT_FAILURE);
     }
 
@@ -252,14 +252,14 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
 	size_t len = fread(buffer, 1, bufferlen, configfile);
 	if (ferror(configfile))
 	{
-	    logerror("error: reading from '%s'", configpath);
+	    logerror("ERROR: reading from '%s'", configpath);
 	    exit(EXIT_FAILURE);
 	}
 
 	fwrite(buffer, 1, len, tmpf);
 	if (ferror(tmpf))
 	{
-	    logerror("error: writing to temporary file '%s'", tmpfilename);
+	    logerror("ERROR: writing to temporary file '%s'", tmpfilename);
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -267,7 +267,7 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
     retval = fclose(configfile);
     if (EOF == retval)
     {
-	logerror("error: closing file '%s'", configpath);
+	logerror("ERROR: closing file '%s'", configpath);
 	exit(EXIT_FAILURE);
     }
 
@@ -278,7 +278,7 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
 static int glob_find_err(const char *epath, int eerrno)
 {
     errno = eerrno;
-    logerror("error: glob testing path '%s'", epath);
+    logerror("ERROR: glob testing path '%s'", epath);
 
     return 0;	// continue finding in glob(): return 0
 }
@@ -302,7 +302,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
 	break;
 
     case GLOB_NOSPACE:
-	printlog("error: glob can not allocate memory");
+	printlog("ERROR: glob can not allocate memory");
 	exit(EXIT_FAILURE);
 
     case 0:
@@ -323,7 +323,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
     }
 
     default:
-	printlog("error: glob returned unknown error code %d", retval);
+	printlog("ERROR: glob returned unknown error code %d", retval);
 	exit(EXIT_FAILURE);
     }
 
@@ -362,14 +362,14 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    char *tmpfilename = tempnam(NULL, "qgis-schedulerd");
 	    if ( !tmpfilename )
 	    {
-		printlog("error: tmpnam() returned no temporary file name");
+		printlog("ERROR: tmpnam() returned no temporary file name");
 		exit(EXIT_FAILURE);
 	    }
 
 	    int tmpfd = open(tmpfilename, O_CREAT|O_WRONLY|O_EXCL|O_CLOEXEC, S_IRUSR|S_IWUSR);
 	    if (-1 == tmpfd)
 	    {
-		logerror("error: can not open temporary file %s", tmpfilename);
+		logerror("ERROR: can not open temporary file %s", tmpfilename);
 		exit(EXIT_FAILURE);
 	    }
 
@@ -377,7 +377,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    FILE *tmpf = fdopen(tmpfd, "w");
 	    if (NULL == tmpf)
 	    {
-		logerror("error: can not open file descriptor on temporary file %s", tmpfilename);
+		logerror("ERROR: can not open file descriptor on temporary file %s", tmpfilename);
 		exit(EXIT_FAILURE);
 	    }
 
@@ -408,7 +408,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    retval = fclose(tmpf);
 	    if (EOF == retval)
 	    {
-		logerror("error: can not close temporary file %s", tmpfilename);
+		logerror("ERROR: can not close temporary file %s", tmpfilename);
 		exit(EXIT_FAILURE);
 	    }
 
@@ -419,7 +419,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 		retval = unlink(tmpfilename);
 		if (-1 == retval)
 		{
-		    logerror("error: can not remove temporary file %s", tmpfilename);
+		    logerror("ERROR: can not remove temporary file %s", tmpfilename);
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -674,7 +674,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -715,7 +715,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 	{
 	    if (NULL == newconfig)
 	    {
-		logerror("ERROR could not load configuration file '%s'", path);
+		logerror("ERROR: could not load configuration file '%s'", path);
 		exit(EXIT_FAILURE);
 	    }
 	    else
@@ -744,7 +744,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
     if (!config_opts)
@@ -763,7 +763,7 @@ void config_shutdown(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -773,7 +773,7 @@ void config_shutdown(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -789,7 +789,7 @@ int config_get_num_projects(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -799,7 +799,7 @@ int config_get_num_projects(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -816,7 +816,7 @@ const char *config_get_name_project(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -826,7 +826,7 @@ const char *config_get_name_project(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -842,7 +842,7 @@ const char *config_get_network_listen(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -852,7 +852,7 @@ const char *config_get_network_listen(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -868,7 +868,7 @@ const char *config_get_network_port(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -878,7 +878,7 @@ const char *config_get_network_port(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -894,7 +894,7 @@ const char *config_get_chuser(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -904,7 +904,7 @@ const char *config_get_chuser(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -920,7 +920,7 @@ const char *config_get_chroot(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -930,7 +930,7 @@ const char *config_get_chroot(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -946,7 +946,7 @@ const char *config_get_pid_path(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -956,7 +956,7 @@ const char *config_get_pid_path(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -972,7 +972,7 @@ const char *config_get_logfile(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -982,7 +982,7 @@ const char *config_get_logfile(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1011,7 +1011,7 @@ const char *config_get_process(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1034,7 +1034,7 @@ const char *config_get_process(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1055,7 +1055,7 @@ const char *config_get_process_args(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1078,7 +1078,7 @@ const char *config_get_process_args(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1099,7 +1099,7 @@ int config_get_min_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1122,7 +1122,7 @@ int config_get_min_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1143,7 +1143,7 @@ int config_get_max_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1166,7 +1166,7 @@ int config_get_max_idle_processes(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1188,7 +1188,7 @@ const char *config_get_scan_parameter_key(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire mutex lock");
+	    logerror("ERROR: acquire mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1206,7 +1206,7 @@ const char *config_get_scan_parameter_key(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex lock");
+	    logerror("ERROR: unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1229,7 +1229,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire mutex lock");
+	    logerror("ERROR: acquire mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1247,7 +1247,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex lock");
+	    logerror("ERROR: unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1269,7 +1269,7 @@ const char *config_get_working_directory(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1292,7 +1292,7 @@ const char *config_get_working_directory(const char *project)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1315,7 +1315,7 @@ const char *config_get_project_config_path(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error acquire mutex lock");
+	    logerror("ERROR: acquire mutex lock");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1332,7 +1332,7 @@ const char *config_get_project_config_path(const char *project)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error unlock mutex lock");
+	    logerror("ERROR: unlock mutex lock");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -1352,7 +1352,7 @@ const char *config_get_init_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1378,7 +1378,7 @@ const char *config_get_init_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1397,7 +1397,7 @@ const char *config_get_init_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1423,7 +1423,7 @@ const char *config_get_init_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1442,7 +1442,7 @@ const char *config_get_env_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1481,7 +1481,7 @@ const char *config_get_env_key(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1500,7 +1500,7 @@ const char *config_get_env_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error acquire mutex lock");
+	logerror("ERROR: acquire mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1539,7 +1539,7 @@ const char *config_get_env_value(const char *project, int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex lock");
+	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
 
@@ -1581,7 +1581,7 @@ void test_set_valid_clock_id(void)
 	{
 	    if (EINVAL != errno)
 	    {
-		logerror("error: clock_getres(%d, NULL)", clockidarr[i]);
+		logerror("ERROR: clock_getres(%d, NULL)", clockidarr[i]);
 	    }
 	}
 	else
@@ -1593,7 +1593,7 @@ void test_set_valid_clock_id(void)
     }
 
     if (errno)
-	logerror("error: can not get valid clockid");
+	logerror("ERROR: can not get valid clockid");
 
 }
 

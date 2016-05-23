@@ -110,7 +110,7 @@ struct qgis_project_s *qgis_project_new(const char *name, const char *configpath
     if (retval)
     {
 	errno = retval;
-	logerror("error init read-write lock");
+	logerror("ERROR: init read-write lock");
 	exit(EXIT_FAILURE);
     }
 

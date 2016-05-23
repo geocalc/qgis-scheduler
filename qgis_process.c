@@ -105,7 +105,7 @@ struct qgis_process_s *qgis_process_new(pid_t pid, int process_socket_fd)
     if (retval)
     {
 	errno = retval;
-	logerror("error: pthread_mutex_init");
+	logerror("ERROR: pthread_mutex_init");
 	exit(EXIT_FAILURE);
     }
 
@@ -131,7 +131,7 @@ void qgis_process_delete(struct qgis_process_s *proc)
 	if (retval)
 	{
 	    errno = retval;
-	    logerror("error delete mutex");
+	    logerror("ERROR: delete mutex");
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -354,7 +354,7 @@ static void qgis_process_send_signal(struct qgis_process_s *proc, int signum)
 	}
 	else if (signum)
 	{
-	    logerror("error: %s:%d kill pid %d", __FUNCTION__, __LINE__, proc->pid);
+	    logerror("ERROR: %s:%d kill pid %d", __FUNCTION__, __LINE__, proc->pid);
 	    exit(EXIT_FAILURE);
 	}
     }
@@ -462,7 +462,7 @@ void qgis_process_signal_shutdown(struct qgis_process_s *proc)
 	break;
 
     default:
-	printlog("error: %s:%d unknown state %d", __FUNCTION__, __LINE__, proc->state);
+	printlog("ERROR: %s:%d unknown state %d", __FUNCTION__, __LINE__, proc->state);
     }
 
 

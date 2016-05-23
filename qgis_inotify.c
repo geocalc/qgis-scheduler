@@ -188,7 +188,7 @@ static void *inotify_thread_watch(void *arg)
 		    break;
 
 		default:
-		    debug(1, "error: got unexpected event %d", tmp_in_event->mask);
+		    debug(1, "ERROR: got unexpected event %d", tmp_in_event->mask);
 		    break;
 		}
 
@@ -255,7 +255,7 @@ void qgis_inotify_init(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error creating thread");
+	logerror("ERROR: creating thread");
 	exit(EXIT_FAILURE);
     }
 
@@ -284,7 +284,7 @@ void qgis_inotify_delete(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error joining thread");
+	logerror("ERROR: joining thread");
 	exit(EXIT_FAILURE);
     }
 
@@ -322,12 +322,12 @@ int qgis_inotify_watch_file(const char *path)
 	    case ENOENT:
 	    case ENOTDIR:
 	    case EOVERFLOW:
-		logerror("error accessing file '%s': ", path);
+		logerror("ERROR: accessing file '%s': ", path);
 		debug(1, "file is not watched for changes");
 		break;
 
 	    default:
-		logerror("error accessing file '%s': ", path);
+		logerror("ERROR: accessing file '%s': ", path);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -386,7 +386,7 @@ int qgis_inotify_watch_file(const char *path)
 		if (retval)
 		{
 		    errno = retval;
-		    logerror("error acquire read-write lock");
+		    logerror("ERROR: acquire read-write lock");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -421,7 +421,7 @@ int qgis_inotify_watch_file(const char *path)
 		if (retval)
 		{
 		    errno = retval;
-		    logerror("error unlock read-write lock");
+		    logerror("ERROR: unlock read-write lock");
 		    exit(EXIT_FAILURE);
 		}
 
@@ -430,7 +430,7 @@ int qgis_inotify_watch_file(const char *path)
 	    }
 	    else
 	    {
-		//debug(1, "error '%s' is no regular file", configpath);
+		//debug(1, "ERROR: '%s' is no regular file", configpath);
 		printlog("INFO: Inotify can not watch '%s', no regular file", path);
 	    }
 	}

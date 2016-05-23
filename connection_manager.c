@@ -76,7 +76,7 @@ static int change_file_mode_blocking(int fd, int is_blocking)
     int retval = fcntl(fd, F_GETFL, 0);
     if (-1 == retval)
     {
-	logerror("error: fcntl(%d, F_GETFL, 0)", fd);
+	logerror("ERROR: fcntl(%d, F_GETFL, 0)", fd);
 	exit(EXIT_FAILURE);
     }
     int flags = retval;
@@ -90,7 +90,7 @@ static int change_file_mode_blocking(int fd, int is_blocking)
     retval = fcntl(fd, F_SETFL, flags);
     if (-1 == retval)
     {
-	logerror("error: fcntl(%d, F_SETFL, %#x)", fd, flags);
+	logerror("ERROR: fcntl(%d, F_SETFL, %#x)", fd, flags);
 	exit(EXIT_FAILURE);
     }
     debug(1, "set fd %d flags %#x", fd, flags);
@@ -135,7 +135,7 @@ static void *thread_handle_connection(void *arg)
 //    int debugfd = open(debugfile, (O_WRONLY|O_CREAT|O_TRUNC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 //    if (-1 == debugfd)
 //    {
-//	debug(1, "error can not open file '%s': ", debugfile);
+//	debug(1, "ERROR: can not open file '%s': ", debugfile);
 //	logerror(NULL);
 //	exit(EXIT_FAILURE);
 //    }
@@ -174,7 +174,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -213,7 +213,7 @@ static void *thread_handle_connection(void *arg)
 		    }
 		    else
 		    {
-			logerror("error: reading from network socket");
+			logerror("ERROR: reading from network socket");
 			exit(EXIT_FAILURE);
 		    }
 		}
@@ -302,13 +302,13 @@ static void *thread_handle_connection(void *arg)
 				else
 				{
 				    // TODO: do not overflow the log with this message, do parse the config file at program start
-				    debug(1, "error: no regular expression found for project '%s'", proj_name);
+				    debug(1, "ERROR: no regular expression found for project '%s'", proj_name);
 				}
 
 			    }
 			    else
 			    {
-				debug(1, "error: no name for project number %d in configuration found", i);
+				debug(1, "ERROR: no name for project number %d in configuration found", i);
 			    }
 			}
 			debug(1, "found project '%s' in query string", request_project_name);
@@ -397,7 +397,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -430,7 +430,7 @@ static void *thread_handle_connection(void *arg)
 		}
 		else
 		{
-		    logerror("error: writing to network socket");
+		    logerror("ERROR: writing to network socket");
 		    exit(EXIT_FAILURE);
 		}
 	    }
@@ -513,7 +513,7 @@ static void *thread_handle_connection(void *arg)
 	retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
-	    logerror("error retrieving the name of child process socket %d", childunixsocketfd);
+	    logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
 	    exit(EXIT_FAILURE);
 	}
 	/* leave the original child socket and create a new one on the opposite
@@ -522,14 +522,14 @@ static void *thread_handle_connection(void *arg)
 	retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
 	if (-1 == retval)
 	{
-	    logerror("error: can not create socket to child process");
+	    logerror("ERROR: can not create socket to child process");
 	    exit(EXIT_FAILURE);
 	}
 	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
 	retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
 	if (-1 == retval)
 	{
-	    logerror("error: can not connect to child process");
+	    logerror("ERROR: can not connect to child process");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -542,7 +542,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -551,7 +551,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(childunixsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -560,7 +560,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -569,7 +569,7 @@ static void *thread_handle_connection(void *arg)
 	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_RCVBUF, &sockbufsize, &size);
 	    if (-1 == retval)
 	    {
-		logerror("error: getsockopt");
+		logerror("ERROR: getsockopt");
 		exit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
@@ -636,7 +636,7 @@ static void *thread_handle_connection(void *arg)
 		    break;
 
 		default:
-		    logerror("error: %s() calling poll", __FUNCTION__);
+		    logerror("ERROR: %s() calling poll", __FUNCTION__);
 		    exit(EXIT_FAILURE);
 		    // no break needed
 		}
@@ -689,7 +689,7 @@ static void *thread_handle_connection(void *arg)
 			}
 			else
 			{
-			    logerror("error: writing to child process socket");
+			    logerror("ERROR: writing to child process socket");
 			    exit(EXIT_FAILURE);
 			}
 		    }
@@ -714,7 +714,7 @@ static void *thread_handle_connection(void *arg)
 			}
 			else
 			{
-			    logerror("error: reading from network socket (%d)", errno);
+			    logerror("ERROR: reading from network socket (%d)", errno);
 			    exit(EXIT_FAILURE);
 			}
 		    }
@@ -740,7 +740,7 @@ static void *thread_handle_connection(void *arg)
 			}
 			else
 			{
-			    logerror("error: writing to child process socket");
+			    logerror("ERROR: writing to child process socket");
 			    exit(EXIT_FAILURE);
 			}
 		    }
@@ -764,7 +764,7 @@ static void *thread_handle_connection(void *arg)
 		    }
 		    else
 		    {
-			logerror("error: reading from child process socket");
+			logerror("ERROR: reading from child process socket");
 			exit(EXIT_FAILURE);
 		    }
 		}
@@ -789,7 +789,7 @@ static void *thread_handle_connection(void *arg)
 		    }
 		    else
 		    {
-			logerror("error: writing to network socket");
+			logerror("ERROR: writing to network socket");
 			exit(EXIT_FAILURE);
 		    }
 		}
@@ -852,7 +852,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
 	    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret < 0)
     {
-	printlog("error: can not convert host address: %s", gai_strerror(ret));
+	printlog("ERROR: can not convert host address: %s", gai_strerror(ret));
 	targs->hostname = NULL;
     }
     else
@@ -867,7 +867,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     if (retval)
     {
 	errno = retval;
-	logerror("error init thread attributes");
+	logerror("ERROR: init thread attributes");
 	exit(EXIT_FAILURE);
     }
     /* detach connection thread from the main thread. Doing this to collect
@@ -878,7 +878,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     if (retval)
     {
 	errno = retval;
-	logerror("error setting attribute thread detached");
+	logerror("ERROR: setting attribute thread detached");
 	exit(EXIT_FAILURE);
     }
 
@@ -887,7 +887,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     if (retval)
     {
 	errno = retval;
-	logerror("error creating thread");
+	logerror("ERROR: creating thread");
 	exit(EXIT_FAILURE);
     }
     pthread_attr_destroy(&attr);

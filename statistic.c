@@ -41,7 +41,7 @@ void statistic_add_connection(const struct timespec *timeradd)
     if (retval)
     {
 	errno = retval;
-	logerror("error lock mutex");
+	logerror("ERROR: lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -52,7 +52,7 @@ void statistic_add_connection(const struct timespec *timeradd)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex");
+	logerror("ERROR: unlock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -65,7 +65,7 @@ void statistic_add_connection(const struct timespec *timeradd)
 //    if (retval)
 //    {
 //	errno = retval;
-//	logerror("error lock mutex");
+//	logerror("ERROR: lock mutex");
 //	exit(EXIT_FAILURE);
 //    }
 //
@@ -75,7 +75,7 @@ void statistic_add_connection(const struct timespec *timeradd)
 //    if (retval)
 //    {
 //	errno = retval;
-//	logerror("error unlock mutex");
+//	logerror("ERROR: unlock mutex");
 //	exit(EXIT_FAILURE);
 //    }
 //}
@@ -87,7 +87,7 @@ void statistic_add_process_shutdown(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error lock mutex");
+	logerror("ERROR: lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -97,7 +97,7 @@ void statistic_add_process_shutdown(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex");
+	logerror("ERROR: unlock mutex");
 	exit(EXIT_FAILURE);
     }
 }
@@ -109,7 +109,7 @@ void statistic_add_process_start(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error lock mutex");
+	logerror("ERROR: lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -119,7 +119,7 @@ void statistic_add_process_start(int num)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex");
+	logerror("ERROR: unlock mutex");
 	exit(EXIT_FAILURE);
     }
 }
@@ -131,7 +131,7 @@ void statistic_printlog(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error lock mutex");
+	logerror("ERROR: lock mutex");
 	exit(EXIT_FAILURE);
     }
 
@@ -142,7 +142,7 @@ void statistic_printlog(void)
     if (retval)
     {
 	errno = retval;
-	logerror("error unlock mutex");
+	logerror("ERROR: unlock mutex");
 	exit(EXIT_FAILURE);
     }
 
