@@ -638,6 +638,25 @@ static void config_convert_list_to_array(char ***array, struct sectionlist_s *li
 }
 
 
+static void check_config(dictionary *config)
+{
+    int n = iniparser_getnsec(config);
+    int i;
+    for (i=0; i<n; i++)
+    {
+	char *secname = iniparser_getsecname(config, i);
+
+	/* Test if a regular expression is given in the key value pairs */
+	const char *key = config_get_scan_parameter_key(secname);
+	if ( !key )
+	{
+	    printlog("WARNING: no regular expression found for project '%s'. Can not filter requests for this project", secname);
+	}
+
+    }
+
+}
+
 
 /* =======================================================
  * public API
@@ -747,6 +766,9 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
+
+    check_config(config_opts);
+
     if (!config_opts)
 	return -1;
 

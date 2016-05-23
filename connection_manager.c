@@ -299,12 +299,6 @@ static void *thread_handle_connection(void *arg)
 					regfree(&regex);
 				    }
 				}
-				else
-				{
-				    // TODO: do not overflow the log with this message, do parse the config file at program start
-				    debug(1, "ERROR: no regular expression found for project '%s'", proj_name);
-				}
-
 			    }
 			    else
 			    {
