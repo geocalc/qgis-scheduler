@@ -852,7 +852,7 @@ void process_manager_process_died(void)
 			    }
 			    else
 			    {
-				printlog("warning: max number (%d) of startup failures in project %s reached."
+				printlog("WARNING: max number (%d) of startup failures in project %s reached."
 					" Stoppped creating new processes until new qgis configuration file is set",
 					max_nr_process_crashes, projname);
 			    }
@@ -860,7 +860,7 @@ void process_manager_process_died(void)
 			}
 			else
 			{
-			    printlog("warning: no project found for pid %d", pid);
+			    printlog("WARNING: no project found for pid %d", pid);
 			}
 		    }
 		}

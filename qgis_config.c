@@ -691,7 +691,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 	{
 	    if (NULL == newconfig)
 	    {
-		logerror("WARNING could not load configuration file '%s'", path);
+		logerror("WARNING: could not load configuration file '%s'", path);
 		*sectionnew = *sectionchanged = *sectiondelete = NULL;
 	    }
 	    else

@@ -243,7 +243,7 @@ void project_manager_shutdown_project(const char *project_name)
     }
     else
     {
-	printlog("warning: got shutdown request for '%s' but no inotify id stored?", project_name);
+	printlog("WARNING: got shutdown request for '%s' but no inotify id stored?", project_name);
     }
     db_move_all_process_from_init_to_shutdown_list(project_name);
     db_move_all_process_from_active_to_shutdown_list(project_name);
