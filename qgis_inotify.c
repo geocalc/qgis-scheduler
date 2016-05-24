@@ -440,18 +440,19 @@ int qgis_inotify_watch_file(const char *path)
 }
 
 
-/* deletes the inotify watch for the file which is identified by "watchid".
+/* deletes the inotify watch for the file which is identified
+ * by the config file path.
  */
-void qgis_inotify_delete_watch(int inotifyid)
+void qgis_inotify_delete_watch(const char *path)
 {
     /* check the number of inotifyids which also got this watch descriptor.
      * if the number is <= 1 we can remove the watch from this file.
      */
-    int watchnum = db_get_num_of_similar_watches_for_inotifyid(inotifyid);
-    debug(1, "number of projects %d are watching with same watchd as inotify id %d", watchnum, inotifyid);
+    int watchnum = db_get_num_watchd_from_config(path);
+    debug(1, "number of watches %d with same directory from %s", watchnum, path);
     if (watchnum <= 1)
     {
-	int watchd = db_get_watchd_for_inotifyid(inotifyid);
+	int watchd = db_get_watchd_from_config(path);
 	debug(1, "remove inotify watchd %d", watchd);
 	int retval = inotify_rm_watch(inotifyfd, watchd);
 	if (-1 == retval)
@@ -460,7 +461,7 @@ void qgis_inotify_delete_watch(int inotifyid)
 	    exit(EXIT_FAILURE);
 	}
     }
-    db_remove_inotifyid(inotifyid);
+    db_remove_inotify_configpath(path);
 }
 
 
