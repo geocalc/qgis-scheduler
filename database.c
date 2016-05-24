@@ -164,6 +164,7 @@ enum db_select_statement_id
     DB_GET_PROJECT_FROM_INOTIFYID,
     DB_GET_INOTIFYID_FROM_PROJECT,
     DB_GET_UNUSED_INOTIFYID,
+    DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
     DB_DUMP_INOTIFY,
@@ -256,6 +257,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT inotifyid FROM projects WHERE name = %s",
 	// DB_GET_UNUSED_INOTIFYID
 	"SELECT min(inotifyid+1) FROM (SELECT 0 AS inotifyid UNION ALL SELECT MIN(inotifyid + 1) FROM inotify) AS T1 WHERE inotifyid+1 NOT IN (SELECT inotifyid FROM inotify)",
+	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
+	"SELECT name FROM projects WHERE configpath IN (SELECT configpath FROM inotify WHERE watchd = %d) AND configbasename = %s",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
@@ -2641,6 +2644,107 @@ int db_get_inotifyid_for_project(const char *projectname)
     debug(1, "returned %d", ret);
 
     return ret;
+}
+
+
+void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, const char *filename)
+{
+    assert(list);
+    assert(len);
+
+    struct namelist_s
+    {
+	STAILQ_HEAD(listhead, nameiterator_s) head;	/* Linked list head */
+    };
+
+    struct nameiterator_s
+    {
+        STAILQ_ENTRY(nameiterator_s) entries;          /* Linked list prev./next entry */
+        char *name;
+    };
+
+    int get_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	struct namelist_s *list = data;
+
+	struct nameiterator_s *entry = malloc(sizeof(*entry));
+	assert(entry);
+	if ( !entry )
+	{
+	    logerror("ERROR: could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+	entry->name = strdup((const char *)results[0].text);
+
+	if (STAILQ_EMPTY(&list->head))
+	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
+	else
+	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+
+	return 0;
+    }
+
+    int num = 0;
+    char **array = NULL;
+
+    struct namelist_s namelist;
+    STAILQ_INIT(&namelist.head);
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS, get_names_list, &namelist, watchd, filename);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    struct nameiterator_s *it;
+    STAILQ_FOREACH(it, &namelist.head, entries)
+    {
+	num++;
+    }
+    debug(1, "select found %d project names", num);
+
+    /* aquire the pointer array */
+    *len = num;
+    array = calloc(num, sizeof(*array));
+    *list = array;
+
+    num = 0;
+    while( !STAILQ_EMPTY(&namelist.head) )
+    {
+	assert(num < *len);
+	it = STAILQ_FIRST(&namelist.head);
+	array[num++] = it->name;
+
+	STAILQ_REMOVE_HEAD(&namelist.head, entries);
+	free(it);
+    }
+
+}
+
+
+void db_delete_projects_for_watchd_and_config(char **list, int len)
+{
+    if (list)
+    {
+	int i;
+	for (i=0; i<len; i++)
+	    free(list[i]);
+	free(list);
+    }
 }
 
 
