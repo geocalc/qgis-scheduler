@@ -276,6 +276,7 @@ enum db_process_state_e qgis_state_to_db_state(enum qgis_process_state_e state)
     return (enum db_process_state_e)state;
 }
 
+void strnbcat(char **buffer, int *len, const char *str);
 
 static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
 {
@@ -379,10 +380,23 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
      * 4. Reset the prepared statement using sqlite3_reset() then go back to step 2. Do this zero or more times.
      * 5. Destroy the object using sqlite3_finalize().
      */
-#define BUFFERSIZE 32
     int retval;
-    char debug_buffer[BUFFERSIZE] = {0,};
     const int loglevel = config_get_debuglevel();
+
+#define BUFFERSIZE 64
+    char debug_buffer[BUFFERSIZE] = {0,};
+    int debug_loglen = BUFFERSIZE;
+    char *debug_log = NULL;
+    if (1 <= loglevel)
+    {
+	debug_log = malloc(BUFFERSIZE);
+	if (NULL == debug_log)
+	{
+	    logerror("ERROR: ");
+	    exit(EXIT_FAILURE);
+	}
+	*debug_log = '\0';
+    }
 
     assert(dbhandler);
     assert(sid < DB_SELECT_ID_MAX);
@@ -418,7 +432,10 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
-                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %p", v);
+                {
+                    snprintf(debug_buffer, BUFFERSIZE-1, ", %p", v);
+                    strnbcat(&debug_log, &debug_loglen, debug_buffer);
+                }
 		break;
 	    }
 
@@ -434,7 +451,10 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
-                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %f", d);
+                {
+                    snprintf(debug_buffer, BUFFERSIZE-1, ", %f", d);
+                    strnbcat(&debug_log, &debug_loglen, debug_buffer);
+                }
 		break;
 	    }
 
@@ -450,7 +470,10 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
-                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %s", s);
+                {
+                    snprintf(debug_buffer, BUFFERSIZE-1, ", %s", s);
+                    strnbcat(&debug_log, &debug_loglen, debug_buffer);
+                }
 		break;
 	    }
 
@@ -467,7 +490,10 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
-                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %d", i);
+                {
+                    snprintf(debug_buffer, BUFFERSIZE-1, ", %d", i);
+                    strnbcat(&debug_log, &debug_loglen, debug_buffer);
+                }
 		break;
 	    }
 
@@ -483,7 +509,10 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                     exit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
-                    snprintf(debug_buffer+strlen(debug_buffer), BUFFERSIZE-strlen(debug_buffer)-1, ", %lld", l);
+                {
+                    snprintf(debug_buffer, BUFFERSIZE-1, ", %lld", l);
+                    strnbcat(&debug_log, &debug_loglen, debug_buffer);
+                }
 		break;
 	    }
 
@@ -507,8 +536,8 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	}
     }
     va_end(args);
-    debug_buffer[BUFFERSIZE-1] = '\0';
-    debug(1, "db selected %d: '%s%s'", sid, db_select_statement[sid], debug_buffer);
+    debug(1, "db selected %d: '%s%s'", sid, db_select_statement[sid], debug_log);
+    free(debug_log);
 
     int try_num = 0;
     do {
