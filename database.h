@@ -137,6 +137,7 @@ char *db_get_project_for_inotifyid(int inotifyid);
 int db_get_inotifyid_for_project(const char *projectname);
 void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, const char *filename);
 void db_delete_projects_for_watchd_and_config(char **list, int len);
+int db_get_watchd_from_config(const char *path);
 
 void db_dump(void);
 

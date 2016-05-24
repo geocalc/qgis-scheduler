@@ -165,6 +165,7 @@ enum db_select_statement_id
     DB_GET_INOTIFYID_FROM_PROJECT,
     DB_GET_UNUSED_INOTIFYID,
     DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS,
+    DB_GET_WATCHD_FROM_CONFIG,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
     DB_DUMP_INOTIFY,
@@ -259,6 +260,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT min(inotifyid+1) FROM (SELECT 0 AS inotifyid UNION ALL SELECT MIN(inotifyid + 1) FROM inotify) AS T1 WHERE inotifyid+1 NOT IN (SELECT inotifyid FROM inotify)",
 	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
 	"SELECT name FROM projects WHERE configpath IN (SELECT configpath FROM inotify WHERE watchd = %d) AND configbasename = %s",
+	// DB_GET_WATCHD_FROM_CONFIG
+	"SELECT watchd FROM inotify WHERE configpath = %s",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
@@ -2745,6 +2748,49 @@ void db_delete_projects_for_watchd_and_config(char **list, int len)
 	    free(list[i]);
 	free(list);
     }
+}
+
+
+int db_get_watchd_from_config(const char *path)
+{
+    assert(path);
+
+    int get_watchd_from_config(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*val = results[0].integer;
+	debug(1, "returned value %d", *val);
+
+	return 0;
+    }
+
+    int ret = -1;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_GET_WATCHD_FROM_CONFIG, get_watchd_from_config, &ret, path);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %d", ret);
+
+    return ret;
 }
 
 
