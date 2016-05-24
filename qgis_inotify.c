@@ -144,7 +144,7 @@ static void *inotify_thread_watch(void *arg)
 	{
 	    struct inotify_event *tmp_in_event = inotifyevent;
 	    int size_read = retval;
-	    debug(1, "inotify read %d bytes, sizeof event %lu, len %u", size_read, sizeof(*tmp_in_event), tmp_in_event->len);
+	    debug(1, "inotify read %d bytes, sizeof event %lu + payload len %u", size_read, sizeof(*tmp_in_event), tmp_in_event->len);
 	    int inotifyeventlen = sizeof(*tmp_in_event) + tmp_in_event->len;
 
 	    while (size_read >= (int)(sizeof(*tmp_in_event) + tmp_in_event->len))
