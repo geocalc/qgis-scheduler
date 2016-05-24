@@ -133,6 +133,7 @@ enum db_select_statement_id
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
     DB_DELETE_PROJECT_DATA,
+    DB_SELECT_CONFIGPATH_WITH_PROJECT,
     DB_INSERT_PROCESS_DATA,
     DB_UPDATE_PROCESS_STATE,
     DB_GET_PROCESS_STATE,
@@ -192,6 +193,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"INSERT INTO projects (name, configpath, configbasename, inotifyid) VALUES (%s,%s,%s,%i)",
 	// DB_DELETE_PROJECT_DATA
 	"DELETE FROM projects WHERE name = %s",
+	// DB_SELECT_CONFIGPATH_WITH_PROJECT
+	"SELECT configpath FROM projects WHERE name = %s",
 	// DB_INSERT_PROCESS_DATA
 	"INSERT INTO processes (projectname, list, state, pid, process_socket_fd) VALUES (%s,%i,%i,%i,%i)",
 	// DB_UPDATE_PROCESS_STATE
@@ -1032,6 +1035,46 @@ void db_remove_project(const char *projname)
 	exit(EXIT_FAILURE);
     }
 
+}
+
+
+char *db_get_configpath_from_project(const char *projname)
+{
+    int get_configpath_from_project(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	const char **path = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_TEXT == type[0]);
+
+	*path = strdup((const char *)results[0].text);
+
+	return 0;
+    }
+
+    char *ret = NULL;
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter_callback(DB_SELECT_CONFIGPATH_WITH_PROJECT, get_configpath_from_project, &ret, projname);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    debug(1, "returned %s", ret);
+
+    return ret;
 }
 
 
