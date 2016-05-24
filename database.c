@@ -167,6 +167,7 @@ enum db_select_statement_id
     DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS,
     DB_GET_WATCHD_FROM_CONFIG,
     DB_GET_NUM_WATCHD_FROM_CONFIG,
+    DB_DELETE_INOTIFY_CONFIGPATH,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
     DB_DUMP_INOTIFY,
@@ -265,6 +266,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT watchd FROM inotify WHERE configpath = %s",
 	// DB_GET_NUM_WATCHD_FROM_CONFIG
 	"SELECT count(watchd) FROM inotify WHERE watchd IN (SELECT watchd FROM inotify WHERE configpath = %s)",
+	// DB_DELETE_INOTIFY_CONFIGPATH
+	"DELETE FROM inotify WHERE configpath = %s",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
@@ -2837,6 +2840,30 @@ int db_get_num_watchd_from_config(const char *path)
     debug(1, "returned %d", ret);
 
     return ret;
+}
+
+
+void db_remove_inotify_configpath(const char *path)
+{
+    assert(path);
+
+    int retval = pthread_mutex_lock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    db_select_parameter(DB_DELETE_INOTIFY_CONFIGPATH, path);
+
+    retval = pthread_mutex_unlock(&db_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
 }
 
 
