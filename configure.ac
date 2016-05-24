@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([qgis-server-scheduler], [0.11.5], [bugs@mwerk.net])
+AC_INIT([qgis-server-scheduler], [0.11.6], [bugs@mwerk.net])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_SRCDIR([qgis_project.h])
 AC_CONFIG_HEADERS([config.h])
