@@ -89,13 +89,13 @@ static void inotify_check_watchlist_for_watch(const struct inotify_event *inotif
     }
 #else
     int len;
-    int *list;
-    db_get_inotifyid_for_watchd(&list, &len, inotifyevent->wd);
+    char **list;
+    db_get_projects_for_watchd_and_config(&list, &len, inotifyevent->wd, inotifyevent->name);
     for (i=0; i<len; i++)
     {
-	project_manager_project_configfile_changed(list[i]);
+	project_manager_projectname_configfile_changed(list[i]);
     }
-    free(list);
+    db_delete_projects_for_watchd_and_config(list, len);
 #endif
 }
 

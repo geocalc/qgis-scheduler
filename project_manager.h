@@ -37,6 +37,7 @@
 void project_manager_startup_projects(void);
 
 void project_manager_start_new_process_detached(int num, const char *projectname, int do_exchange_processes);
+void project_manager_projectname_configfile_changed(const char *projname);
 void project_manager_project_configfile_changed(int inotifyid);
 
 void project_manager_manage_project_changes(const char **newproj, const char **changedproj, const char **deletedproj);
