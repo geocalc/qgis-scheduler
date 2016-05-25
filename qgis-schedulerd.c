@@ -269,14 +269,6 @@ void check_ressource_limits(void)
 
 
 
-
-struct signal_data_s
-{
-    int signal;
-    pid_t pid;
-    int is_shutdown;
-};
-
 /* act on signals */
 /* TODO: according to this website
  *       http://www.securecoding.cert.org/confluence/display/c/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers

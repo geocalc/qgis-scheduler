@@ -56,14 +56,6 @@ static int do_shutdown_thread = 0;
 static int has_list_change = 0;
 static int shutdown_main_pipe_wr = -1;
 
-#warning double declaration of type, TODO
-struct signal_data_s
-{
-    int signal;
-    pid_t pid;
-    int is_shutdown;
-};
-
 
 static void *qgis_shutdown_thread(void *arg)
 {

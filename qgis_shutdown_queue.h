@@ -35,6 +35,18 @@
 
 #include <sys/types.h>
 
+/* NOTE: This is a workaround. Normally this definition belongs to the main
+ *       module and not this shutdown module. But the main module has no
+ *       header file, so we move the definition - visible by both modules -
+ *       over here.
+ */
+struct signal_data_s
+{
+    int signal;
+    pid_t pid;
+    int is_shutdown;
+};
+
 
 void qgis_shutdown_init(int main_pipe_wr);
 void qgis_shutdown_delete(void);
