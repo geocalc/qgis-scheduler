@@ -242,7 +242,51 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 static sqlite3_stmt *db_prepared_stmt[DB_SELECT_ID_MAX] = { 0 };
 
 
-void strnbcat(char **buffer, int *len, const char *str);
+/* Like strncat() appends a string to an exiting string buffer. If the string
+ * does not fit into the buffer it is resized to a new size. The new buffer is
+ * stored into "buffer" and "len" is updated.
+ */
+void strnbcat(char **buffer, int *len, const char *str)
+{
+    int appendlen = strlen(str);
+    int bufferlen = strlen(*buffer);
+    int newlen = *len;
+
+    static const int max_resize_iteration = 10;
+    int i;
+    for (i=0; i<max_resize_iteration; i++)
+    {
+	// need newlen >=  (appendlen + bufferlen + 1) to fit into buffer
+	if ((appendlen + bufferlen) >= newlen)
+	{
+	    /* "str" doesn't fit into "buffer". need to resize it
+	     * Just double the size of the buffer */
+	    newlen += newlen;
+	}
+	else
+	{
+	    break;
+	}
+    }
+    if (i >= max_resize_iteration)
+    {
+	/* possible endless loop. exit with error */
+	printlog("ERROR: possible endless loop in resize() algorithm. exit");
+	exit(EXIT_FAILURE);
+    }
+    if ( newlen != *len )
+    {
+	*len = newlen;
+	*buffer = realloc(*buffer, newlen);
+	if ( !*buffer )
+	{
+	    /* realloc failed. exit */
+	    logerror("ERROR: realloc failed");
+	    exit(EXIT_FAILURE);
+	}
+    }
+    strcat(*buffer, str);
+}
 
 
 static void db_global_lock(void)
@@ -2104,53 +2148,6 @@ void db_remove_inotify_configpath(const char *path)
     db_select_parameter(DB_DELETE_INOTIFY_CONFIGPATH, path);
 
     db_global_unlock();
-}
-
-
-/* Like strncat() appends a string to an exiting string buffer. If the string
- * does not fit into the buffer it is resized to a new size. The new buffer is
- * stored into "buffer" and "len" is updated.
- */
-void strnbcat(char **buffer, int *len, const char *str)
-{
-    int appendlen = strlen(str);
-    int bufferlen = strlen(*buffer);
-    int newlen = *len;
-
-    static const int max_resize_iteration = 10;
-    int i;
-    for (i=0; i<max_resize_iteration; i++)
-    {
-	// need newlen >=  (appendlen + bufferlen + 1) to fit into buffer
-	if ((appendlen + bufferlen) >= newlen)
-	{
-	    /* "str" doesn't fit into "buffer". need to resize it
-	     * Just double the size of the buffer */
-	    newlen += newlen;
-	}
-	else
-	{
-	    break;
-	}
-    }
-    if (i >= max_resize_iteration)
-    {
-	/* possible endless loop. exit with error */
-	printlog("ERROR: possible endless loop in resize() algorithm. exit");
-	exit(EXIT_FAILURE);
-    }
-    if ( newlen != *len )
-    {
-	*len = newlen;
-	*buffer = realloc(*buffer, newlen);
-	if ( !*buffer )
-	{
-	    /* realloc failed. exit */
-	    logerror("ERROR: realloc failed");
-	    exit(EXIT_FAILURE);
-	}
-    }
-    strcat(*buffer, str);
 }
 
 
