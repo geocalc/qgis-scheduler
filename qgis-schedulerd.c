@@ -796,7 +796,7 @@ int main(int argc, char **argv)
 		    case SIGINT:
 		    case SIGQUIT:
 			/* termination signal, kill all child processes */
-			debug(1, "got termination signal, exit program");
+			printlog("received signal %d, shutting down", sigdata.signal);
 			set_program_shutdown(1);
 
 			/* shut down all projects */
