@@ -879,7 +879,8 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
     assert(projname);
     assert(configpath);
 
-    char *basenam = basename(configpath);
+    char *buffer = strdup(configpath);
+    char *basenam = basename(buffer);
 
     int retval = pthread_mutex_lock(&db_lock);
     if (retval)
@@ -898,6 +899,8 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
 	logerror("ERROR: unlock mutex lock");
 	exit(EXIT_FAILURE);
     }
+
+    free(buffer);
 }
 
 
