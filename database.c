@@ -102,24 +102,6 @@ static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t idle_process_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-/* This is a serial type analogue to the INTEGER PRIMARY KEY NOT NULL.
- * Normally this serial is better handled by the database engine.
- * But in the table inotify we need to insert a dataset and return the index
- * to the caller. But we can not INSERT new data and SELECT the data within one
- * single statement. So if we already have two data rows with the same data
- * only distinguished by the inotifyid being different we can not get the
- * correct inotifyid. Because we don't know on the inotifyid which one has been
- * added at last.
- * Thus we create the inotifyid from an external serial type
- * (db_inotifyid_serial) and provide this value to both the table row INSERT
- * statement and the caller as well.
- *
- * caution: this value shall only be read and incremented within the protection
- *          of "db_lock".
- */
-int db_inotifyid_serial = 0;
-
-
 enum db_select_statement_id
 {
     DB_SELECT_ID_NULL = 0,
