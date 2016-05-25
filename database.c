@@ -289,6 +289,63 @@ void strnbcat(char **buffer, int *len, const char *str)
 }
 
 
+/* Add a value to an array. Resize the array if all elements are filled.
+ * 'dataarray' is a pointer to an array which is resized on demand.
+ * 'nelem' holds the length of the array (measured in elements not bytes).
+ * 'nlen' holds the used array elements.
+ * 'data' is a pointer to the value of size 'sizeofdata'.
+ */
+void arraycat(void *dataarray, int *nelem, int *nlen, void *data, int sizeofdata)
+{
+    assert(dataarray);
+    assert(nelem);
+    assert(nlen);
+    assert(data);
+    assert(sizeofdata > 0);
+
+    /* construct a datatype with sizeof(struct datatype_s) == sizeofdata */
+    typedef struct datatype_s
+    {
+	unsigned char dat[sizeofdata];
+    } datatype_t;
+
+    int myelem = *nelem;
+    int mylen = *nlen;
+    datatype_t *myarray = *((datatype_t **)dataarray);
+
+    if (!myarray)	// reset all values if array is NULL
+    {
+	mylen = myelem = 0;
+    }
+
+    /* resize if the array is full */
+    if (mylen >= myelem)
+    {
+	if (0 >= myelem)
+	{
+	    myelem = 16;	// set an initial array size of 16 elements
+	    mylen = 0;
+	}
+	else
+	    myelem *= 2;
+
+	myarray = realloc(myarray, myelem*sizeof(*myarray));
+	if ( !myarray )
+	{
+	    /* realloc failed. exit */
+	    logerror("ERROR: realloc failed");
+	    exit(EXIT_FAILURE);
+	}
+
+	*((datatype_t **)dataarray) = myarray;
+	*nelem = myelem;
+    }
+
+    myarray[mylen++] = *((datatype_t *)data);
+    *nlen = mylen;
+}
+
+
 static void db_global_lock(void)
 {
     int retval = pthread_mutex_lock(&db_mutex_lock);
