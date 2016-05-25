@@ -96,9 +96,6 @@ typedef int (*db_callback)(void *data, int ncol, int *type, union callback_resul
 
 static sqlite3 *dbhandler = NULL;
 
-/* transitional data. this will be deleted after the code change */
-#include "qgis_project_list.h"
-
 static pthread_mutex_t db_mutex_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;

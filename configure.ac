@@ -4,7 +4,7 @@
 AC_PREREQ([2.69])
 AC_INIT([qgis-server-scheduler], [0.11.6], [bugs@mwerk.net])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
-AC_CONFIG_SRCDIR([qgis_project.h])
+AC_CONFIG_SRCDIR([qgis-schedulerd.c])
 AC_CONFIG_HEADERS([config.h])
 AC_USE_SYSTEM_EXTENSIONS
 
