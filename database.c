@@ -99,7 +99,7 @@ static sqlite3 *dbhandler = NULL;
 /* transitional data. this will be deleted after the code change */
 #include "qgis_project_list.h"
 
-static pthread_mutex_t db_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t db_mutex_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t idle_process_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -882,7 +882,7 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
     char *buffer = strdup(configpath);
     char *basenam = basename(buffer);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -892,7 +892,7 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
 
     db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -950,7 +950,7 @@ int db_get_names_project(char ***projname, int *len)
     struct namelist_s namelist;
     STAILQ_INIT(&namelist.head);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -960,7 +960,7 @@ int db_get_names_project(char ***projname, int *len)
 
     db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1014,7 +1014,7 @@ void db_remove_project(const char *projname)
 {
     assert(projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1024,7 +1024,7 @@ void db_remove_project(const char *projname)
 
     db_select_parameter(DB_DELETE_PROJECT_DATA, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1051,7 +1051,7 @@ char *db_get_configpath_from_project(const char *projname)
 
     char *ret = NULL;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1061,7 +1061,7 @@ char *db_get_configpath_from_project(const char *projname)
 
     db_select_parameter_callback(DB_SELECT_CONFIGPATH_WITH_PROJECT, get_configpath_from_project, &ret, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1081,7 +1081,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
     assert(pid > 0);
     assert(process_socket_fd >= 0);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1091,7 +1091,7 @@ void db_add_process(const char *projname, pid_t pid, int process_socket_fd)
 
     db_select_parameter(DB_INSERT_PROCESS_DATA, projname, LIST_INIT, PROC_STATE_START, pid, process_socket_fd);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1120,7 +1120,7 @@ char *db_get_project_for_this_process(pid_t pid)
 
     char *ret = NULL;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1130,7 +1130,7 @@ char *db_get_project_for_this_process(pid_t pid)
 
     db_select_parameter_callback(DB_SELECT_PROJECT_WITH_PID, get_projectname, &ret, pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1186,7 +1186,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	exit(EXIT_FAILURE);
     }
 
-    retval = pthread_mutex_lock(&db_lock);
+    retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1199,7 +1199,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     {
 	db_nolock__process_set_state(ret, PROC_STATE_BUSY, 0);
 
-	retval = pthread_mutex_unlock(&db_lock);
+	retval = pthread_mutex_unlock(&db_mutex_lock);
 	if (retval)
 	{
 	    errno = retval;
@@ -1212,7 +1212,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	/* unsuccesful tried for idle process. conditional wait for some
 	 * process becoming idle.
 	 */
-	retval = pthread_mutex_unlock(&db_lock);
+	retval = pthread_mutex_unlock(&db_mutex_lock);
 	if (retval)
 	{
 	    errno = retval;
@@ -1252,7 +1252,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    /* got the condition within the timeout value
 	     * get the next idle process
 	     */
-	    retval = pthread_mutex_lock(&db_lock);
+	    retval = pthread_mutex_lock(&db_mutex_lock);
 	    if (retval)
 	    {
 		errno = retval;
@@ -1265,7 +1265,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    if (0 < ret)
 		db_nolock__process_set_state(ret, PROC_STATE_BUSY, 0);
 
-	    retval = pthread_mutex_unlock(&db_lock);
+	    retval = pthread_mutex_unlock(&db_mutex_lock);
 	    if (retval)
 	    {
 		errno = retval;
@@ -1304,7 +1304,7 @@ int db_has_process(pid_t pid)
 
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1314,7 +1314,7 @@ int db_has_process(pid_t pid)
 
     db_select_parameter_callback(DB_GET_PROCESS_STATE, has_process, &ret, (int)pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1344,7 +1344,7 @@ int db_get_process_socket(pid_t pid)
 
     int ret = -1;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1354,7 +1354,7 @@ int db_get_process_socket(pid_t pid)
 
     db_select_parameter_callback(DB_GET_PROCESS_SOCKET_FROM_PROCESS, get_process_socket, &ret, (int)pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1382,7 +1382,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 
     enum db_process_state_e ret = PROCESS_STATE_MAX ;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1392,7 +1392,7 @@ enum db_process_state_e db_get_process_state(pid_t pid)
 
     db_select_parameter_callback(DB_GET_PROCESS_STATE, get_process_state, &ret, pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1414,7 +1414,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
     // because the vararg parser assumes type "long long int" with "%l"
     long long threadid = thread_id;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1424,7 +1424,7 @@ int db_process_set_state_init(pid_t pid, pthread_t thread_id)
 
     db_nolock__process_set_state(pid, PROC_STATE_INIT, threadid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1449,7 +1449,7 @@ int db_process_set_state_idle(pid_t pid)
 	exit(EXIT_FAILURE);
     }
 
-    retval = pthread_mutex_lock(&db_lock);
+    retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1459,7 +1459,7 @@ int db_process_set_state_idle(pid_t pid)
 
     db_nolock__process_set_state(pid, PROC_STATE_IDLE, 0);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1492,7 +1492,7 @@ int db_process_set_state_exit(pid_t pid)
 {
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1502,7 +1502,7 @@ int db_process_set_state_exit(pid_t pid)
 
     db_nolock__process_set_state(pid, PROC_STATE_EXIT, 0);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1518,7 +1518,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
 {
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1528,7 +1528,7 @@ int db_process_set_state(pid_t pid, enum db_process_state_e state)
 
     db_nolock__process_set_state(pid, state, 0);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1559,7 +1559,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1569,7 +1569,7 @@ int db_get_num_process_by_status(const char *projname, enum db_process_state_e s
 
     db_select_parameter_callback(DB_GET_STATE_PROCESS, get_pid_by_status, &ret, projname, (int)state);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1616,7 +1616,7 @@ int db_get_num_start_init_idle_process(const char *projname)
 
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1626,7 +1626,7 @@ int db_get_num_start_init_idle_process(const char *projname)
 
     db_select_parameter_callback(DB_GET_NUM_START_INIT_IDLE_PROCESS, get_num_start_init_idle_process, &ret, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1686,7 +1686,7 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
     struct pidlist_s mypidlist;
     STAILQ_INIT(&mypidlist.head);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1696,7 +1696,7 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
 
     db_select_parameter_callback(DB_GET_ALL_PROCESS, get_pid_list, &mypidlist);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1779,7 +1779,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     struct pidlist_s mypidlist;
     STAILQ_INIT(&mypidlist.head);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1789,7 +1789,7 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
 
     db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_pid_list, &mypidlist, (int)list);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1838,7 +1838,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
     assert(LIST_SELECTOR_MAX > list);
     assert(0 < pid);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1848,7 +1848,7 @@ void db_move_process_to_list(enum db_process_list_e list, pid_t pid)
 
     db_select_parameter(DB_UPDATE_PROCESS_LIST_PID, list, pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1875,7 +1875,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
 
     enum db_process_list_e ret = LIST_SELECTOR_MAX;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1885,7 +1885,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
 
     db_select_parameter_callback(DB_GET_LIST_FROM_PROCESS, get_list_pid, &ret, (int)pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1906,7 +1906,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1916,7 +1916,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_ACTIVE, projname, LIST_INIT);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1934,7 +1934,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1944,7 +1944,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_ACTIVE);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1962,7 +1962,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
     debug(1, "project '%s'", projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1972,7 +1972,7 @@ void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 
     db_select_parameter(DB_UPDATE_PROCESS_LISTS_WITH_NAME_AND_LIST, LIST_SHUTDOWN, projname, LIST_INIT);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -1990,7 +1990,7 @@ void db_move_all_process_to_list(enum db_process_list_e list)
 
     int mylist = list;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2000,7 +2000,7 @@ void db_move_all_process_to_list(enum db_process_list_e list)
 
     db_select_parameter(DB_UPDATE_PROCESS_LIST, mylist);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2041,7 +2041,7 @@ int db_reset_signal_timer(pid_t pid)
     long long sec = ts.tv_sec;
     long long nsec = ts.tv_nsec;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2051,7 +2051,7 @@ int db_reset_signal_timer(pid_t pid)
 
     db_select_parameter(DB_UPDATE_PROCESS_SIGNAL_TIMER, sec, nsec, (int)pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2085,7 +2085,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 
     struct timespec timesp = {0,0};
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2095,7 +2095,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 
     db_select_parameter_callback(DB_SELECT_PROCESS_SIGNAL_TIMER, get_signal_timer, &timesp, pid);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2133,7 +2133,7 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 
     struct timespec timesp = {0,0};
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2143,7 +2143,7 @@ void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 
     db_select_parameter_callback(DB_SELECT_PROCESS_MIN_SIGNAL_TIMER, get_signal_timer, &timesp);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2174,7 +2174,7 @@ int db_get_num_shutdown_processes(void)
 
     int num_list = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2184,7 +2184,7 @@ int db_get_num_shutdown_processes(void)
 
     db_select_parameter_callback(DB_GET_NUM_PROCESS_FROM_LIST, get_num_shutdown_processes, &num_list, LIST_SHUTDOWN);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2202,7 +2202,7 @@ int db_remove_process_with_state_exit(void)
 {
     int ret = 0;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2212,7 +2212,7 @@ int db_remove_process_with_state_exit(void)
 
     db_select_parameter(DB_DELETE_PROCESS_WITH_STATE, PROC_STATE_EXIT);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2228,7 +2228,7 @@ void db_inc_startup_failures(const char *projname)
 {
     assert(projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2238,7 +2238,7 @@ void db_inc_startup_failures(const char *projname)
 
     db_select_parameter(DB_INC_PROJECT_STARTUP_FAILURE, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2267,7 +2267,7 @@ int db_get_startup_failures(const char *projname)
 
     int ret = -1;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2277,7 +2277,7 @@ int db_get_startup_failures(const char *projname)
 
     db_select_parameter_callback(DB_SELECT_PROJECT_STARTUP_FAILURE, get_startup_failures, &ret, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2295,7 +2295,7 @@ void db_reset_startup_failures(const char *projname)
 {
     assert(projname);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2305,7 +2305,7 @@ void db_reset_startup_failures(const char *projname)
 
     db_select_parameter(DB_RESET_PROJECT_STARTUP_FAILURE, projname);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2332,7 +2332,7 @@ int db_add_new_inotifyid(const char *path, int watchd)
 	return 0;
     }
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2352,7 +2352,7 @@ int db_add_new_inotifyid(const char *path, int watchd)
 
     db_select_parameter(DB_ADD_NEW_INOTIFYID, path, inotifyid, watchd);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2409,7 +2409,7 @@ void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, c
     struct namelist_s namelist;
     STAILQ_INIT(&namelist.head);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2419,7 +2419,7 @@ void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, c
 
     db_select_parameter_callback(DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS, get_names_list, &namelist, watchd, filename);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2484,7 +2484,7 @@ int db_get_watchd_from_config(const char *path)
 
     int ret = -1;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2494,7 +2494,7 @@ int db_get_watchd_from_config(const char *path)
 
     db_select_parameter_callback(DB_GET_WATCHD_FROM_CONFIG, get_watchd_from_config, &ret, path);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2527,7 +2527,7 @@ int db_get_num_watchd_from_config(const char *path)
 
     int ret = -1;
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2537,7 +2537,7 @@ int db_get_num_watchd_from_config(const char *path)
 
     db_select_parameter_callback(DB_GET_NUM_WATCHD_FROM_CONFIG, get_num_watchd_from_config, &ret, path);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2555,7 +2555,7 @@ void db_remove_inotify_configpath(const char *path)
 {
     assert(path);
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2565,7 +2565,7 @@ void db_remove_inotify_configpath(const char *path)
 
     db_select_parameter(DB_DELETE_INOTIFY_CONFIGPATH, path);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2667,7 +2667,7 @@ void db_dump(void)
     data.buffer = malloc(data.bufferlen);
     *data.buffer = '\0';	// empty string
 
-    int retval = pthread_mutex_lock(&db_lock);
+    int retval = pthread_mutex_lock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
@@ -2695,7 +2695,7 @@ void db_dump(void)
     sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
     printlog("%s", data.buffer);
 
-    retval = pthread_mutex_unlock(&db_lock);
+    retval = pthread_mutex_unlock(&db_mutex_lock);
     if (retval)
     {
 	errno = retval;
