@@ -40,7 +40,6 @@
 #include <assert.h>
 #include <string.h>
 #include <libgen.h>
-#include <sys/queue.h>
 #include <errno.h>
 
 #include "logger.h"
@@ -992,78 +991,40 @@ int db_get_names_project(char ***projname, int *len)
     assert(projname);
     assert(len);
 
-    struct namelist_s
+    struct data_s
     {
-	STAILQ_HEAD(listhead, nameiterator_s) head;	/* Linked list head */
-    };
-
-    struct nameiterator_s
-    {
-        STAILQ_ENTRY(nameiterator_s) entries;          /* Linked list prev./next entry */
-        char *name;
+	char **array;
+	int arraysize;
+	int num;
     };
 
     int get_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
-	struct namelist_s *list = data;
+	struct data_s *mydata = data;
 
-	struct nameiterator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
 	assert(1 == ncol);
 	assert(SQLITE_TEXT == type[0]);
-	entry->name = strdup((const char *)results[0].text);
 
-	if (STAILQ_EMPTY(&list->head))
-	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
-	else
-	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+	char *str = strdup((const char *)results[0].text);
+	arraycat(&mydata->array, &mydata->arraysize, &mydata->num, &str, sizeof(str));
 
 	return 0;
     }
 
-    int ret = 0;
-    int num = 0;
-    char **array = NULL;
 
-    struct namelist_s namelist;
-    STAILQ_INIT(&namelist.head);
+    struct data_s data = {0};
 
     db_global_lock();
 
-    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &namelist);
+    db_select_parameter_callback(DB_SELECT_GET_NAMES_FROM_PROJECT, get_names_list, &data);
 
     db_global_unlock();
 
-    struct nameiterator_s *it;
-    STAILQ_FOREACH(it, &namelist.head, entries)
-    {
-	num++;
-    }
-    debug(1, "select found %d project names", num);
+    debug(1, "select found %d project names", data.num);
+    *projname = data.array;
+    *len = data.num;
 
-    /* aquire the pointer array */
-    *len = num;
-    array = calloc(num, sizeof(*array));
-    *projname = array;
-
-    num = 0;
-    while( !STAILQ_EMPTY(&namelist.head) )
-    {
-	assert(num < *len);
-	it = STAILQ_FIRST(&namelist.head);
-	array[num++] = it->name;
-
-	STAILQ_REMOVE_HEAD(&namelist.head, entries);
-	free(it);
-    }
-
-
-    return ret;
+    return 0;
 }
 
 
@@ -1531,78 +1492,40 @@ int db_get_complete_list_process(pid_t **pidlist, int *len)
     assert(pidlist);
     assert(len);
 
-    struct pidlist_s
+    struct data_s
     {
-	STAILQ_HEAD(listhead, piditerator_s) head;	/* Linked list head */
+	pid_t *array;
+	int arraysize;
+	int num;
     };
-
-    struct piditerator_s
-    {
-        STAILQ_ENTRY(piditerator_s) entries;          /* Linked list prev./next entry */
-        pid_t pid;
-    };
-
 
     int get_pid_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
-	struct pidlist_s *list = data;
-
-	struct piditerator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
+	struct data_s *mydata = data;
 
 	assert(1 == ncol);
 	assert(SQLITE_INTEGER == type[0]);
-	entry->pid = results[0].integer;
 
-	if (STAILQ_EMPTY(&list->head))
-	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
-	else
-	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+	pid_t pid = results[0].integer;
+	arraycat(&mydata->array, &mydata->arraysize, &mydata->num, &pid, sizeof(pid));
 
 	return 0;
     }
 
 
-    struct pidlist_s mypidlist;
-    STAILQ_INIT(&mypidlist.head);
+    struct data_s data = {0};
 
     db_global_lock();
 
-    db_select_parameter_callback(DB_GET_ALL_PROCESS, get_pid_list, &mypidlist);
+    db_select_parameter_callback(DB_GET_ALL_PROCESS, get_pid_list, &data);
 
     db_global_unlock();
 
-    int ret = 0;
-    int num = 0;
-    struct piditerator_s *it;
-    STAILQ_FOREACH(it, &mypidlist.head, entries)
-    {
-	num++;
-    }
-    debug(1, "select found %d processes", num);
+    debug(1, "select found %d processes", data.num);
+    *len = data.num;
+    *pidlist = data.array;
 
-    /* aquire the pointer array */
-    *len = num;
-    pid_t *array = calloc(num, sizeof(*array));
-    *pidlist = array;
-
-    num = 0;
-    while( !STAILQ_EMPTY(&mypidlist.head) )
-    {
-	assert(num < *len);
-	it = STAILQ_FIRST(&mypidlist.head);
-	array[num++] = it->pid;
-
-	STAILQ_REMOVE_HEAD(&mypidlist.head, entries);
-	free(it);
-    }
-
-    return ret;
+    return 0;
 }
 
 
@@ -1612,78 +1535,40 @@ int db_get_list_process_by_list(pid_t **pidlist, int *len, enum db_process_list_
     assert(len);
     assert(list < LIST_SELECTOR_MAX);
 
-    struct pidlist_s
+    struct data_s
     {
-	STAILQ_HEAD(listhead, piditerator_s) head;	/* Linked list head */
+	pid_t *array;
+	int arraysize;
+	int num;
     };
-
-    struct piditerator_s
-    {
-        STAILQ_ENTRY(piditerator_s) entries;          /* Linked list prev./next entry */
-        pid_t pid;
-    };
-
 
     int get_pid_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
-	struct pidlist_s *list = data;
-
-	struct piditerator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
+	struct data_s *mydata = data;
 
 	assert(1 == ncol);
 	assert(SQLITE_INTEGER == type[0]);
-	entry->pid = results[0].integer;
 
-	if (STAILQ_EMPTY(&list->head))
-	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
-	else
-	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+	pid_t pid = results[0].integer;
+	arraycat(&mydata->array, &mydata->arraysize, &mydata->num, &pid, sizeof(pid));
 
 	return 0;
     }
 
 
-    struct pidlist_s mypidlist;
-    STAILQ_INIT(&mypidlist.head);
+    struct data_s data = {0};
 
     db_global_lock();
 
-    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_pid_list, &mypidlist, (int)list);
+    db_select_parameter_callback(DB_GET_PROCESS_FROM_LIST, get_pid_list, &data, (int)list);
 
     db_global_unlock();
 
-    int ret = 0;
-    int num = 0;
-    struct piditerator_s *it;
-    STAILQ_FOREACH(it, &mypidlist.head, entries)
-    {
-	num++;
-    }
-    debug(1, "select found %d processes", num);
+    debug(1, "select found %d processes", data.num);
+    *len = data.num;
+    *pidlist = data.array;
 
-    /* aquire the pointer array */
-    *len = num;
-    pid_t *array = calloc(num, sizeof(*array));
-    *pidlist = array;
-
-    num = 0;
-    while( !STAILQ_EMPTY(&mypidlist.head) )
-    {
-	assert(num < *len);
-	it = STAILQ_FIRST(&mypidlist.head);
-	array[num++] = it->pid;
-
-	STAILQ_REMOVE_HEAD(&mypidlist.head, entries);
-	free(it);
-    }
-
-    return ret;
+    return 0;
 }
 
 
@@ -2050,74 +1935,38 @@ void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, c
     assert(list);
     assert(len);
 
-    struct namelist_s
+    struct data_s
     {
-	STAILQ_HEAD(listhead, nameiterator_s) head;	/* Linked list head */
-    };
-
-    struct nameiterator_s
-    {
-        STAILQ_ENTRY(nameiterator_s) entries;          /* Linked list prev./next entry */
-        char *name;
+	char **array;
+	int arraysize;
+	int num;
     };
 
     int get_names_list(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
-	struct namelist_s *list = data;
+	struct data_s *mydata = data;
 
-	struct nameiterator_s *entry = malloc(sizeof(*entry));
-	assert(entry);
-	if ( !entry )
-	{
-	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
-	}
 	assert(1 == ncol);
 	assert(SQLITE_TEXT == type[0]);
-	entry->name = strdup((const char *)results[0].text);
 
-	if (STAILQ_EMPTY(&list->head))
-	    STAILQ_INSERT_HEAD(&list->head, entry, entries);
-	else
-	    STAILQ_INSERT_TAIL(&list->head, entry, entries);
+	char *str = strdup((const char *)results[0].text);
+	arraycat(&mydata->array, &mydata->arraysize, &mydata->num, &str, sizeof(str));
 
 	return 0;
     }
 
-    int num = 0;
-    char **array = NULL;
 
-    struct namelist_s namelist;
-    STAILQ_INIT(&namelist.head);
+    struct data_s data = {0};
 
     db_global_lock();
 
-    db_select_parameter_callback(DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS, get_names_list, &namelist, watchd, filename);
+    db_select_parameter_callback(DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS, get_names_list, &data, watchd, filename);
 
     db_global_unlock();
 
-    struct nameiterator_s *it;
-    STAILQ_FOREACH(it, &namelist.head, entries)
-    {
-	num++;
-    }
-    debug(1, "select found %d project names", num);
-
-    /* aquire the pointer array */
-    *len = num;
-    array = calloc(num, sizeof(*array));
-    *list = array;
-
-    num = 0;
-    while( !STAILQ_EMPTY(&namelist.head) )
-    {
-	assert(num < *len);
-	it = STAILQ_FIRST(&namelist.head);
-	array[num++] = it->name;
-
-	STAILQ_REMOVE_HEAD(&namelist.head, entries);
-	free(it);
-    }
+    debug(1, "select found %d project names", data.num);
+    *len = data.num;
+    *list = data.array;
 
 }
 
