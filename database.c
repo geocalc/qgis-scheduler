@@ -263,16 +263,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 static sqlite3_stmt *db_prepared_stmt[DB_SELECT_ID_MAX] = { 0 };
 
 
-enum qgis_process_state_e db_state_to_qgis_state(enum db_process_state_e state)
-{
-    return (enum qgis_process_state_e)state;
-}
-
-enum db_process_state_e qgis_state_to_db_state(enum qgis_process_state_e state)
-{
-    return (enum db_process_state_e)state;
-}
-
 void strnbcat(char **buffer, int *len, const char *str);
 
 
