@@ -79,111 +79,6 @@ static void *project_manager_thread_start_project_processes(void *arg)
 }
 
 
-void project_manager_startup_projects(void)
-{
-    int retval;
-    /* do for every project:
-     * (TODO) check every project for correct configured settings.
-     * Start a thread for every project, which in turn starts multiple
-     *  child processes in parallel.
-     * Wait for the project threads to finish.
-     * After that we accept network connections.
-     */
-
-    int num_proj = config_get_num_projects();
-    {
-	pthread_t threads[num_proj];
-	int i;
-	for (i=0; i<num_proj; i++)
-	{
-	    int inotifyfd = 0;
-	    const char *projname = config_get_name_project(i);
-	    debug(1, "found project '%s'. Startup child processes", projname);
-
-	    const char *configpath = config_get_project_config_path(projname);
-	    /* if the path to a configuration file has been given and the path
-	     * is correct (stat()), then watch the file with inotify for changes
-	     * If the file changed, kill all processes and restart them anew.
-	     */
-	    if (configpath)
-	    {
-		struct stat statbuf;
-		retval = stat(configpath, &statbuf);
-		if (-1 == retval)
-		{
-		    switch(errno)
-		    {
-		    case EACCES:
-		    case ELOOP:
-		    case EFAULT:
-		    case ENAMETOOLONG:
-		    case ENOENT:
-		    case ENOTDIR:
-		    case EOVERFLOW:
-			logerror("ERROR: accessing file '%s': ", configpath);
-			debug(1, "file is not watched for changes");
-			break;
-
-		    default:
-			logerror("ERROR: accessing file '%s': ", configpath);
-			exit(EXIT_FAILURE);
-		    }
-		}
-		else
-		{
-		    if (S_ISREG(statbuf.st_mode))
-		    {
-			/* if I can stat the file I assume we can read it.
-			 * Now setup the inotify descriptor.
-			 */
-			retval = qgis_inotify_watch_file(configpath);
-			inotifyfd = retval;
-		    }
-		    else
-		    {
-			debug(1, "ERROR: '%s' is no regular file", configpath);
-		    }
-		}
-	    }
-
-	    db_add_project(projname, configpath, inotifyfd);
-
-	    int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
-
-
-	    struct thread_start_project_processes_args *targs = malloc(sizeof(*targs));
-	    assert(targs);
-	    if ( !targs )
-	    {
-		logerror("ERROR: could not allocate memory");
-		exit(EXIT_FAILURE);
-	    }
-	    targs->project_name = strdup(projname);
-	    targs->num = nr_of_childs_during_startup;
-
-	    retval = pthread_create(&threads[i], NULL, project_manager_thread_start_project_processes, targs);
-	    if (retval)
-	    {
-		errno = retval;
-		logerror("ERROR: creating thread");
-		exit(EXIT_FAILURE);
-	    }
-	}
-
-	for (i=0; i<num_proj; i++)
-	{
-	    retval = pthread_join(threads[i], NULL);
-	    if (retval)
-	    {
-		errno = retval;
-		logerror("ERROR: joining thread");
-		exit(EXIT_FAILURE);
-	    }
-	}
-    }
-}
-
-
 /* restarts all processes.
  * I.e. evaluate current number of processes for this project,
  * start num processes, init them,
@@ -208,27 +103,6 @@ void project_manager_projectname_configfile_changed(const char *projname)
 {
     printlog("Project '%s' config change. Restart processes", projname);
     project_manager_restart_processes(projname);
-}
-
-
-/* A configuration with this watch descriptor has changed. Get the project
- * belonging to this descriptor and restart the project.
- */
-void project_manager_project_configfile_changed(int inotifyid)
-{
-    assert(inotifyid >= 0);
-
-    char *projname = db_get_project_for_inotifyid(inotifyid);
-    if (projname)
-    {
-	project_manager_projectname_configfile_changed(projname);
-    }
-    else
-    {
-	printlog("ERROR: got config change request for inotify id %d but no project responsible?", inotifyid);
-	exit(EXIT_FAILURE);
-    }
-    free(projname);
 }
 
 

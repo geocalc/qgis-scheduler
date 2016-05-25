@@ -129,12 +129,6 @@ int db_get_startup_failures(const char *projname);
 void db_reset_startup_failures(const char *projname);
 
 int db_add_new_inotifyid(const char *path, int watchd);
-void db_remove_inotifyid(int inotifyid);
-int db_get_num_of_similar_watches_for_inotifyid(int inotifyid);
-void db_get_inotifyid_for_watchd(int **inotifyidlist, int *len, int watchd);
-int db_get_watchd_for_inotifyid(int inotifyid);
-char *db_get_project_for_inotifyid(int inotifyid);
-int db_get_inotifyid_for_project(const char *projectname);
 void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, const char *filename);
 void db_delete_projects_for_watchd_and_config(char **list, int len);
 int db_get_watchd_from_config(const char *path);
