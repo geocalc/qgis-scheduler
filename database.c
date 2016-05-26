@@ -144,12 +144,10 @@ enum db_select_statement_id
     DB_SELECT_PROCESS_WITH_NAME_LIST_AND_STATE,
     DB_GET_LIST_FROM_PROCESS,
     DB_GET_PROCESS_SOCKET_FROM_PROCESS,
-    DB_ADD_NEW_INOTIFYID,
     DB_ADD_NEW_INOTIFYID2,
     DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS,
     DB_GET_WATCHD_FROM_CONFIG,
     DB_GET_NUM_WATCHD_FROM_CONFIG,
-    DB_DELETE_INOTIFY_CONFIGPATH,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
     DB_DUMP_INOTIFY,
@@ -225,8 +223,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT list FROM processes WHERE pid = %d",
 	// DB_GET_PROCESS_SOCKET_FROM_PROCESS
 	"SELECT process_socket_fd FROM processes WHERE pid = %d",
-	// DB_ADD_NEW_INOTIFYID
-	"INSERT INTO inotify (configpath, watchd) VALUES (%s,%i)",
 	// DB_ADD_NEW_INOTIFYID2
 	"UPDATE OR IGNORE projects SET configpath = %s, configbasename = %s, watchd = %i WHERE name = %s",
 	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
@@ -235,8 +231,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT watchd FROM projects WHERE configpath = %s",
 	// DB_GET_NUM_WATCHD_FROM_CONFIG
 	"SELECT count(watchd) FROM projects WHERE watchd IN (SELECT watchd FROM projects WHERE configpath = %s)",
-	// DB_DELETE_INOTIFY_CONFIGPATH
-	"DELETE FROM inotify WHERE configpath = %s",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
@@ -1919,7 +1913,6 @@ int db_add_new_inotify_watchd(const char *projectname, const char *path, int wat
 
     db_global_lock();
 
-    db_select_parameter(DB_ADD_NEW_INOTIFYID, path, watchd);
     db_select_parameter(DB_ADD_NEW_INOTIFYID2, path, basenam, watchd, projectname);
 
     db_global_unlock();
@@ -2051,7 +2044,6 @@ void db_remove_inotify_configpath(const char *projectname, const char *path)
 
     db_global_lock();
 
-    db_select_parameter(DB_DELETE_INOTIFY_CONFIGPATH, path);
     db_select_parameter(DB_ADD_NEW_INOTIFYID2, "", "", 0, projectname);
 
     db_global_unlock();
