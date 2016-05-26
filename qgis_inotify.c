@@ -415,7 +415,8 @@ int qgis_inotify_watch_file(const char *path)
 		lastusedwatch++;
 #endif
 
-		ret = db_add_new_inotify_watchd(path, retval);
+		ret = retval;
+		db_add_new_inotify_watchd(path, retval);
 
 		retval = pthread_rwlock_unlock(&inotifyrwlock);
 		if (retval)
