@@ -51,7 +51,7 @@
 #include "logger.h"
 #include "project_manager.h"
 
-//#define OLD_STRUCT
+
 
 struct inotify_watch
 {
@@ -62,11 +62,6 @@ struct inotify_watch
 
 
 static int inotifyfd = -1;
-#ifdef OLD_STRUCT
-static struct inotify_watch *watchlist = NULL;
-static int watchlistlen = 0;
-static int lastusedwatch = 0;
-#endif
 static pthread_rwlock_t inotifyrwlock = PTHREAD_RWLOCK_INITIALIZER;
 static pthread_t inotifythread = -1;
 
@@ -74,20 +69,6 @@ static pthread_t inotifythread = -1;
 static void inotify_check_watchlist_for_watch(const struct inotify_event *inotifyevent)
 {
     int i;
-#ifdef OLD_STRUCT
-    int len = lastusedwatch; // make local copy of global variable just in case the variable changes
-    for (i=0; i<len; i++)
-    {
-	if (inotifyevent->wd == watchlist[i].watchfd)
-	{
-	    int retval = strcmp(inotifyevent->name, watchlist[i].filename);
-	    if (0 == retval)
-	    {
-		project_manager_project_configfile_changed(i);
-	    }
-	}
-    }
-#else
     int len;
     char **list;
     db_get_projects_for_watchd_and_config(&list, &len, inotifyevent->wd, inotifyevent->name);
@@ -96,7 +77,6 @@ static void inotify_check_watchlist_for_watch(const struct inotify_event *inotif
 	project_manager_projectname_configfile_changed(list[i]);
     }
     db_delete_projects_for_watchd_and_config(list, len);
-#endif
 }
 
 
@@ -230,18 +210,6 @@ static void *inotify_thread_watch(void *arg)
 
 void qgis_inotify_init(void)
 {
-#ifdef OLD_STRUCT
-    /* NOTE: if we handle configuration reload without restarting this program
-     * we need to care for this allocation as well!
-     */
-    watchlistlen = config_get_num_projects();
-    watchlist = calloc(watchlistlen, sizeof(*watchlist));
-    if (NULL == watchlist)
-    {
-	logerror("ERROR: calloc, can not get memory for inotify service");
-	exit(EXIT_FAILURE);
-    }
-#endif
 
     int retval = inotify_init1(IN_CLOEXEC);
     if (-1 == retval)
@@ -265,20 +233,6 @@ void qgis_inotify_init(void)
 void qgis_inotify_delete(void)
 {
     int retval;
-#ifdef OLD_STRUCT
-    int i;
-    for (i=0; i<watchlistlen; i++)
-    {
-	// TODO watchfd is used more than once
-	retval = inotify_rm_watch(inotifyfd, watchlist[i].watchfd);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: can not remove inotify watch for watchfd %d", watchlist[i].watchfd);
-	    // intentional no exit() call
-	}
-	free(watchlist[i].filename);
-    }
-#endif
 
     retval = pthread_join(inotifythread, NULL);
     if (retval)
@@ -296,9 +250,6 @@ void qgis_inotify_delete(void)
 	// intentional no exit() call
     }
 
-#ifdef OLD_STRUCT
-    free(watchlist);
-#endif
 }
 
 
@@ -368,9 +319,6 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 		 * directory. This case may expose some bugs though..
 		 */
 
-#ifdef OLD_STRUCT
-		assert(lastusedwatch < watchlistlen);
-#endif
 
 		char *directoryname = strdup(path);
 		assert(directoryname);
@@ -390,15 +338,6 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 		    exit(EXIT_FAILURE);
 		}
 
-#ifdef OLD_STRUCT
-		const char *configbasename = basename((char *)path);
-		watchlist[lastusedwatch].filename = strdup(configbasename);
-		if ( !watchlist[lastusedwatch].filename )
-		{
-		    logerror("ERROR: could not allocate memory");
-		    exit(EXIT_FAILURE);
-		}
-#endif
 		/* NOTE: if we call inotify_add_watch() multiple times with the
 		 *       same 'directoryname' then it returns the same value.
 		 */
@@ -408,12 +347,6 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 		    logerror("ERROR: inotify_add_watch");
 		    exit(EXIT_FAILURE);
 		}
-#ifdef OLD_STRUCT
-		watchlist[lastusedwatch].watchfd = retval;
-		ret = lastusedwatch;
-
-		lastusedwatch++;
-#endif
 
 		ret = retval;
 		db_add_new_inotify_path(projectname, path, retval);
