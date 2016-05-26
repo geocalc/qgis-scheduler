@@ -180,8 +180,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_STATE_PROCESS
 	"SELECT pid FROM processes WHERE projectname = %s AND state = %i",
 	// DB_GET_NUM_START_INIT_IDLE_PROCESS
-	"SELECT pid FROM processes WHERE projectname = %s AND ( state = 0 OR state = 1 OR state = 2 )",
-//	"SELECT count(*) FROM processes WHERE (projectname = %s AND ( state = 0 OR state = 1 OR state = 2 ))", // NOTE: does not work! count() always returned 1
+	"SELECT count(pid) FROM processes WHERE projectname = %s AND ( state = 0 OR state = 1 OR state = 2 )",
 	// DB_GET_ALL_PROCESS
 	"SELECT pid FROM processes",
 	// DB_GET_PROCESS_FROM_LIST
@@ -1466,8 +1465,7 @@ int db_get_num_start_init_idle_process(const char *projname)
 	assert(1 == ncol);
 	assert(SQLITE_INTEGER == type[0]);
 
-	(*num)++;
-//	*num = type[0];
+	*num = results[0].integer;
 
 	return 0;
     }
