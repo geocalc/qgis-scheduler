@@ -154,42 +154,7 @@ void project_manager_start_project(const char *projname)
      */
     if (configpath)
     {
-	struct stat statbuf;
-	retval = stat(configpath, &statbuf);
-	if (-1 == retval)
-	{
-	    switch(errno)
-	    {
-	    case EACCES:
-	    case ELOOP:
-	    case EFAULT:
-	    case ENAMETOOLONG:
-	    case ENOENT:
-	    case ENOTDIR:
-	    case EOVERFLOW:
-		logerror("ERROR: accessing file '%s': ", configpath);
-		debug(1, "file is not watched for changes");
-		break;
-
-	    default:
-		logerror("ERROR: accessing file '%s': ", configpath);
-		exit(EXIT_FAILURE);
-	    }
-	}
-	else
-	{
-	    if (S_ISREG(statbuf.st_mode))
-	    {
-		/* if I can stat the file I assume we can read it.
-		 * Now setup the inotify descriptor.
-		 */
-		retval = qgis_inotify_watch_file(projname, configpath);
-	    }
-	    else
-	    {
-		debug(1, "ERROR: '%s' is no regular file", configpath);
-	    }
-	}
+	retval = qgis_inotify_watch_file(projname, configpath);
     }
 
 
