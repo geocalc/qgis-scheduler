@@ -145,6 +145,9 @@ void project_manager_start_project(const char *projname)
 {
     int watchd = 0;
     int retval;
+
+    db_add_project(projname, "", watchd);
+
     const char *configpath = config_get_project_config_path(projname);
     /* if the path to a configuration file has been given and the path
      * is correct (stat()), then watch the file with inotify for changes
@@ -191,7 +194,6 @@ void project_manager_start_project(const char *projname)
 	}
     }
 
-    db_add_project(projname, configpath, watchd);
 
     int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
     printlog("startup project '%s', starting %d processes", projname, nr_of_childs_during_startup);
