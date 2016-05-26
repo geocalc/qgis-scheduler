@@ -143,7 +143,7 @@ void project_manager_shutdown(void)
 
 void project_manager_start_project(const char *projname)
 {
-    int inotifyfd = 0;
+    int watchd = 0;
     int retval;
     const char *configpath = config_get_project_config_path(projname);
     /* if the path to a configuration file has been given and the path
@@ -182,7 +182,7 @@ void project_manager_start_project(const char *projname)
 		 * Now setup the inotify descriptor.
 		 */
 		retval = qgis_inotify_watch_file(configpath);
-		inotifyfd = retval;
+		watchd = retval;
 	    }
 	    else
 	    {
@@ -191,7 +191,7 @@ void project_manager_start_project(const char *projname)
 	}
     }
 
-    db_add_project(projname, configpath, inotifyfd);
+    db_add_project(projname, configpath, watchd);
 
     int nr_of_childs_during_startup	= config_get_min_idle_processes(projname);
     printlog("startup project '%s', starting %d processes", projname, nr_of_childs_during_startup);
