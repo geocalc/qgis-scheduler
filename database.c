@@ -117,7 +117,6 @@ enum db_select_statement_id
     // from this id on we can use prepared statements
     DB_SELECT_CREATE_PROJECT_TABLE,
     DB_SELECT_CREATE_PROCESS_TABLE,
-    DB_SELECT_CREATE_INOTIFY_TABLE,
     DB_SELECT_GET_NAMES_FROM_PROJECT,
     DB_INSERT_PROJECT_DATA,
     DB_DELETE_PROJECT_DATA,
@@ -150,7 +149,6 @@ enum db_select_statement_id
     DB_GET_NUM_WATCHD_FROM_CONFIG,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
-    DB_DUMP_INOTIFY,
 
     DB_SELECT_ID_MAX	// last entry, do not use
 };
@@ -169,8 +167,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	    "process_socket_fd INTEGER UNIQUE NOT NULL, client_socket_fd INTEGER DEFAULT -1, "
 	    "starttime_sec INTEGER DEFAULT 0, starttime_nsec INTEGER DEFAULT 0, "
 	    "signaltime_sec INTEGER DEFAULT 0, signaltime_nsec INTEGER DEFAULT 0 )",
-	// DB_SELECT_CREATE_INOTIFY_TABLE
-	"CREATE TABLE inotify ("/*"projectname TEXT REFERENCES projects (name),"*/" configpath TEXT NOT NULL, watchd INTEGER NOT NULL)",
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
@@ -235,8 +231,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
 	"SELECT * FROM processes ORDER BY projectname ASC, pid ASC",
-	// DB_DUMP_INOTIFY
-	"SELECT * FROM inotify ORDER BY watchd ASC",
 
 };
 
@@ -952,8 +946,6 @@ void db_init(void)
     db_select_parameter(DB_SELECT_CREATE_PROJECT_TABLE);
 
     db_select_parameter(DB_SELECT_CREATE_PROCESS_TABLE);
-
-    db_select_parameter(DB_SELECT_CREATE_INOTIFY_TABLE);
 
     /* prepare further statements */
 //    db_statements_prepare();
@@ -2107,13 +2099,6 @@ void db_dump(void)
     *data.buffer = '\0';	// empty string
     sql = db_select_statement[DB_DUMP_PROCESS];
     strnbcat(&data.buffer, &data.bufferlen, "PROCESSES:\n");
-    sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
-    printlog("%s", data.buffer);
-
-    data.has_printed_headline = 0;
-    *data.buffer = '\0';	// empty string
-    sql = db_select_statement[DB_DUMP_INOTIFY];
-    strnbcat(&data.buffer, &data.bufferlen, "INOTIFY:\n");
     sqlite3_exec(dbhandler, sql, dump_tabledata, &data, &err );
     printlog("%s", data.buffer);
 
