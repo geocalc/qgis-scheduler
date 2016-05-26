@@ -416,7 +416,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 #endif
 
 		ret = retval;
-		db_add_new_inotify_watchd(path, retval);
+		db_add_new_inotify_watchd(projectname, path, retval);
 
 		retval = pthread_rwlock_unlock(&inotifyrwlock);
 		if (retval)
@@ -462,7 +462,7 @@ void qgis_inotify_delete_watch(const char *projectname, const char *path)
 	    exit(EXIT_FAILURE);
 	}
     }
-    db_remove_inotify_configpath(path);
+    db_remove_inotify_configpath(projectname, path);
 }
 
 

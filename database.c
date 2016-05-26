@@ -1888,7 +1888,7 @@ void db_reset_startup_failures(const char *projname)
 }
 
 
-int db_add_new_inotify_watchd(const char *path, int watchd)
+int db_add_new_inotify_watchd(const char *projectname, const char *path, int watchd)
 {
     assert(path);
 
@@ -2017,7 +2017,7 @@ int db_get_num_watchd_from_config(const char *path)
 }
 
 
-void db_remove_inotify_configpath(const char *path)
+void db_remove_inotify_configpath(const char *projectname, const char *path)
 {
     assert(path);
 

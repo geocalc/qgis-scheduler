@@ -128,12 +128,12 @@ void db_inc_startup_failures(const char *projname);
 int db_get_startup_failures(const char *projname);
 void db_reset_startup_failures(const char *projname);
 
-int db_add_new_inotify_watchd(const char *path, int watchd);
+int db_add_new_inotify_watchd(const char *projectname, const char *path, int watchd);
 void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, const char *filename);
 void db_delete_projects_for_watchd_and_config(char **list, int len);
 int db_get_watchd_from_config(const char *path);
 int db_get_num_watchd_from_config(const char *path);
-void db_remove_inotify_configpath(const char *path);
+void db_remove_inotify_configpath(const char *projectname, const char *path);
 
 void db_dump(void);
 
