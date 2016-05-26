@@ -273,7 +273,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 	    case ENOENT:
 	    case ENOTDIR:
 	    case EOVERFLOW:
-		logerror("ERROR: accessing file '%s': ", path);
+		logerror("WARNING: accessing file '%s': ", path);
 		debug(1, "file is not watched for changes");
 		break;
 
@@ -364,8 +364,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 	    }
 	    else
 	    {
-		//debug(1, "ERROR: '%s' is no regular file", configpath);
-		printlog("INFO: Inotify can not watch '%s', no regular file", path);
+		printlog("WARNING: Inotify can not watch '%s' for project '%s', no regular file", path, projectname);
 	    }
 	}
     }
