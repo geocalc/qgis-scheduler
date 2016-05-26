@@ -152,7 +152,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_ID_NULL
 	"",
 	// DB_SELECT_CREATE_PROJECT_TABLE
-	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, inotifyid INTEGER, nr_crashs INTEGER DEFAULT 0)",
+	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, watchd INTEGER, nr_crashs INTEGER DEFAULT 0)",
 	// DB_SELECT_CREATE_PROCESS_TABLE
 	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
 	    "list INTEGER NOT NULL, state INTEGER NOT NULL, "
@@ -165,7 +165,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
-	"INSERT INTO projects (name, configpath, configbasename, inotifyid) VALUES (%s,%s,%s,%i)",
+	"INSERT INTO projects (name, configpath, configbasename, watchd) VALUES (%s,%s,%s,%i)",
 	// DB_DELETE_PROJECT_DATA
 	"DELETE FROM projects WHERE name = %s",
 	// DB_SELECT_CONFIGPATH_WITH_PROJECT
@@ -229,7 +229,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_DUMP_PROCESS
 	"SELECT * FROM processes ORDER BY projectname ASC, pid ASC",
 	// DB_DUMP_INOTIFY
-	"SELECT * FROM inotify ORDER BY inotifyid ASC",
+	"SELECT * FROM inotify ORDER BY watchd ASC",
 
 };
 
