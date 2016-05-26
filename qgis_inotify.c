@@ -53,12 +53,6 @@
 
 
 
-struct inotify_watch
-{
-    char *filename;
-    int watchfd;
-};
-
 
 
 static int inotifyfd = -1;
