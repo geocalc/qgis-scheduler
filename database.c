@@ -176,7 +176,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
-	"INSERT INTO projects (name, configpath, configbasename, watchd) VALUES (%s,%s,%s,%i)",
+	"INSERT INTO projects (name) VALUES (%s)",
 	// DB_DELETE_PROJECT_DATA
 	"DELETE FROM projects WHERE name = %s",
 	// DB_SELECT_CONFIGPATH_WITH_PROJECT
@@ -993,20 +993,14 @@ void db_delete(void)
 void db_add_project(const char *projname, const char *configpath, int inotifyid)
 {
     assert(projname);
-    assert(configpath);
-
-    char *buffer = strdup(configpath);
-    char *basenam = basename(buffer);
 
     db_global_lock();
 
     db_exit_on_error = 1;	// exit on error
-    db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyid);
+    db_select_parameter(DB_INSERT_PROJECT_DATA, projname);
     db_exit_on_error = 0;	// reset exit flag
 
     db_global_unlock();
-
-    free(buffer);
 }
 
 
