@@ -152,7 +152,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_SELECT_ID_NULL
 	"",
 	// DB_SELECT_CREATE_PROJECT_TABLE
-	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT, configbasename TEXT, watchd INTEGER, nr_crashs INTEGER DEFAULT 0)",
+	"CREATE TABLE projects (name TEXT UNIQ NOT NULL, configpath TEXT DEFAULT '', configbasename TEXT DEFAULT '', watchd INTEGER DEFAULT 0, nr_crashs INTEGER DEFAULT 0)",
 	// DB_SELECT_CREATE_PROCESS_TABLE
 	"CREATE TABLE processes (projectname TEXT REFERENCES projects (name), "
 	    "list INTEGER NOT NULL, state INTEGER NOT NULL, "
