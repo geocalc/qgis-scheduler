@@ -302,7 +302,7 @@ void qgis_inotify_delete(void)
 }
 
 
-int qgis_inotify_watch_file(const char *path)
+int qgis_inotify_watch_file(const char *projectname, const char *path)
 {
     int ret = -1;
 
@@ -444,7 +444,7 @@ int qgis_inotify_watch_file(const char *path)
 /* deletes the inotify watch for the file which is identified
  * by the config file path.
  */
-void qgis_inotify_delete_watch(const char *path)
+void qgis_inotify_delete_watch(const char *projectname, const char *path)
 {
     /* check the number of inotifyids which also got this watch descriptor.
      * if the number is <= 1 we can remove the watch from this file.

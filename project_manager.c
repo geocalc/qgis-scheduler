@@ -112,7 +112,7 @@ void project_manager_shutdown_project(const char *project_name)
     printlog("shutdown project '%s'", project_name);
 
     char *path = db_get_configpath_from_project(project_name);
-    qgis_inotify_delete_watch(path);
+    qgis_inotify_delete_watch(project_name, path);
     free(path);
 
     db_move_all_process_from_init_to_shutdown_list(project_name);
@@ -181,7 +181,7 @@ void project_manager_start_project(const char *projname)
 		/* if I can stat the file I assume we can read it.
 		 * Now setup the inotify descriptor.
 		 */
-		retval = qgis_inotify_watch_file(configpath);
+		retval = qgis_inotify_watch_file(projname, configpath);
 		watchd = retval;
 	    }
 	    else
