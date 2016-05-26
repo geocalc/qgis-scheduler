@@ -143,7 +143,6 @@ void project_manager_shutdown(void)
 
 void project_manager_start_project(const char *projname)
 {
-    int watchd = 0;
     int retval;
 
     db_add_project(projname);
@@ -185,7 +184,6 @@ void project_manager_start_project(const char *projname)
 		 * Now setup the inotify descriptor.
 		 */
 		retval = qgis_inotify_watch_file(projname, configpath);
-		watchd = retval;
 	    }
 	    else
 	    {
