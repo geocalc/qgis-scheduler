@@ -232,7 +232,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
 	"SELECT name FROM projects WHERE watchd = %d AND configbasename = %s",
 	// DB_GET_WATCHD_FROM_CONFIG
-	"SELECT watchd FROM inotify WHERE configpath = %s",
+	"SELECT watchd FROM projects WHERE configpath = %s",
 	// DB_GET_NUM_WATCHD_FROM_CONFIG
 	"SELECT count(watchd) FROM inotify WHERE watchd IN (SELECT watchd FROM inotify WHERE configpath = %s)",
 	// DB_DELETE_INOTIFY_CONFIGPATH
