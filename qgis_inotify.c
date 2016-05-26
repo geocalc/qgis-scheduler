@@ -62,7 +62,6 @@ struct inotify_watch
 
 
 static int inotifyfd = -1;
-static pthread_rwlock_t inotifyrwlock = PTHREAD_RWLOCK_INITIALIZER;
 static pthread_t inotifythread = -1;
 
 
@@ -330,14 +329,6 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 
 		directoryname = dirname(directoryname);
 
-		retval = pthread_rwlock_wrlock(&inotifyrwlock);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("ERROR: acquire read-write lock");
-		    exit(EXIT_FAILURE);
-		}
-
 		/* NOTE: if we call inotify_add_watch() multiple times with the
 		 *       same 'directoryname' then it returns the same value.
 		 */
@@ -350,14 +341,6 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 
 		ret = retval;
 		db_add_new_inotify_path(projectname, path, retval);
-
-		retval = pthread_rwlock_unlock(&inotifyrwlock);
-		if (retval)
-		{
-		    errno = retval;
-		    logerror("ERROR: unlock read-write lock");
-		    exit(EXIT_FAILURE);
-		}
 
 
 		free(directoryname);
