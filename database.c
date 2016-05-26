@@ -135,7 +135,6 @@ enum db_select_statement_id
     DB_GET_LIST_FROM_PROCESS,
     DB_GET_PROCESS_SOCKET_FROM_PROCESS,
     DB_ADD_NEW_INOTIFYID,
-    DB_GET_UNUSED_INOTIFYID,
     DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS,
     DB_GET_WATCHD_FROM_CONFIG,
     DB_GET_NUM_WATCHD_FROM_CONFIG,
@@ -162,7 +161,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	    "starttime_sec INTEGER DEFAULT 0, starttime_nsec INTEGER DEFAULT 0, "
 	    "signaltime_sec INTEGER DEFAULT 0, signaltime_nsec INTEGER DEFAULT 0 )",
 	// DB_SELECT_CREATE_INOTIFY_TABLE
-	"CREATE TABLE inotify ("/*"projectname TEXT REFERENCES projects (name),"*/" configpath TEXT NOT NULL, inotifyid INTEGER UNIQ NOT NULL, watchd INTEGER NOT NULL)",
+	"CREATE TABLE inotify ("/*"projectname TEXT REFERENCES projects (name),"*/" configpath TEXT NOT NULL, watchd INTEGER NOT NULL)",
 	// DB_SELECT_GET_NAMES_FROM_PROJECT
 	"SELECT name FROM projects",
 	// DB_INSERT_PROJECT_DATA
@@ -216,9 +215,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_GET_PROCESS_SOCKET_FROM_PROCESS
 	"SELECT process_socket_fd FROM processes WHERE pid = %d",
 	// DB_ADD_NEW_INOTIFYID
-	"INSERT INTO inotify (configpath, inotifyid, watchd) VALUES (%s,%i,%i)",
-	// DB_GET_UNUSED_INOTIFYID
-	"SELECT min(inotifyid+1) FROM (SELECT 0 AS inotifyid UNION ALL SELECT MIN(inotifyid + 1) FROM inotify) AS T1 WHERE inotifyid+1 NOT IN (SELECT inotifyid FROM inotify)",
+	"INSERT INTO inotify (configpath, watchd) VALUES (%s,%i)",
 	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
 	"SELECT name FROM projects WHERE configpath IN (SELECT configpath FROM inotify WHERE watchd = %d) AND configbasename = %s",
 	// DB_GET_WATCHD_FROM_CONFIG
@@ -1895,36 +1892,13 @@ int db_add_new_inotify_watchd(const char *path, int watchd)
 {
     assert(path);
 
-    int get_free_inotifyid(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
-    {
-	int *val = data;
-
-	assert(1 == ncol);
-	assert(SQLITE_NULL == type[0] || SQLITE_INTEGER == type[0]);
-
-	*val = results[0].integer;
-	debug(1, "returned value %d", *val);
-
-	return 0;
-    }
-
-    int inotifyid = -1;
-
     db_global_lock();
 
-    db_select_parameter_callback(DB_GET_UNUSED_INOTIFYID, get_free_inotifyid, &inotifyid);
-
-    if (0 > inotifyid)
-    {
-	printlog("ERROR: can not set uniq id for inotify handler (%d)", inotifyid);
-	exit(EXIT_FAILURE);
-    }
-
-    db_select_parameter(DB_ADD_NEW_INOTIFYID, path, inotifyid, watchd);
+    db_select_parameter(DB_ADD_NEW_INOTIFYID, path, watchd);
 
     db_global_unlock();
 
-    return inotifyid;
+    return 0;
 }
 
 
