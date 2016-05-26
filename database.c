@@ -1891,7 +1891,7 @@ void db_reset_startup_failures(const char *projname)
 }
 
 
-int db_add_new_inotifyid(const char *path, int watchd)
+int db_add_new_inotify_watchd(const char *path, int watchd)
 {
     assert(path);
 
