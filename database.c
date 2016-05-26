@@ -100,6 +100,16 @@ static pthread_mutex_t db_mutex_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t idle_process_condition = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t idle_process_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* This is a global flag where statements can set the default error behaviour
+ * Normally the error is printed on standard error channel or into the log file.
+ * By setting this variable != 0 the behavior changes and the application exits
+ * with an error message.
+ *
+ * CAUTION: This variable needs to be changed under the protection of
+ * "db_mutex_lock", i.e. inbetween db_global_lock() and db_global_unlock().
+ */
+static int db_exit_on_error = 0;
+
 
 enum db_select_statement_id
 {
@@ -736,10 +746,18 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
     {
 	const char *sql = db_select_statement[sid];
 	printlog("ERROR: stepping sql statement '%s': %s", sql, sqlite3_errstr(retval));
-	retval = sqlite3_reset(ppstmt);
-	if (SQLITE_OK != retval)
+	if (db_exit_on_error)
 	{
-	    printlog("ERROR: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    printlog("exiting..");
+	    exit(EXIT_FAILURE);
+	}
+	else
+	{
+	    retval = sqlite3_reset(ppstmt);
+	    if (SQLITE_OK != retval)
+	    {
+		printlog("ERROR: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
+	    }
 	}
     }
     break;
@@ -747,6 +765,11 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
     case SQLITE_MISUSE:
 	/* the statement has been incorrect */
 	printlog("ERROR: misuse of prepared sql statement '%s'", db_select_statement[sid]);
+	if (db_exit_on_error)
+	{
+	    printlog("exiting..");
+	    exit(EXIT_FAILURE);
+	}
 	break;
 
     case SQLITE_ABORT:
@@ -977,7 +1000,9 @@ void db_add_project(const char *projname, const char *configpath, int inotifyid)
 
     db_global_lock();
 
+    db_exit_on_error = 1;	// exit on error
     db_select_parameter(DB_INSERT_PROJECT_DATA, projname, configpath, basenam, inotifyid);
+    db_exit_on_error = 0;	// reset exit flag
 
     db_global_unlock();
 
