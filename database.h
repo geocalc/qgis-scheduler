@@ -84,7 +84,7 @@ void db_init(void);
 void db_delete(void);
 
 
-void db_add_project(const char *projname, const char *configpath, int inotifyfd);
+void db_add_project(const char *projname);
 int db_get_names_project(char ***projname, int *len);
 void db_free_names_project(char **projname, int len);
 void db_remove_project(const char *projname);

@@ -146,7 +146,7 @@ void project_manager_start_project(const char *projname)
     int watchd = 0;
     int retval;
 
-    db_add_project(projname, "", watchd);
+    db_add_project(projname);
 
     const char *configpath = config_get_project_config_path(projname);
     /* if the path to a configuration file has been given and the path

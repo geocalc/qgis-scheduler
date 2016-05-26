@@ -990,7 +990,7 @@ void db_delete(void)
 }
 
 
-void db_add_project(const char *projname, const char *configpath, int inotifyid)
+void db_add_project(const char *projname)
 {
     assert(projname);
 
