@@ -108,7 +108,6 @@ void project_manager_projectname_configfile_changed(const char *projname)
 
 void project_manager_shutdown_project(const char *project_name)
 {
-//    debug(1, "shutdown project '%s'", project_name);
     printlog("shutdown project '%s'", project_name);
 
     char *path = db_get_configpath_from_project(project_name);
@@ -136,8 +135,6 @@ void project_manager_shutdown(void)
     }
 
     db_free_names_project(projects, len);
-
-//    db_move_all_process_to_list(LIST_SHUTDOWN);
 }
 
 
