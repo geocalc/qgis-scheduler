@@ -230,7 +230,7 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	// DB_ADD_NEW_INOTIFYID2
 	"UPDATE OR IGNORE projects SET configpath = %s, configbasename = %s, watchd = %i WHERE name = %s",
 	// DB_GET_PROJECTS_FOR_WATCHES_AND_CONFIGS
-	"SELECT name FROM projects WHERE configpath IN (SELECT configpath FROM inotify WHERE watchd = %d) AND configbasename = %s",
+	"SELECT name FROM projects WHERE watchd = %d AND configbasename = %s",
 	// DB_GET_WATCHD_FROM_CONFIG
 	"SELECT watchd FROM inotify WHERE configpath = %s",
 	// DB_GET_NUM_WATCHD_FROM_CONFIG
