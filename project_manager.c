@@ -253,7 +253,9 @@ void project_manager_manage_project_changes(const char **newproj, const char **c
 	    const char **deletedprojcopy = deletedproj;
 	    while ((proj = *deletedprojcopy++))
 		if ( !strcmp(proj, projname) )
-		    goto continue_outer;
+		    break;
+	    if (proj)
+		continue; // ..outer loop
 	}
 
 	if (changedproj)
@@ -261,7 +263,9 @@ void project_manager_manage_project_changes(const char **newproj, const char **c
 	    const char **changedprojcopy = changedproj;
 	    while ((proj = *changedprojcopy++))
 		if ( !strcmp(proj, projname) )
-		    goto continue_outer;
+		    break;
+	    if (proj)
+		continue; // ..outer loop
 	}
 
 	if (newproj)
@@ -269,7 +273,9 @@ void project_manager_manage_project_changes(const char **newproj, const char **c
 	    const char **newprojcopy = newproj;
 	    while ((proj = *newprojcopy++))
 		if ( !strcmp(proj, projname) )
-		    goto continue_outer;
+		    break;
+	    if (proj)
+		continue; // ..outer loop
 	}
 
 	const int projprocnum = config_get_min_idle_processes(projname);
@@ -280,8 +286,6 @@ void project_manager_manage_project_changes(const char **newproj, const char **c
 	    process_manager_start_new_process_detached(newprocnum, projname, 0);
 	}
 
-	continue_outer:
-	(void)0;	// do nothing, continue outer loop
     }
 }
 
