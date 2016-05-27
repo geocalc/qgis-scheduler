@@ -149,6 +149,7 @@ enum db_select_statement_id
     DB_GET_WATCHD_FROM_CONFIG,
     DB_GET_WATCHD_FROM_PROJECT,
     DB_GET_NUM_WATCHD_FROM_CONFIG,
+    DB_GET_NUM_WATCHD_FROM_WATCHD,
     DB_DUMP_PROJECT,
     DB_DUMP_PROCESS,
 
@@ -231,6 +232,8 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 	"SELECT watchd FROM projects WHERE name = %s",
 	// DB_GET_NUM_WATCHD_FROM_CONFIG
 	"SELECT count(watchd) FROM projects WHERE watchd IN (SELECT watchd FROM projects WHERE configpath = %s)",
+	// DB_GET_NUM_WATCHD_FROM_WATCHD
+	"SELECT count(watchd) FROM projects WHERE watchd = %d",
 	// DB_DUMP_PROJECT
 	"SELECT * FROM projects ORDER BY name ASC",
 	// DB_DUMP_PROCESS
@@ -1963,6 +1966,36 @@ int db_get_num_watchd_from_config(const char *path)
     db_global_lock();
 
     db_select_parameter_callback(DB_GET_NUM_WATCHD_FROM_CONFIG, get_num_watchd_from_config, &ret, path);
+
+    db_global_unlock();
+
+    debug(1, "returned %d", ret);
+
+    return ret;
+}
+
+
+int db_get_num_watchd_from_watchd(int watchd)
+{
+
+    int get_num_watchd_from_watchd(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
+    {
+	int *val = data;
+
+	assert(1 == ncol);
+	assert(SQLITE_INTEGER == type[0]);
+
+	*val = results[0].integer;
+	debug(1, "returned value %d", *val);
+
+	return 0;
+    }
+
+    int ret = -1;
+
+    db_global_lock();
+
+    db_select_parameter_callback(DB_GET_NUM_WATCHD_FROM_WATCHD, get_num_watchd_from_watchd, &ret, watchd);
 
     db_global_unlock();
 

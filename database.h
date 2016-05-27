@@ -134,6 +134,7 @@ void db_delete_projects_for_watchd_and_config(char **list, int len);
 int db_get_watchd_from_config(const char *path);
 int db_get_watchd_from_project(const char *projectname);
 int db_get_num_watchd_from_config(const char *path);
+int db_get_num_watchd_from_watchd(int watchd);
 void db_remove_inotify_path(const char *projectname, const char *path);
 
 void db_dump(void);
