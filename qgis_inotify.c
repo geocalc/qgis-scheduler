@@ -358,13 +358,13 @@ void qgis_inotify_delete_watch(const char *projectname, const char *path)
     /* check the watch descriptor. an unsuccessful inotify call is stored
      * with the watchd == 0.
      */
-    int watchd = db_get_watchd_from_project(projectname);
+    const int watchd = db_get_watchd_from_project(projectname);
     if (0 < watchd)
     {
 	/* check the number of inotifyids which also got this watch descriptor.
 	 * if the number is <= 1 we can remove the watch from this file.
 	 */
-	int watchnum = db_get_num_watchd_from_config(path);
+	const int watchnum = db_get_num_watchd_from_watchd(watchd);
 	debug(1, "number of watches %d with same directory from %s", watchnum, path);
 	if (1 >= watchnum)
 	{
