@@ -376,7 +376,7 @@ void qgis_inotify_delete_watch(const char *projectname, const char *path)
 		exit(EXIT_FAILURE);
 	    }
 	}
-	db_remove_inotify_path(projectname, path);
+	db_remove_inotify_path(projectname);
     }
 }
 

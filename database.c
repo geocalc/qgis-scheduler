@@ -2005,10 +2005,9 @@ int db_get_num_watchd_from_watchd(int watchd)
 }
 
 
-void db_remove_inotify_path(const char *projectname, const char *path)
+void db_remove_inotify_path(const char *projectname)
 {
     assert(projectname);
-    assert(path);
 
     db_global_lock();
 
