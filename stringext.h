@@ -32,5 +32,16 @@
 #define STRINGEXT_H_
 
 
+/* Copy content of s1 and s2 into a new allocated string.
+ * You have to free() the resulting string yourself.
+ */
+#define astrcat(s1,s2)	anstrcat(2,s1,s2)
+
+/* Copy content of s1, s2, ... into a new allocated string.
+ * You have to free() the resulting string yourself.
+ * Argument "n" describes the number of strings.
+ */
+char *anstrcat(int n, ...);
+
 
 #endif /* STRINGEXT_H_ */

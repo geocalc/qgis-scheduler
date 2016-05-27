@@ -30,3 +30,52 @@
 
 #include "stringext.h"
 
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <assert.h>
+
+
+/* Copy content of s1, s2, ... into a new allocated string.
+ * You have to free() the resulting string yourself.
+ * Argument "n" describes the number of strings.
+ */
+char *anstrcat(int n, ...)
+{
+    assert(n >= 0);
+    int len = 0;
+    int i;
+
+    if (0 >= n)
+	return NULL;
+
+    va_list args, carg;
+    va_start(args, n);
+    va_copy(carg, args);
+
+    // evaluate string length
+    for (i=0; i<n; i++)
+    {
+	char *s = va_arg(args, char *);
+	len += strlen(s);
+    }
+    va_end(args);
+
+    // allocate fitting memory
+    char *astr = malloc(len+1);
+    *astr = '\0';
+
+    // copy strings to memory
+    for (i=0; i<n; i++)
+    {
+	char *s = va_arg(carg, char *);
+	strcat(astr, s);
+    }
+    va_end(carg);
+
+
+    return astr;
+}
+
+

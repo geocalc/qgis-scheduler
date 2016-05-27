@@ -47,6 +47,7 @@
 #include <libgen.h>
 
 #include "logger.h"
+#include "stringext.h"
 
 
 #define CONFIG_LISTEN_KEY		":listen"
@@ -144,54 +145,6 @@ static int does_program_shutdown = 0;
 static clockid_t system_clk_id = 0;
 static int debuglevel = DEFAULT_CONFIG_DEBUGLEVEL; // cache debuglevel, so we dont need mutex to read the level value (used to debug this module itself)
 
-
-
-/* Copy content of s1 and s2 into a new allocated string.
- * You have to free() the resulting string yourself.
- */
-#define astrcat(s1,s2)	anstrcat(2,s1,s2)
-
-
-/* Copy content of s1, s2, ... into a new allocated string.
- * You have to free() the resulting string yourself.
- * Argument "n" describes the number of strings.
- */
-static char *anstrcat(int n, ...)
-{
-    assert(n >= 0);
-    int len = 0;
-    int i;
-
-    if (0 >= n)
-	return NULL;
-
-    va_list args, carg;
-    va_start(args, n);
-    va_copy(carg, args);
-
-    // evaluate string length
-    for (i=0; i<n; i++)
-    {
-	char *s = va_arg(args, char *);
-	len += strlen(s);
-    }
-    va_end(args);
-
-    // allocate fitting memory
-    char *astr = malloc(len+1);
-    *astr = '\0';
-
-    // copy strings to memory
-    for (i=0; i<n; i++)
-    {
-	char *s = va_arg(carg, char *);
-	strcat(astr, s);
-    }
-    va_end(carg);
-
-
-    return astr;
-}
 
 
 /* load an include file and append its section data to the temporary file "f"
