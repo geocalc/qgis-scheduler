@@ -213,22 +213,76 @@ void project_manager_restart_project(const char *proj)
  * new projects are started according to their settings.
  * deleted projects are shut down, i.e. the processes are killed from memory.
  * changed projects are restarted, analog to being a deleted and new project in series.
+ *
+ * additionally check for a change in the minimal number of programs global setting
  */
 void project_manager_manage_project_changes(const char **newproj, const char **changedproj, const char **deletedproj)
 {
     const char *proj;
 
     if (deletedproj)
-	while ((proj = *deletedproj++))
+    {
+	const char **deletedprojcopy = deletedproj;
+	while ((proj = *deletedprojcopy++))
 	    project_manager_shutdown_project(proj);
+    }
 
     if (changedproj)
-	while ((proj = *changedproj++))
+    {
+	const char **changedprojcopy = changedproj;
+	while ((proj = *changedprojcopy++))
 	    project_manager_restart_project(proj);
+    }
 
     if (newproj)
-	while ((proj = *newproj++))
+    {
+	const char **newprojcopy = newproj;
+	while ((proj = *newprojcopy++))
 	    project_manager_start_project(proj);
+    }
+
+    /* test if the project setting for the minimal number of processes changed */
+    const int projnum = config_get_num_projects();
+    int i;
+    for (i=0; i<projnum; i++)
+    {
+	const char *projname = config_get_name_project(i);
+
+	if (deletedproj)
+	{
+	    const char **deletedprojcopy = deletedproj;
+	    while ((proj = *deletedprojcopy++))
+		if ( !strcmp(proj, projname) )
+		    goto continue_outer;
+	}
+
+	if (changedproj)
+	{
+	    const char **changedprojcopy = changedproj;
+	    while ((proj = *changedprojcopy++))
+		if ( !strcmp(proj, projname) )
+		    goto continue_outer;
+	}
+
+	if (newproj)
+	{
+	    const char **newprojcopy = newproj;
+	    while ((proj = *newprojcopy++))
+		if ( !strcmp(proj, projname) )
+		    goto continue_outer;
+	}
+
+	const int projprocnum = config_get_min_idle_processes(projname);
+	const int aktprocnum = db_get_num_start_init_idle_process(projname);
+	if (aktprocnum < projprocnum)
+	{
+	    int newprocnum = projprocnum - aktprocnum;
+	    process_manager_start_new_process_detached(newprocnum, projname, 0);
+	}
+
+	continue_outer:
+	(void)0;	// do nothing, continue outer loop
+    }
 }
 
 
