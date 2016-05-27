@@ -961,6 +961,8 @@ void db_remove_project(const char *projname)
 
 char *db_get_configpath_from_project(const char *projname)
 {
+    assert(projname);
+
     int get_configpath_from_project(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
 	const char **path = data;
@@ -1064,6 +1066,8 @@ char *db_get_project_for_this_process(pid_t pid)
 
 pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutsec)
 {
+    assert(projname);
+
     pid_t ret = -1;
 
     int retval = pthread_mutex_lock(&idle_process_mutex);
@@ -1302,6 +1306,7 @@ int db_process_set_state_exit(pid_t pid)
 
 int db_process_set_state(pid_t pid, enum db_process_state_e state)
 {
+    assert(state < PROCESS_STATE_MAX);
     int ret = 0;
 
     db_global_lock();
@@ -1529,6 +1534,7 @@ enum db_process_list_e db_get_process_list(pid_t pid)
  */
 void db_move_all_idle_process_from_init_to_active_list(const char *projname)
 {
+    assert(projname);
     debug(1, "project '%s'", projname);
 
     db_global_lock();
@@ -1545,6 +1551,7 @@ void db_move_all_idle_process_from_init_to_active_list(const char *projname)
  */
 void db_move_all_process_from_active_to_shutdown_list(const char *projname)
 {
+    assert(projname);
     debug(1, "project '%s'", projname);
 
     db_global_lock();
@@ -1561,6 +1568,7 @@ void db_move_all_process_from_active_to_shutdown_list(const char *projname)
  */
 void db_move_all_process_from_init_to_shutdown_list(const char *projname)
 {
+    assert(projname);
     debug(1, "project '%s'", projname);
 
     db_global_lock();
@@ -1668,6 +1676,7 @@ int db_get_signal_timer(struct timespec *ts, pid_t pid)
 
 void db_shutdown_get_min_signaltimer(struct timespec *maxtimeval)
 {
+    assert(maxtimeval);
 
     int get_signal_timer(void *data, int ncol, int *type, union callback_result_t *results, const char**cols)
     {
@@ -1798,6 +1807,7 @@ void db_reset_startup_failures(const char *projname)
 
 int db_add_new_inotify_path(const char *projectname, const char *path, int watchd)
 {
+    assert(projectname);
     assert(path);
 
     char *buffer = strdup(path);
@@ -1819,6 +1829,7 @@ void db_get_projects_for_watchd_and_config(char ***list, int *len, int watchd, c
 {
     assert(list);
     assert(len);
+    assert(filename);
 
     struct data_s
     {
@@ -1963,6 +1974,7 @@ int db_get_num_watchd_from_config(const char *path)
 
 void db_remove_inotify_path(const char *projectname, const char *path)
 {
+    assert(projectname);
     assert(path);
 
     db_global_lock();
