@@ -407,6 +407,7 @@ static int config_test_for_section_change(dictionary *oldconfig, dictionary *new
     /* section count equals in both dictionaries.
      * check for differences in key names or key values.
      */
+    int retval = 0;
     int k;
     char **oldkeys = iniparser_getseckeys(oldconfig, section);
     char **newkeys = iniparser_getseckeys(newconfig, section);
@@ -421,7 +422,7 @@ static int config_test_for_section_change(dictionary *oldconfig, dictionary *new
 	    {
 		// keys are equal
 		newkey = newkeys[k];
-		break;
+		break; // exit inner loop
 	    }
 	}
 
@@ -431,8 +432,11 @@ static int config_test_for_section_change(dictionary *oldconfig, dictionary *new
 	    const char *oldvalue = iniparser_getstring(oldconfig, oldkey, "");
 	    const char *newvalue = iniparser_getstring(newconfig, newkey, "");
 	    if (strcmp(oldvalue, newvalue))
+	    {
 		// values differ
-		return 1;
+		retval = 1;
+		break; // exit outer loop
+	    }
 	}
 	else
 	{
@@ -440,13 +444,14 @@ static int config_test_for_section_change(dictionary *oldconfig, dictionary *new
 	     * configs differ, return 1
 	     */
 	    debug(1, "did not find key '%s' in new dictionary. dictionaries differ", oldkey);
-	    return 1;
+	    retval = 1;
+	    break; // exit outer loop
 	}
     }
     free(oldkeys);
     free(newkeys);
 
-    return 0;
+    return retval;
 }
 
 
