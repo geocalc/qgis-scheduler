@@ -46,6 +46,7 @@
 #include "qgis_config.h"
 #include "qgis_shutdown_queue.h"
 #include "statistic.h"
+#include "stringext.h"
 #include "timer.h"
 
 
@@ -236,110 +237,6 @@ static const char *db_select_statement[DB_SELECT_ID_MAX] =
 
 
 static sqlite3_stmt *db_prepared_stmt[DB_SELECT_ID_MAX] = { 0 };
-
-
-/* Like strncat() appends a string to an exiting string buffer. If the string
- * does not fit into the buffer it is resized to a new size. The new buffer is
- * stored into "buffer" and "len" is updated.
- */
-void strnbcat(char **buffer, int *len, const char *str)
-{
-    int appendlen = strlen(str);
-    int bufferlen = strlen(*buffer);
-    int newlen = *len;
-
-    static const int max_resize_iteration = 10;
-    int i;
-    for (i=0; i<max_resize_iteration; i++)
-    {
-	// need newlen >=  (appendlen + bufferlen + 1) to fit into buffer
-	if ((appendlen + bufferlen) >= newlen)
-	{
-	    /* "str" doesn't fit into "buffer". need to resize it
-	     * Just double the size of the buffer */
-	    newlen += newlen;
-	}
-	else
-	{
-	    break;
-	}
-    }
-    if (i >= max_resize_iteration)
-    {
-	/* possible endless loop. exit with error */
-	printlog("ERROR: possible endless loop in resize() algorithm. exit");
-	exit(EXIT_FAILURE);
-    }
-    if ( newlen != *len )
-    {
-	*len = newlen;
-	*buffer = realloc(*buffer, newlen);
-	if ( !*buffer )
-	{
-	    /* realloc failed. exit */
-	    logerror("ERROR: realloc failed");
-	    exit(EXIT_FAILURE);
-	}
-    }
-    strcat(*buffer, str);
-}
-
-
-/* Add a value to an array. Resize the array if all elements are filled.
- * 'dataarray' is a pointer to an array which is resized on demand.
- * 'nelem' holds the length of the array (measured in elements not bytes).
- * 'nlen' holds the used array elements.
- * 'data' is a pointer to the value of size 'sizeofdata'.
- */
-void arraycat(void *dataarray, int *nelem, int *nlen, void *data, int sizeofdata)
-{
-    assert(dataarray);
-    assert(nelem);
-    assert(nlen);
-    assert(data);
-    assert(sizeofdata > 0);
-
-    /* construct a datatype with sizeof(struct datatype_s) == sizeofdata */
-    typedef struct datatype_s
-    {
-	unsigned char dat[sizeofdata];
-    } datatype_t;
-
-    int myelem = *nelem;
-    int mylen = *nlen;
-    datatype_t *myarray = *((datatype_t **)dataarray);
-
-    if (!myarray)	// reset all values if array is NULL
-    {
-	mylen = myelem = 0;
-    }
-
-    /* resize if the array is full */
-    if (mylen >= myelem)
-    {
-	if (0 >= myelem)
-	{
-	    myelem = 16;	// set an initial array size of 16 elements
-	    mylen = 0;
-	}
-	else
-	    myelem *= 2;
-
-	myarray = realloc(myarray, myelem*sizeof(*myarray));
-	if ( !myarray )
-	{
-	    /* realloc failed. exit */
-	    logerror("ERROR: realloc failed");
-	    exit(EXIT_FAILURE);
-	}
-
-	*((datatype_t **)dataarray) = myarray;
-	*nelem = myelem;
-    }
-
-    myarray[mylen++] = *((datatype_t *)data);
-    *nlen = mylen;
-}
 
 
 static void db_global_lock(void)

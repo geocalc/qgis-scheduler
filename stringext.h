@@ -43,5 +43,18 @@
  */
 char *anstrcat(int n, ...);
 
+/* Like strncat() appends a string to an exiting string buffer. If the string
+ * does not fit into the buffer it is resized to a new size. The new buffer is
+ * stored into "buffer" and "len" is updated.
+ */
+void strnbcat(char **buffer, int *len, const char *str);
+
+/* Add a value to an array. Resize the array if all elements are filled.
+ * 'dataarray' is a pointer to an array which is resized on demand.
+ * 'nelem' holds the length of the array (measured in elements not bytes).
+ * 'nlen' holds the used array elements.
+ * 'data' is a pointer to the value of size 'sizeofdata'.
+ */
+void arraycat(void *dataarray, int *nelem, int *nlen, void *data, int sizeofdata);
 
 #endif /* STRINGEXT_H_ */
