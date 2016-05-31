@@ -52,6 +52,7 @@
 #include "qgis_shutdown_queue.h"
 #include "project_manager.h"
 #include "statistic.h"
+#include "stringext.h"
 #include "timer.h"
 
 
@@ -504,22 +505,27 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     /* preparation of data before fork() so we don't need to call functions with
      * mutexes after fork() (see below for further reading).
      */
-    int maxenv = 25;	// support 25 environment variables at max
-    const char **key = calloc(maxenv, sizeof(*key));
-    const char **value = calloc(maxenv, sizeof(*value));
+    static const int maxenv = 128;	// to prevent infinite loop support 128 environment variables at max
+    int lenkey = 0;
+    int numkey = 0;
+    const char **keys = NULL;
+    const char **values = NULL;
     int i;
     for (i=0; i<maxenv; i++)
     {
-	key[i] = config_get_env_key(project_name, i);
-	if ( !key[i] )
+	const char *key = config_get_env_key(project_name, i);
+	if ( !key )
 	    break;
-	value[i] = config_get_env_value(project_name, i);
-	if ( !value[i] )
+	const char *value = config_get_env_value(project_name, i);
+	if ( !value )
 	    break;
 
-	debug(1, "project %s: add %s = %s to environment", project_name, key[i], value[i]);
+	int lenvalue = lenkey;
+	int numvalue = numkey;
+	arraycat(&values, &numvalue, &lenvalue, &value, sizeof(*values) );
+	arraycat(&keys, &numkey, &lenkey, &key, sizeof(*keys) );
+	debug(1, "project %s: add %s = %s to environment", project_name, key, value);
     }
-    maxenv = i; // correct max to really used data
 
     const char *working_directory = config_get_working_directory(project_name);
 
@@ -545,10 +551,10 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
 	/* Add the configured environment to the existing environment */
 	/* Note: shall we clean up before? */
-	for (i=0; i<maxenv; i++)
+	for (i=0; i<lenkey; i++)
 	{
 //	    debug(1, "project %s: add %s = %s to environment", project_name, key, value); # no debug message allowed because of locking
-	    retval = setenv(key[i], value[i], 1);
+	    retval = setenv(keys[i], values[i], 1);
 	    if (retval)
 	    {
 //		logerror("ERROR: can not set environment with key='%s' and value='%s'", key[i], value[i]); # no log message allowed because of locking
@@ -594,8 +600,8 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     else if (0 < pid)
     {
 	/* parent */
-	free(key);
-	free(value);
+	free(keys);
+	free(values);
 	debug(1, "project '%s' started new child process '%s', pid %d", project_name, command, pid);
 	db_add_process( project_name, pid, childsocket);
 
