@@ -55,6 +55,6 @@ void strnbcat(char **buffer, int *len, const char *str);
  * 'nlen' holds the used array elements.
  * 'data' is a pointer to the value of size 'sizeofdata'.
  */
-void arraycat(void *dataarray, int *nelem, int *nlen, void *data, int sizeofdata);
+void arraycat(void *dataarray, int *nelem, int *nlen, const void *data, int sizeofdata);
 
 #endif /* STRINGEXT_H_ */
