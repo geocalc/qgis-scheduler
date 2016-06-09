@@ -810,6 +810,8 @@ int main(int argc, char **argv)
 			/* hang up signal, reload configuration */
 			printlog("received SIGHUP, reloading configuration");
 			config_load(configuration_path, &sectionnew, &sectionchange, &sectiondelete);
+			logger_open_logfile();
+			printlog("log file reopened");
 			project_manager_manage_project_changes((const char **)sectionnew, (const char **)sectionchange, (const char **)sectiondelete);
 			config_delete_section_change_list(sectionnew);
 			config_delete_section_change_list(sectionchange);

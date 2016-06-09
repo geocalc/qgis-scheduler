@@ -122,6 +122,12 @@ int my_vdprintf(int fd, const char *format, va_list ap)
 }
 
 
+int logger_init(void)
+{
+    return logger_open_logfile();
+}
+
+
 int my_dprintf(int fd, const char *format, ...)
 {
     va_list args;
@@ -138,7 +144,7 @@ int my_dprintf(int fd, const char *format, ...)
 /* opens the logfile specified by config,
  * redirects stdout and stderr to logfile.
  */
-int logger_init(void)
+int logger_open_logfile(void)
 {
     const char *logfilename = config_get_logfile();
     if (logfilename)

@@ -40,6 +40,7 @@
 
 
 int logger_init(void);
+int logger_open_logfile(void);
 int printlog(const char *format, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 #define debug(level, format, ...)	mydebug(level, "[%#lx] %s():%d " format, pthread_self(), __FUNCTION__, __LINE__, ## __VA_ARGS__)
 int mydebug(int level, const char *format, ...) __attribute__ ((__format__ (__printf__, 2, 3)));
