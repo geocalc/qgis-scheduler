@@ -718,6 +718,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
      */
     if (do_exchange_processes)
     {
+	// TODO: move only those processes which have been started above
 	db_move_all_process_from_active_to_shutdown_list(projname);
 	db_reset_startup_failures(projname);	// TODO: move this line to the config change manager
     }
