@@ -57,4 +57,13 @@ void strnbcat(char **buffer, int *len, const char *str);
  */
 void arraycat(void *dataarray, int *nelem, int *nlen, const void *data, int sizeofdata);
 
+/* Like memcpy() appends data to an exiting buffer. If the data does not fit
+ * into the buffer that buffer is resized to a new size. The new buffer is
+ * stored into "buffer" and "buffersize" is updated.
+ * Then the data is appended to the old buffer and "bufferlen" is updated.
+ *
+ * return: 0 on success, -1 otherwise
+ */
+int membcat(void **buffer, int *buffersize, int *bufferlen, const void *src, int srclen);
+
 #endif /* STRINGEXT_H_ */

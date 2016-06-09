@@ -87,6 +87,10 @@ char *anstrcat(int n, ...)
  */
 void strnbcat(char **buffer, int *len, const char *str)
 {
+    assert(buffer);
+    assert(len);
+    assert(str);
+
     int appendlen = strlen(str);
     int bufferlen = strlen(*buffer);
     int newlen = *len;
@@ -182,6 +186,92 @@ void arraycat(void *dataarray, int *nelem, int *nlen, const void *data, int size
 
     myarray[mylen++] = *((datatype_t *)data);
     *nlen = mylen;
+}
+
+
+/* Like memcpy() appends data to an exiting buffer. If the data does not fit
+ * into the buffer that buffer is resized to a new size. The new buffer is
+ * stored into "buffer" and "buffersize" is updated.
+ * Then the data is appended to the old buffer and "bufferlen" is updated.
+ *
+ * return: 0 on success, -1 otherwise
+ */
+int membcat(void **buffer, int *buffersize, int *bufferlen, const void *src, int srclen)
+{
+    assert(buffer);
+    assert(buffersize);
+    assert(*buffersize >= 0);
+    assert(bufferlen);
+    assert(*bufferlen >= 0);
+    assert(src);
+    assert(srclen >= 0);
+
+    void *mybuffer = *buffer;
+    unsigned int mybuffersize = *buffersize;
+    unsigned int mybufferlen = *bufferlen;
+
+    assert(mybuffersize >= mybufferlen);
+    if ( !mybuffer )
+	assert( !mybuffersize );
+
+
+    int retval = 0;
+    /* check the size needed to copy all data */
+    unsigned int newbufferlen = mybufferlen + srclen;
+    if (mybuffersize < newbufferlen)
+    {
+	/* bigger size needed.
+	 * make new size 2^n with 2^n > newlen
+	 */
+	if (newbufferlen >= ((unsigned int)1)<<31) /* test for value > 2^30 */
+	{
+	    /* we can not use a bigger value because we can not store
+	     * the value in a signed integer value (-2^31..+(2^31-1))
+	     */
+	    retval = -1; // unusable result, can not store in signed int type
+	}
+	else
+	{
+	    /* this is from https://graphics.stanford.edu/~seander/bithacks.html */
+
+	    /* this code works with values below 2^31 */
+	    unsigned int v = newbufferlen; // compute the next highest power of 2 of 32-bit v
+
+	    v--;
+	    v |= v >> 1;
+	    v |= v >> 2;
+	    v |= v >> 4;
+	    v |= v >> 8;
+	    v |= v >> 16;
+	    v++;
+
+	    if (v >= ((unsigned int)1)<<31) /* test for value > 2^31-1 */
+		retval = -1; // unusable result, can not store in signed int type
+	    else
+		mybuffersize = v;
+	}
+    }
+
+    if ( !retval )
+    {
+	if ( mybuffersize != *buffersize )
+	{
+	    mybuffer = realloc(mybuffer, mybuffersize);
+	    if ( !mybuffer )
+	    {
+		/* realloc failed. exit */
+		logerror("ERROR: realloc failed");
+		exit(EXIT_FAILURE);
+	    }
+	    *buffer = mybuffer;
+	    *buffersize = mybuffersize;
+	}
+
+	memcpy(mybuffer + mybufferlen, src, srclen);
+	*bufferlen = newbufferlen;
+    }
+
+    return retval;
 }
 
 
