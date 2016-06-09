@@ -900,6 +900,7 @@ void process_manager_process_died_during_init(pid_t pid, const char *projname)
     int retval = get_program_shutdown();
     if (!retval)
     {
+	printlog("WARNING: project %s process %d died during init", projname, pid);
 	db_inc_startup_failures(projname);
 
 //	retval = db_get_startup_failures(projname);
