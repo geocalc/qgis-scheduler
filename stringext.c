@@ -66,6 +66,12 @@ char *anstrcat(int n, ...)
 
     // allocate fitting memory
     char *astr = malloc(len+1);
+    if ( !astr )
+    {
+	/* malloc failed. exit */
+	logerror("ERROR: malloc failed");
+	exit(EXIT_FAILURE);
+    }
     *astr = '\0';
 
     // copy strings to memory
