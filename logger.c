@@ -335,7 +335,13 @@ int logerror(const char *format, ...)
 	    strsize += 5;		// add size of ": %m\n"
 
 	    // print string
-	    char strbuffer[strsize+1];
+	    char *strbuffer = malloc(strsize+1);
+	    if ( !strbuffer )
+	    {
+		/* malloc failed. exit */
+		logerror("ERROR: malloc failed");
+		exit(EXIT_FAILURE);
+	    }
 	    strcpy(strbuffer, timebuffer);
 	    strcat(strbuffer, format);
 	    strcat(strbuffer, ": %m\n");
@@ -344,6 +350,8 @@ int logerror(const char *format, ...)
 	    errno = myerrno;
 	    retval = my_vdprintf(STDERR_FILENO, strbuffer, args);
 	    va_end(args);
+
+	    free(strbuffer);
 	}
     }
     else
