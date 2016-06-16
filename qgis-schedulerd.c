@@ -496,6 +496,47 @@ int main(int argc, char **argv)
 	    if (pwnam)
 	    {
 		gid_t gid = pwnam->pw_gid;
+		uid_t uid = pwnam->pw_uid;
+
+		/* change the user and group id of the log file. So if we
+		 * receive the signal SIGHUP and reopen the file we won't
+		 * exit with a permission failure.
+		 *
+		 * first test if we write to a file or tty
+		 */
+		errno = 0;
+		retval = isatty(STDOUT_FILENO);
+		if (!retval)
+		{
+		    /* is no tty.
+		     * check for errors
+		     */
+		    switch (errno)
+		    {
+//		    case EINVAL: // fall through
+		    case ENOTTY:
+			/* return values for valid files
+			 * glibc: EINVAL, POSIX: ENOTTY
+			 * note: despite of the man page glibc-2.22 returns ENOTTY */
+			break;
+		    default:
+			logerror("ERROR: isatty");
+			exit(EXIT_FAILURE);
+		    }
+
+		    /* is no error.
+		     * change owner of the logfile
+		     */
+		    retval = fchown(STDOUT_FILENO, uid, gid);
+		    if (retval)
+		    {
+			const char *logfile = config_get_logfile();
+			logerror("ERROR: can not set owner of logfile '%s' to %s", logfile, chuser);
+			exit(EXIT_FAILURE);
+		    }
+		}
+
+		/* change user and group id */
 		retval = setgid(gid);
 		if (retval)
 		{
@@ -503,7 +544,6 @@ int main(int argc, char **argv)
 		    exit(EXIT_FAILURE);
 		}
 
-		uid_t uid = pwnam->pw_uid;
 		retval = setuid(uid);
 		if (retval)
 		{
