@@ -153,7 +153,7 @@ int logger_open_logfile(void)
 	int retval = open(logfilename, (O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC), (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH));
 	if (-1 == retval)
 	{
-	    logerror("ERROR: can not open log file '%s': ", logfilename);
+	    logerror("ERROR: can not open log file '%s'", logfilename);
 	    exit(EXIT_FAILURE);
 	}
 	int logfd = retval;

@@ -194,7 +194,7 @@ void write_pid_file(const char *path)
     FILE *f = fopen(path, "w");
     if (NULL == f)
     {
-	logerror("ERROR: can not open pidfile '%s': ", path);
+	logerror("ERROR: can not open pidfile '%s'", path);
 	exit(EXIT_FAILURE);
     }
 
@@ -209,7 +209,7 @@ void remove_pid_file(const char *path)
     int retval = unlink(path);
     if (-1 == retval)
     {
-	logerror("ERROR: can not remove pidfile '%s': ", path);
+	logerror("ERROR: can not remove pidfile '%s'", path);
 	// intentionally no exit() call
     }
 }
@@ -555,7 +555,7 @@ int main(int argc, char **argv)
 	    pidfile = fopen(pidpath, "w");
 	    if (NULL == pidfile)
 	    {
-		logerror("ERROR: can not open pidfile '%s': ", pidpath);
+		logerror("ERROR: can not open pidfile '%s'", pidpath);
 		exit(EXIT_FAILURE);
 	    }
 	}
@@ -577,7 +577,7 @@ int main(int argc, char **argv)
 	    retval = fprintf(pidfile, "%d", pid);
 	    if (0 > retval)
 	    {
-		logerror("ERROR: can not write to pidfile '%s': ", pidpath);
+		logerror("ERROR: can not write to pidfile '%s'", pidpath);
 	    }
 	    fclose(pidfile);
 	}

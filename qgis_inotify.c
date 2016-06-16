@@ -266,12 +266,12 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 	    case ENOENT:
 	    case ENOTDIR:
 	    case EOVERFLOW:
-		logerror("WARNING: accessing file '%s': ", path);
+		logerror("WARNING: accessing file '%s'", path);
 		debug(1, "file is not watched for changes");
 		break;
 
 	    default:
-		logerror("ERROR: accessing file '%s': ", path);
+		logerror("ERROR: accessing file '%s'", path);
 		exit(EXIT_FAILURE);
 	    }
 	}

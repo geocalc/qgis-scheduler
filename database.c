@@ -383,7 +383,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	debug_log = malloc(BUFFERSIZE);
 	if (NULL == debug_log)
 	{
-	    logerror("ERROR: ");
+	    logerror("ERROR: malloc");
 	    exit(EXIT_FAILURE);
 	}
 	*debug_log = '\0';
