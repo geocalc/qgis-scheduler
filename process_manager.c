@@ -853,14 +853,14 @@ void process_manager_process_died(void)
 				printlog("ERROR: can not get number of startup failures, function call failed for project %s", projname);
 				exit(EXIT_FAILURE);
 			    }
-			    else if (max_nr_process_crashes > retval)
+			    else if (max_nr_process_crashes > retval+1)
 			    {
 				process_manager_start_new_process_detached(1, projname, 0);
 			    }
 			    else
 			    {
 				printlog("WARNING: max number (%d) of startup failures in project %s reached."
-					" Stoppped creating new processes until new qgis configuration file is set",
+					" Stoppped creating new processes until the configuration for this project has changed",
 					max_nr_process_crashes, projname);
 			    }
 			    free(projname);
