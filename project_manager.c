@@ -102,6 +102,10 @@ static void project_manager_restart_processes(const char *proj_name)
 void project_manager_projectname_configfile_changed(const char *projname)
 {
     printlog("Project '%s' config change. Restart processes", projname);
+    /* If the QGis process had problems during the startup the new config file
+     * may change this. So clear the startup failure log and try again
+     */
+    db_reset_startup_failures(projname);
     project_manager_restart_processes(projname);
 }
 

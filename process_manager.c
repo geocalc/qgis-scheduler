@@ -661,71 +661,92 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
     int i;
     int retval;
 
-    printlog("Starting %d process%s for project '%s'", num, (num>1)?"es":"", projname);
 
-    /* start all thread in parallel */
-    for (i=0; i<num; i++)
+
+
+    retval = db_get_startup_failures(projname);
+    if ( 0 > retval )
+    {	// too much dying processes during init phase, do not start new processes
+	printlog("ERROR: can not get number of startup failures, function call failed for project %s", projname);
+	exit(EXIT_FAILURE);
+    }
+    else if (max_nr_process_crashes > retval+1)
     {
-	/* NOTE: aside from the general rule
-	 * "malloc() and free() within the same function"
-	 * we transfer the responsibility for this memory
-	 * to the thread itself.
+
+
+	printlog("Starting %d process%s for project '%s'", num, (num>1)?"es":"", projname);
+
+	/* start all thread in parallel */
+	for (i=0; i<num; i++)
+	{
+	    /* NOTE: aside from the general rule
+	     * "malloc() and free() within the same function"
+	     * we transfer the responsibility for this memory
+	     * to the thread itself.
+	     */
+	    struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
+	    assert(targs);
+	    if ( !targs )
+	    {
+		logerror("ERROR: could not allocate memory");
+		exit(EXIT_FAILURE);
+	    }
+	    targs->project_name = strdup(projname);
+
+	    retval = pthread_create(&threads[i], NULL, process_manager_thread_start_new_child, targs);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("ERROR: creating thread");
+		exit(EXIT_FAILURE);
+	    }
+	    debug(1, "[%lu] started thread %lu", pthread_self(), threads[i]);
+	}
+	/* wait for those threads */
+	for (i=0; i<num; i++)
+	{
+	    debug(1, "[%lu] join thread %lu", pthread_self(), threads[i]);
+	    retval = pthread_join(threads[i], NULL);
+	    if (retval)
+	    {
+		errno = retval;
+		logerror("ERROR: joining thread");
+		exit(EXIT_FAILURE);
+	    }
+	}
+
+
+	/* move the processes from the initialization list to the active process
+	 * list.
+	 * If we got the option to exchange the processes then first move all
+	 * existing processes from the active list to the shutdown queue.
+	 *
+	 * Note: The option to exchange the processes is usually set if a new
+	 * configuration file has been copied to the processes.
+	 * If a new configuration file arrives the number of crashed processes is
+	 * reset. But if we do this during a crashing process, the number becomes
+	 * invalid. So we can not reset the number in
+	 * qgis_project_check_inotify_config_changed(), because it is not
+	 * protected. We have the reset the number over here.
 	 */
-	struct thread_start_new_child_args *targs = malloc(sizeof(*targs));
-	assert(targs);
-	if ( !targs )
+	if (do_exchange_processes)
 	{
-	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    // TODO: move only those processes which have been started above
+	    db_move_all_process_from_active_to_shutdown_list(projname);
+	    db_reset_startup_failures(projname);	// TODO: move this line to the config change manager
 	}
-	targs->project_name = strdup(projname);
 
-	retval = pthread_create(&threads[i], NULL, process_manager_thread_start_new_child, targs);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("ERROR: creating thread");
-	    exit(EXIT_FAILURE);
-	}
-	debug(1, "[%lu] started thread %lu", pthread_self(), threads[i]);
+	db_move_all_idle_process_from_init_to_active_list(projname);
+
+	statistic_add_process_start(num);
+
     }
-    /* wait for those threads */
-    for (i=0; i<num; i++)
+    else
     {
-	debug(1, "[%lu] join thread %lu", pthread_self(), threads[i]);
-	retval = pthread_join(threads[i], NULL);
-	if (retval)
-	{
-	    errno = retval;
-	    logerror("ERROR: joining thread");
-	    exit(EXIT_FAILURE);
-	}
+	printlog("WARNING: max number (%d) of startup failures in project %s reached."
+		" Stoppped creating new processes until the configuration for this project has changed",
+		max_nr_process_crashes, projname);
     }
-
-
-    /* move the processes from the initialization list to the active process
-     * list.
-     * If we got the option to exchange the processes then first move all
-     * existing processes from the active list to the shutdown queue.
-     *
-     * Note: The option to exchange the processes is usually set if a new
-     * configuration file has been copied to the processes.
-     * If a new configuration file arrives the number of crashed processes is
-     * reset. But if we do this during a crashing process, the number becomes
-     * invalid. So we can not reset the number in
-     * qgis_project_check_inotify_config_changed(), because it is not
-     * protected. We have the reset the number over here.
-     */
-    if (do_exchange_processes)
-    {
-	// TODO: move only those processes which have been started above
-	db_move_all_process_from_active_to_shutdown_list(projname);
-	db_reset_startup_failures(projname);	// TODO: move this line to the config change manager
-    }
-
-    db_move_all_idle_process_from_init_to_active_list(projname);
-
-    statistic_add_process_start(num);
 
 }
 
@@ -847,27 +868,12 @@ void process_manager_process_died(void)
 			 */
 			if (projname)
 			{
-			    retval = db_get_startup_failures(projname);
-			    if ( 0 > retval )
-			    {	// too much dying processes during init phase, do not start new processes
-				printlog("ERROR: can not get number of startup failures, function call failed for project %s", projname);
-				exit(EXIT_FAILURE);
-			    }
-			    else if (max_nr_process_crashes > retval+1)
-			    {
-				process_manager_start_new_process_detached(1, projname, 0);
-			    }
-			    else
-			    {
-				printlog("WARNING: max number (%d) of startup failures in project %s reached."
-					" Stoppped creating new processes until the configuration for this project has changed",
-					max_nr_process_crashes, projname);
-			    }
+			    process_manager_start_new_process_detached(1, projname, 0);
 			    free(projname);
 			}
 			else
 			{
-			    printlog("WARNING: no project found for pid %d", pid);
+			    printlog("WARNING: no project name found for pid %d", pid);
 			}
 		    }
 		}
