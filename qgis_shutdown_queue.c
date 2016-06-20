@@ -115,8 +115,8 @@ static void *qgis_shutdown_thread(void *arg)
 	// no need to check, retval is always 0
 
 	retval = config_get_term_timeout();
-	default_signal_timeout.tv_sec = retval / 1000;
-	default_signal_timeout.tv_nsec = (((__typeof__ (default_signal_timeout.tv_nsec))retval)%1000)*1000*1000;
+	default_signal_timeout.tv_sec = retval;
+	default_signal_timeout.tv_nsec = 0;
 
 	struct timespec min_timer = {0};
 	struct timespec proc_timer = {0};

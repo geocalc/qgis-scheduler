@@ -323,7 +323,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     retval = 1;
     while (retval>0)
     {
-	retval = read_timeout(childunixsocketfd, buffer, maxbufferlen, init_read_timeout);
+	retval = read_timeout(childunixsocketfd, buffer, maxbufferlen, init_read_timeout*1000);
 //	debug(1, "init project '%s' received:\n%.*s", projname, retval, buffer);
 	if (-1 == retval)
 	{
