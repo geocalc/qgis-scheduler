@@ -685,7 +685,7 @@ static const char *config_get_project_config_string(const char *project, const c
 }
 
 
-const char *config_get_project_only_config_string(const char *project, const char *key,  char *defaultvalue)
+static const char *config_get_project_only_config_string(const char *project, const char *key,  char *defaultvalue)
 {
     /* if project != NULL we first test the project section.
      * if project == NULL we return default */
@@ -727,7 +727,66 @@ const char *config_get_project_only_config_string(const char *project, const cha
 }
 
 
-int config_get_project_config_int(const char *project, const char *key, int defaultvalue)
+static const char *config_get_project_numbered_config_string(const char *project, const char *key,  char *defaultvalue, int num)
+{
+    const char *ret = INVALID_STRING;
+
+    assert(config_opts);
+//    assert(project);
+    assert(key);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *pkey;
+	retval = asprintf(&pkey, "%s%s%d", project, key, num);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, pkey, INVALID_STRING);
+	free (pkey);
+    }
+
+    if (INVALID_STRING == ret)
+    {
+	char *pkey;
+	retval = asprintf(&pkey, "%s%d", key, num);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: asprintf");
+	    exit(EXIT_FAILURE);
+	}
+	ret = iniparser_getstring(config_opts, pkey, defaultvalue);
+	free (pkey);
+    }
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+static int config_get_project_config_int(const char *project, const char *key, int defaultvalue)
 {
     /* if project != NULL we first test the project section, then the
      * global section.
@@ -1110,44 +1169,7 @@ const char *config_get_project_config_path(const char *project)
 
 const char *config_get_init_key(const char *project, int num)
 {
-    const char *ret = DEFAULT_CONFIG_PROJ_INITVAR;
-
-    assert(config_opts);
-    assert(project);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key;
-	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITVAR, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITVAR);
-	free (key);
-    }
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_numbered_config_string(project, CONFIG_PROJ_INITVAR, DEFAULT_CONFIG_PROJ_INITVAR, num);
 
     return ret;
 }
@@ -1155,44 +1177,7 @@ const char *config_get_init_key(const char *project, int num)
 
 const char *config_get_init_value(const char *project, int num)
 {
-    const char *ret = DEFAULT_CONFIG_PROJ_INITDATA;
-
-    assert(config_opts);
-    assert(project);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key;
-	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_INITDATA, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_INITDATA);
-	free (key);
-    }
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_numbered_config_string(project, CONFIG_PROJ_INITDATA, DEFAULT_CONFIG_PROJ_INITDATA, num);
 
     return ret;
 }
@@ -1200,57 +1185,7 @@ const char *config_get_init_value(const char *project, int num)
 
 const char *config_get_env_key(const char *project, int num)
 {
-    const char *ret = INVALID_STRING;
-
-    assert(config_opts);
-    assert(project);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key;
-	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVVAR, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
-	free (key);
-    }
-
-    if (INVALID_STRING == ret)
-    {
-	char *key;
-	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVVAR, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVVAR);
-	free (key);
-    }
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_numbered_config_string(project, CONFIG_PROJ_ENVVAR, DEFAULT_CONFIG_PROJ_ENVVAR, num);
 
     return ret;
 }
@@ -1258,57 +1193,7 @@ const char *config_get_env_key(const char *project, int num)
 
 const char *config_get_env_value(const char *project, int num)
 {
-    const char *ret = INVALID_STRING;
-
-    assert(config_opts);
-    assert(project);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key;
-	retval = asprintf(&key, "%s%s%d", project, CONFIG_PROJ_ENVDATA, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
-	free (key);
-    }
-
-    if (INVALID_STRING == ret)
-    {
-	char *key;
-	retval = asprintf(&key, "%s%d", CONFIG_PROJ_ENVDATA, num);
-	if (-1 == retval)
-	{
-	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
-	}
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROJ_ENVDATA);
-	free (key);
-    }
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_numbered_config_string(project, CONFIG_PROJ_ENVDATA, DEFAULT_CONFIG_PROJ_ENVDATA, num);
 
     return ret;
 }
