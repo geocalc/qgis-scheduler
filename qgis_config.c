@@ -68,8 +68,10 @@
 #define DEFAULT_CONFIG_MIN_PROCESS	1
 #define CONFIG_MAX_PROCESS		":max_proc"
 #define DEFAULT_CONFIG_MAX_PROCESS	20
-#define CONFIG_CHILD_READ_TIMEOUT	":proc_read_timeout"
-#define DEFAULT_CONFIG_CHILD_READ_TIMEOUT	270000
+#define CONFIG_CHILD_READ_TIMEOUT		":proc_read_timeout"
+#define DEFAULT_CONFIG_CHILD_READ_TIMEOUT	270000	/* ms */
+#define CONFIG_CHILD_TERMINATION_TIMEOUT		":proc_term_timeout"
+#define DEFAULT_CONFIG_CHILD_TERMINATION_TIMEOUT	10000	/* ms */
 #define CONFIG_SCAN_PARAM		":scan_param"
 #define DEFAULT_CONFIG_SCAN_PARAM	NULL
 #define CONFIG_SCAN_REGEX		":scan_regex"
@@ -1187,6 +1189,37 @@ int config_get_read_timeout(const char *project)
 
     if (INT32_MIN == ret)
 	ret = iniparser_getint(config_opts, CONFIG_CHILD_READ_TIMEOUT, DEFAULT_CONFIG_CHILD_READ_TIMEOUT);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+int config_get_term_timeout(void)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    int ret = INT32_MIN;
+
+    assert(config_opts);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    ret = iniparser_getint(config_opts, CONFIG_CHILD_TERMINATION_TIMEOUT, DEFAULT_CONFIG_CHILD_TERMINATION_TIMEOUT);
 
     retval = pthread_mutex_unlock(&config_lock);
     if (retval)
