@@ -133,13 +133,6 @@ struct sectioniterator_s
 
 
 
-const struct timespec default_signal_timeout =
-{
-	tv_sec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_SEC,
-	tv_nsec: DEFAULT_PROCESS_SIGNAL_TIMEOUT_NANOSEC
-};
-
-
 
 static dictionary *config_opts = NULL;
 static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;

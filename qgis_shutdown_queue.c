@@ -81,6 +81,7 @@ static void *qgis_shutdown_thread(void *arg)
 
     for (;;)
     {
+	struct timespec default_signal_timeout;
 	int retval;
 
 	/* get a list of all processes in the shutdown list.
@@ -112,6 +113,10 @@ static void *qgis_shutdown_thread(void *arg)
 	int len;
 	retval = db_get_list_process_by_list(&pidlist, &len, LIST_SHUTDOWN);
 	// no need to check, retval is always 0
+
+	retval = config_get_term_timeout();
+	default_signal_timeout.tv_sec = retval / 1000;
+	default_signal_timeout.tv_nsec = (((__typeof__ (default_signal_timeout.tv_nsec))retval)%1000)*1000*1000;
 
 	struct timespec min_timer = {0};
 	struct timespec proc_timer = {0};

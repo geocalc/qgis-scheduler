@@ -33,7 +33,6 @@
 
 #include <time.h>
 
-extern const struct timespec default_signal_timeout;
 
 int config_load(const char *path, char ***sectionnew, char ***sectionchanged, char ***sectiondelete);
 void config_shutdown(void);
