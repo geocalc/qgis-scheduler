@@ -640,6 +640,54 @@ static const char *config_get_global_config_string(const char *key,  char *defau
 }
 
 
+static const char *config_get_project_config_string(const char *project, const char *key,  char *defaultvalue)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    const char *ret = defaultvalue;
+
+    assert(config_opts);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *pkey = astrcat(project, key);
+	ret = iniparser_getstring(config_opts, pkey, INVALID_STRING);
+	free (pkey);
+    }
+
+    if (INVALID_STRING == ret)
+	ret = iniparser_getstring(config_opts, key, defaultvalue);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
+
+
+
+
 /* =======================================================
  * public API
  */
@@ -896,43 +944,7 @@ int config_get_debuglevel(void)
 
 const char *config_get_process(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    const char *ret = DEFAULT_CONFIG_PROCESS_VALUE;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_PROCESS_KEY);
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_VALUE);
-	free (key);
-    }
-
-    if (DEFAULT_CONFIG_PROCESS_VALUE == ret)
-	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_config_string(project, CONFIG_PROCESS_KEY, DEFAULT_CONFIG_PROCESS_VALUE);
 
     return ret;
 }
@@ -940,43 +952,7 @@ const char *config_get_process(const char *project)
 
 const char *config_get_process_args(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    const char *ret = DEFAULT_CONFIG_PROCESS_ARGS_VALUE;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_PROCESS_ARGS_KEY);
-	ret = iniparser_getstring(config_opts, key, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
-	free (key);
-    }
-
-    if (DEFAULT_CONFIG_PROCESS_ARGS_VALUE == ret)
-	ret = iniparser_getstring(config_opts, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_config_string(project, CONFIG_PROCESS_ARGS_KEY, DEFAULT_CONFIG_PROCESS_ARGS_VALUE);
 
     return ret;
 }
@@ -1229,43 +1205,7 @@ const char *config_get_scan_parameter_regex(const char *project)
 
 const char *config_get_working_directory(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    const char *ret = DEFAULT_CONFIG_CWD;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_CWD);
-	ret = iniparser_getstring(config_opts, key, INVALID_STRING);
-	free (key);
-    }
-
-    if (INVALID_STRING == ret)
-	ret = iniparser_getstring(config_opts, CONFIG_CWD, DEFAULT_CONFIG_CWD);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_project_config_string(project, CONFIG_CWD, DEFAULT_CONFIG_CWD);
 
     return ret;
 
