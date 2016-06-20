@@ -648,6 +648,7 @@ static const char *config_get_project_config_string(const char *project, const c
     const char *ret = defaultvalue;
 
     assert(config_opts);
+    assert(key);
 
     int retval = pthread_mutex_lock(&config_lock);
     if (retval)
@@ -684,7 +685,49 @@ static const char *config_get_project_config_string(const char *project, const c
 }
 
 
+int config_get_project_config_int(const char *project, const char *key, int defaultvalue)
+{
+    /* if project != NULL we first test the project section, then the
+     * global section.
+     * if project == NULL we take the global section */
+    int ret = INT32_MIN;
 
+    assert(config_opts);
+    assert(key);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    if (project)
+    {
+	/* NOTE: this could be faster if we use a local char array instead of
+	 * dynamic memory. However this buffer maybe too small, to circumvent
+	 * this we need to know the string sizes before. I think it is too much
+	 * effort. Just use dynamic memory.
+	 */
+	char *pkey = astrcat(project, key);
+	ret = iniparser_getint(config_opts, pkey, INT32_MIN);
+	free (pkey);
+    }
+
+    if (INT32_MIN == ret)
+	ret = iniparser_getint(config_opts, key, defaultvalue);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
 
 
 
@@ -960,43 +1003,7 @@ const char *config_get_process_args(const char *project)
 
 int config_get_min_idle_processes(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    int ret = INT32_MIN;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_MIN_PROCESS);
-	ret = iniparser_getint(config_opts, key, INT32_MIN);
-	free (key);
-    }
-
-    if (INT32_MIN == ret)
-	ret = iniparser_getint(config_opts, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    int ret = config_get_project_config_int(project, CONFIG_MIN_PROCESS, DEFAULT_CONFIG_MIN_PROCESS);
 
     return ret;
 }
@@ -1004,43 +1011,7 @@ int config_get_min_idle_processes(const char *project)
 
 int config_get_max_idle_processes(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    int ret = INT32_MIN;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_MAX_PROCESS);
-	ret = iniparser_getint(config_opts, key, INT32_MIN);
-	free (key);
-    }
-
-    if (INT32_MIN == ret)
-	ret = iniparser_getint(config_opts, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    int ret = config_get_project_config_int(project, CONFIG_MAX_PROCESS, DEFAULT_CONFIG_MAX_PROCESS);
 
     return ret;
 }
@@ -1048,43 +1019,7 @@ int config_get_max_idle_processes(const char *project)
 
 int config_get_read_timeout(const char *project)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    int ret = INT32_MIN;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    if (project)
-    {
-	/* NOTE: this could be faster if we use a local char array instead of
-	 * dynamic memory. However this buffer maybe too small, to circumvent
-	 * this we need to know the string sizes before. I think it is too much
-	 * effort. Just use dynamic memory.
-	 */
-	char *key = astrcat(project, CONFIG_CHILD_READ_TIMEOUT);
-	ret = iniparser_getint(config_opts, key, INT32_MIN);
-	free (key);
-    }
-
-    if (INT32_MIN == ret)
-	ret = iniparser_getint(config_opts, CONFIG_CHILD_READ_TIMEOUT, DEFAULT_CONFIG_CHILD_READ_TIMEOUT);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    int ret = config_get_project_config_int(project, CONFIG_CHILD_READ_TIMEOUT, DEFAULT_CONFIG_CHILD_READ_TIMEOUT);
 
     return ret;
 }
@@ -1092,30 +1027,7 @@ int config_get_read_timeout(const char *project)
 
 int config_get_term_timeout(void)
 {
-    /* if project != NULL we first test the project section, then the
-     * global section.
-     * if project == NULL we take the global section */
-    int ret = INT32_MIN;
-
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    ret = iniparser_getint(config_opts, CONFIG_CHILD_TERMINATION_TIMEOUT, DEFAULT_CONFIG_CHILD_TERMINATION_TIMEOUT);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    int ret = config_get_project_config_int(NULL, CONFIG_CHILD_TERMINATION_TIMEOUT, DEFAULT_CONFIG_CHILD_TERMINATION_TIMEOUT);
 
     return ret;
 }
