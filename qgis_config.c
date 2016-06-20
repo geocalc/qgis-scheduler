@@ -613,6 +613,33 @@ static void check_config(dictionary *config)
 }
 
 
+static const char *config_get_global_config_string(const char *key,  char *defaultvalue)
+{
+    assert(config_opts);
+    assert(key);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    const char *ret = iniparser_getstring(config_opts, key, defaultvalue);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
 /* =======================================================
  * public API
  */
@@ -813,25 +840,7 @@ const char *config_get_name_project(int num)
 
 const char *config_get_network_listen(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_LISTEN_KEY, DEFAULT_CONFIG_LISTEN_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_LISTEN_KEY, DEFAULT_CONFIG_LISTEN_VALUE);
 
     return ret;
 }
@@ -839,25 +848,7 @@ const char *config_get_network_listen(void)
 
 const char *config_get_network_port(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_PORT_KEY, DEFAULT_CONFIG_PORT_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_PORT_KEY, DEFAULT_CONFIG_PORT_VALUE);
 
     return ret;
 }
@@ -865,25 +856,7 @@ const char *config_get_network_port(void)
 
 const char *config_get_chuser(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_CHUSER_KEY, DEFAULT_CONFIG_CHUSER_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_CHUSER_KEY, DEFAULT_CONFIG_CHUSER_VALUE);
 
     return ret;
 }
@@ -891,25 +864,7 @@ const char *config_get_chuser(void)
 
 const char *config_get_chroot(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_CHROOT_KEY, DEFAULT_CONFIG_CHROOT_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_CHROOT_KEY, DEFAULT_CONFIG_CHROOT_VALUE);
 
     return ret;
 }
@@ -917,25 +872,7 @@ const char *config_get_chroot(void)
 
 const char *config_get_pid_path(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_PID_KEY, DEFAULT_CONFIG_PID_VALUE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_PID_KEY, DEFAULT_CONFIG_PID_VALUE);
 
     return ret;
 }
@@ -943,25 +880,7 @@ const char *config_get_pid_path(void)
 
 const char *config_get_logfile(void)
 {
-    assert(config_opts);
-
-    int retval = pthread_mutex_lock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
-    }
-
-    const char *ret = iniparser_getstring(config_opts, CONFIG_LOGFILE, DEFAULT_CONFIG_LOGFILE);
-
-    retval = pthread_mutex_unlock(&config_lock);
-    if (retval)
-    {
-	errno = retval;
-	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
-    }
+    const char *ret = config_get_global_config_string(CONFIG_LOGFILE, DEFAULT_CONFIG_LOGFILE);
 
     return ret;
 }
