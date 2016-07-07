@@ -128,8 +128,11 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     const char *projname = tinfo->project_name;
     assert(projname);
     const pthread_t thread_id = pthread_self();
-    char *buffer;
+    char *buffer = NULL;
     int retval;
+    int has_timeout = 0;
+    int len;
+    struct fcgi_message_s *message = NULL;
 
     db_process_set_state_init(pid, thread_id);
 
@@ -181,10 +184,13 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
 
 
+    static const int maxbufferlen = 4096;
+    static const int requestid = 1;
+    if (!has_timeout)
+    {
     /* create the fcgi data and
      * send the fcgi data to the child process
      */
-    static const int maxbufferlen = 4096;
     buffer = malloc(maxbufferlen);
     assert(buffer);
     if ( !buffer )
@@ -193,9 +199,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	exit(EXIT_FAILURE);
     }
 
-    static const int requestid = 1;
-    int len;
-    struct fcgi_message_s *message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
+    message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)	// TODO: be more flexible if buffer too small
     {
@@ -211,7 +215,9 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     }
     //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
     fcgi_message_delete(message);
+    }
 
+    if (!has_timeout)
     {
 	char *parambuffer = (char *)buffer;
 	int remain_len = maxbufferlen;
@@ -250,6 +256,8 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	}
     }
 
+    if (!has_timeout)
+    {
     /* send parameter list */
     message = fcgi_message_new_parameter(requestid, buffer, len);
     len = fcgi_message_write(buffer, maxbufferlen, message);
@@ -266,7 +274,10 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
+    }
 
+    if (!has_timeout)
+    {
     /* send empty parameter list to signal EOP */
     message = fcgi_message_new_parameter(requestid, "", 0);
     len = fcgi_message_write(buffer, maxbufferlen, message);
@@ -283,8 +294,10 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
+    }
 
-
+    if (!has_timeout)
+    {
     message = fcgi_message_new_stdin(requestid, "", 0);
     len = fcgi_message_write(buffer, maxbufferlen, message);
     if (-1 == len)
@@ -308,8 +321,10 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	exit(EXIT_FAILURE);
     }
     fcgi_message_delete(message);
+    }
 
-
+    if (!has_timeout)
+    {
     /* now read from socket into void until no more data
      * we do it to make sure that the child process has completed the request
      * and filled up its cache.
@@ -319,7 +334,6 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
      * database mark the process as crashed.
      */
     const int init_read_timeout = config_get_read_timeout(projname);
-    int has_timeout = 0;
     retval = 1;
     while (retval>0)
     {
@@ -333,6 +347,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 		has_timeout = 1;
 	    }
 	}
+    }
     }
 
     /* if the child process died during the initialization we need to figure
@@ -372,6 +387,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 
     /* ok, we did read each and every byte from child process.
      * now close this and set idle
+     * Try to close the file secriptor even if errors occurred previously
      */
     retval = close(childunixsocketfd);
     debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
