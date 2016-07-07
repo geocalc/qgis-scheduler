@@ -579,6 +579,13 @@ static void config_convert_list_to_array(char ***array, struct sectionlist_s *li
     }
 
     *array = calloc(n+1, sizeof(**array)); // last entry is NULL terminator
+    assert(*array);
+    if ( !*array )
+    {
+	logerror("ERROR: could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
+
     int i = 0;
     while( !STAILQ_EMPTY(&list->head) )
     {
@@ -918,6 +925,12 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 		const int n = iniparser_getnsec(config_opts);
 
 		*sectionnew = calloc(n+1, sizeof(**sectionnew));
+		assert(*sectionnew);
+		if ( !*sectionnew )
+		{
+		    logerror("ERROR: could not allocate memory");
+		    exit(EXIT_FAILURE);
+		}
 
 		int i;
 		for (i=0; i<n; i++)

@@ -2060,6 +2060,11 @@ void db_dump(void)
 
     data.bufferlen = buffer_size;
     data.buffer = malloc(data.bufferlen);
+    if (NULL == data.buffer)
+    {
+	logerror("ERROR: could not allocate memory");
+	exit(EXIT_FAILURE);
+    }
     *data.buffer = '\0';	// empty string
 
     db_global_lock();

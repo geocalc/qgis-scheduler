@@ -262,6 +262,12 @@ static void *thread_handle_connection(void *arg)
 					{
 					    size_t len = regerror(retval, &regex, NULL, 0);
 					    char *buffer = malloc(len);
+					    assert(buffer);
+					    if ( !buffer )
+					    {
+						logerror("ERROR: could not allocate memory");
+						exit(EXIT_FAILURE);
+					    }
 					    (void) regerror (retval, &regex, buffer, len);
 
 					    debug(1, "Could not compile regular expression: %s", buffer);
@@ -289,6 +295,12 @@ static void *thread_handle_connection(void *arg)
 					    {
 						size_t len = regerror(retval, &regex, NULL, 0);
 						char *buffer = malloc(len);
+						assert(buffer);
+						if ( !buffer )
+						{
+						    logerror("ERROR: could not allocate memory");
+						    exit(EXIT_FAILURE);
+						}
 						(void) regerror (retval, &regex, buffer, len);
 
 						debug(1, "Could not match regular expression: %s", buffer);

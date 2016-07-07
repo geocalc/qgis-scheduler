@@ -199,11 +199,21 @@ int fcgi_param_parse(struct fcgi_param_s *param, const unsigned char *buffer, in
 	}
 
 	param->name = malloc(nameLen+1);
+	if ( !param->name )
+	{
+	    logerror("ERROR: could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	memcpy(param->name, buffer, nameLen);
 	param->name[nameLen] = '\0';
 	buffer += nameLen;
 
 	param->value = malloc(valueLen+1);
+	if ( !param->value )
+	{
+	    logerror("ERROR: could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 	memcpy(param->value, buffer, valueLen);
 	param->value[valueLen] = '\0';
 
