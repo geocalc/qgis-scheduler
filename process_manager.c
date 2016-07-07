@@ -179,7 +179,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: init can not connect to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
     }
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
 
@@ -211,7 +211,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: can not write to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
     }
     //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
     fcgi_message_delete(message);
@@ -251,8 +251,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (i>=128)
 	{
 	    debug(1, "fcgi parameter too many key/value pairs");
-	    exit(EXIT_FAILURE);
-
+	    has_timeout = 1;
 	}
     }
 
@@ -271,7 +270,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: can not write to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
     }
     fcgi_message_delete(message);
     }
@@ -291,7 +290,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: can not write to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
     }
     fcgi_message_delete(message);
     }
@@ -310,15 +309,18 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: can not write to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
     }
     // write stdin = "" twice
+    if (!has_timeout)
+    {
 //    retval = write(debugfd, buffer, len);
     retval = write(childunixsocketfd, buffer, len);
     if (-1 == retval)
     {
 	logerror("ERROR: can not write to child process");
-	exit(EXIT_FAILURE);
+	has_timeout = 1;
+    }
     }
     fcgi_message_delete(message);
     }
