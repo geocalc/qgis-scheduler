@@ -188,33 +188,33 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     static const int requestid = 1;
     if (!has_timeout)
     {
-    /* create the fcgi data and
-     * send the fcgi data to the child process
-     */
-    buffer = malloc(maxbufferlen);
-    assert(buffer);
-    if ( !buffer )
-    {
-	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
-    }
+	/* create the fcgi data and
+	 * send the fcgi data to the child process
+	 */
+	buffer = malloc(maxbufferlen);
+	assert(buffer);
+	if ( !buffer )
+	{
+	    logerror("ERROR: could not allocate memory");
+	    exit(EXIT_FAILURE);
+	}
 
-    message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	logerror("ERROR: can not write to child process");
-	has_timeout = 1;
-    }
-    //printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
-    fcgi_message_delete(message);
+	message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
+	len = fcgi_message_write(buffer, maxbufferlen, message);
+	if (-1 == len)	// TODO: be more flexible if buffer too small
+	{
+	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
+	    exit(EXIT_FAILURE);
+	}
+//	retval = write(debugfd, buffer, len);
+	retval = write(childunixsocketfd, buffer, len);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: can not write to child process");
+	    has_timeout = 1;
+	}
+	//printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
+	fcgi_message_delete(message);
     }
 
     if (!has_timeout)
@@ -257,99 +257,99 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 
     if (!has_timeout)
     {
-    /* send parameter list */
-    message = fcgi_message_new_parameter(requestid, buffer, len);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	logerror("ERROR: can not write to child process");
-	has_timeout = 1;
-    }
-    fcgi_message_delete(message);
-    }
-
-    if (!has_timeout)
-    {
-    /* send empty parameter list to signal EOP */
-    message = fcgi_message_new_parameter(requestid, "", 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)	// TODO: be more flexible if buffer too small
-    {
-	debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	logerror("ERROR: can not write to child process");
-	has_timeout = 1;
-    }
-    fcgi_message_delete(message);
-    }
-
-    if (!has_timeout)
-    {
-    message = fcgi_message_new_stdin(requestid, "", 0);
-    len = fcgi_message_write(buffer, maxbufferlen, message);
-    if (-1 == len)
-    {
-	debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	exit(EXIT_FAILURE);
-    }
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	logerror("ERROR: can not write to child process");
-	has_timeout = 1;
-    }
-    // write stdin = "" twice
-    if (!has_timeout)
-    {
-//    retval = write(debugfd, buffer, len);
-    retval = write(childunixsocketfd, buffer, len);
-    if (-1 == retval)
-    {
-	logerror("ERROR: can not write to child process");
-	has_timeout = 1;
-    }
-    }
-    fcgi_message_delete(message);
-    }
-
-    if (!has_timeout)
-    {
-    /* now read from socket into void until no more data
-     * we do it to make sure that the child process has completed the request
-     * and filled up its cache.
-     *
-     * Set a timeout of N seconds in case the program crashed during start. If
-     * the timeout catches move the process to the shutdown module and in the
-     * database mark the process as crashed.
-     */
-    const int init_read_timeout = config_get_read_timeout(projname);
-    retval = 1;
-    while (retval>0)
-    {
-	retval = read_timeout(childunixsocketfd, buffer, maxbufferlen, init_read_timeout*1000);
-//	debug(1, "init project '%s' received:\n%.*s", projname, retval, buffer);
+	/* send parameter list */
+	message = fcgi_message_new_parameter(requestid, buffer, len);
+	len = fcgi_message_write(buffer, maxbufferlen, message);
+	if (-1 == len)	// TODO: be more flexible if buffer too small
+	{
+	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
+	    exit(EXIT_FAILURE);
+	}
+//	retval = write(debugfd, buffer, len);
+	retval = write(childunixsocketfd, buffer, len);
 	if (-1 == retval)
 	{
-	    logerror("ERROR: read() from child process during init phase");
-	    if (ETIMEDOUT == errno)
+	    logerror("ERROR: can not write to child process");
+	    has_timeout = 1;
+	}
+	fcgi_message_delete(message);
+    }
+
+    if (!has_timeout)
+    {
+	/* send empty parameter list to signal EOP */
+	message = fcgi_message_new_parameter(requestid, "", 0);
+	len = fcgi_message_write(buffer, maxbufferlen, message);
+	if (-1 == len)	// TODO: be more flexible if buffer too small
+	{
+	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
+	    exit(EXIT_FAILURE);
+	}
+//	retval = write(debugfd, buffer, len);
+	retval = write(childunixsocketfd, buffer, len);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: can not write to child process");
+	    has_timeout = 1;
+	}
+	fcgi_message_delete(message);
+    }
+
+    if (!has_timeout)
+    {
+	message = fcgi_message_new_stdin(requestid, "", 0);
+	len = fcgi_message_write(buffer, maxbufferlen, message);
+	if (-1 == len)
+	{
+	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
+	    exit(EXIT_FAILURE);
+	}
+//	retval = write(debugfd, buffer, len);
+	retval = write(childunixsocketfd, buffer, len);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: can not write to child process");
+	    has_timeout = 1;
+	}
+	// write stdin = "" twice
+	if (!has_timeout)
+	{
+//	    retval = write(debugfd, buffer, len);
+	    retval = write(childunixsocketfd, buffer, len);
+	    if (-1 == retval)
 	    {
+		logerror("ERROR: can not write to child process");
 		has_timeout = 1;
 	    }
 	}
+	fcgi_message_delete(message);
     }
+
+    if (!has_timeout)
+    {
+	/* now read from socket into void until no more data
+	 * we do it to make sure that the child process has completed the request
+	 * and filled up its cache.
+	 *
+	 * Set a timeout of N seconds in case the program crashed during start. If
+	 * the timeout catches move the process to the shutdown module and in the
+	 * database mark the process as crashed.
+	 */
+	const int init_read_timeout = config_get_read_timeout(projname);
+	retval = 1;
+	while (retval>0)
+	{
+	    retval = read_timeout(childunixsocketfd, buffer, maxbufferlen, init_read_timeout*1000);
+//	    debug(1, "init project '%s' received:\n%.*s", projname, retval, buffer);
+	    if (-1 == retval)
+	    {
+		logerror("ERROR: read() from child process during init phase");
+		if (ETIMEDOUT == errno)
+		{
+		    has_timeout = 1;
+		}
+	    }
+	}
     }
 
     /* if the child process died during the initialization we need to figure
