@@ -130,7 +130,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     const pthread_t thread_id = pthread_self();
     char *buffer = NULL;
     int retval;
-    int has_timeout = 0;
+    int has_child_crash = 0;
     int len;
     struct fcgi_message_s *message = NULL;
 
@@ -179,14 +179,14 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: init can not connect to child process");
-	has_timeout = 1;
+	has_child_crash = 1;
     }
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
 
 
     static const int maxbufferlen = 4096;
     static const int requestid = 1;
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	/* create the fcgi data and
 	 * send the fcgi data to the child process
@@ -211,13 +211,13 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not write to child process");
-	    has_timeout = 1;
+	    has_child_crash = 1;
 	}
 	//printf(stderr, "write to child prog (%d): %.*s\n", retval, buffer, retval);
 	fcgi_message_delete(message);
     }
 
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	char *parambuffer = (char *)buffer;
 	int remain_len = maxbufferlen;
@@ -251,11 +251,11 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (i>=128)
 	{
 	    debug(1, "fcgi parameter too many key/value pairs");
-	    has_timeout = 1;
+	    has_child_crash = 1;
 	}
     }
 
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	/* send parameter list */
 	message = fcgi_message_new_parameter(requestid, buffer, len);
@@ -270,12 +270,12 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not write to child process");
-	    has_timeout = 1;
+	    has_child_crash = 1;
 	}
 	fcgi_message_delete(message);
     }
 
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	/* send empty parameter list to signal EOP */
 	message = fcgi_message_new_parameter(requestid, "", 0);
@@ -290,12 +290,12 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not write to child process");
-	    has_timeout = 1;
+	    has_child_crash = 1;
 	}
 	fcgi_message_delete(message);
     }
 
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	message = fcgi_message_new_stdin(requestid, "", 0);
 	len = fcgi_message_write(buffer, maxbufferlen, message);
@@ -309,23 +309,23 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not write to child process");
-	    has_timeout = 1;
+	    has_child_crash = 1;
 	}
 	// write stdin = "" twice
-	if (!has_timeout)
+	if (!has_child_crash)
 	{
 //	    retval = write(debugfd, buffer, len);
 	    retval = write(childunixsocketfd, buffer, len);
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: can not write to child process");
-		has_timeout = 1;
+		has_child_crash = 1;
 	    }
 	}
 	fcgi_message_delete(message);
     }
 
-    if (!has_timeout)
+    if (!has_child_crash)
     {
 	/* now read from socket into void until no more data
 	 * we do it to make sure that the child process has completed the request
@@ -346,7 +346,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 		logerror("ERROR: read() from child process during init phase");
 		if (ETIMEDOUT == errno)
 		{
-		    has_timeout = 1;
+		    has_child_crash = 1;
 		}
 	    }
 	}
@@ -357,7 +357,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
      * there may be a race condition between the signal handler and this thread
      * so we test the existence of the child process after the read.
      */
-    if (has_timeout)
+    if (has_child_crash)
     {
 	printlog("starting new process for project %s", projname);
 	qgis_shutdown_add_process(pid);
@@ -389,7 +389,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 
     /* ok, we did read each and every byte from child process.
      * now close this and set idle
-     * Try to close the file secriptor even if errors occurred previously
+     * Try to close the file secriptor even if error occurred previously
      */
     retval = close(childunixsocketfd);
     debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
