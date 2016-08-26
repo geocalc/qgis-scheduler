@@ -94,6 +94,8 @@
 #define DEFAULT_CONFIG_DEBUGLEVEL	0
 #define CONFIG_INCLUDE			":include"
 #define DEFAULT_CONFIG_INCLUDE		NULL
+#define CONFIG_ABORT			":abort_on_error"
+#define DEFAULT_CONFIG_ABORT		0
 
 
 #if __WORDSIZE == 64
@@ -647,6 +649,33 @@ static const char *config_get_global_config_string(const char *key,  char *defau
 }
 
 
+static int config_get_global_config_int(const char *key,  int defaultvalue)
+{
+    assert(config_opts);
+    assert(key);
+
+    int retval = pthread_mutex_lock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: acquire mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    int ret = iniparser_getint(config_opts, key, defaultvalue);
+
+    retval = pthread_mutex_unlock(&config_lock);
+    if (retval)
+    {
+	errno = retval;
+	logerror("ERROR: unlock mutex lock");
+	exit(EXIT_FAILURE);
+    }
+
+    return ret;
+}
+
+
 static const char *config_get_project_config_string(const char *project, const char *key,  char *defaultvalue)
 {
     /* if project != NULL we first test the project section, then the
@@ -956,6 +985,8 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 
     check_config(config_opts);
 
+    config_get_abort(); /* get current value and store in static variable */
+
     if (!config_opts)
 	return -1;
 
@@ -1097,6 +1128,22 @@ int config_get_debuglevel(void)
     return debuglevel;
 }
 
+
+int config_get_abort(void)
+{
+    /* note:
+     *   This function has to perform even if the config module has been shut
+     *   down. In case just use the last known value which has been evaluated
+     *   after parsing the config file.
+     */
+    static int ret = DEFAULT_CONFIG_ABORT;
+
+    if (config_opts)
+	ret = config_get_global_config_int(CONFIG_ABORT, DEFAULT_CONFIG_ABORT);
+
+
+    return ret;
+}
 
 
 const char *config_get_process(const char *project)

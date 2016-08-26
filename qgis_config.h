@@ -45,6 +45,7 @@ const char *config_get_chroot(void);
 const char *config_get_pid_path(void);
 const char *config_get_logfile(void);
 int config_get_debuglevel(void);
+int config_get_abort(void);
 
 
 const char *config_get_process(const char *project);
