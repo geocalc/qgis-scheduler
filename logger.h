@@ -33,10 +33,7 @@
 #ifndef LOGGER_H_
 #define LOGGER_H_
 
-#ifndef __GNUC__
-# define __attribute__(a)
-#endif
-
+#include "common.h"
 
 
 int logger_init(void);

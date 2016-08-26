@@ -60,4 +60,10 @@
 #define UNUSED_PARAMETER(x)	((void)(x))
 
 
+/* do not use attribute setting outside the gcc world */
+#ifndef __GNUC__
+# define __attribute__(a)
+#endif
+
+
 #endif /* COMMON_H_ */
