@@ -55,6 +55,7 @@
 #include "qgis_config.h"
 #include "statistic.h"
 #include "process_manager.h"
+#include "qgis_shutdown_queue.h"
 
 
 
@@ -77,7 +78,7 @@ static int change_file_mode_blocking(int fd, int is_blocking)
     if (-1 == retval)
     {
 	logerror("ERROR: fcntl(%d, F_GETFL, 0)", fd);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     int flags = retval;
     debug(1, "got fd %d flags %#x", fd, flags);
@@ -91,7 +92,7 @@ static int change_file_mode_blocking(int fd, int is_blocking)
     if (-1 == retval)
     {
 	logerror("ERROR: fcntl(%d, F_SETFL, %#x)", fd, flags);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     debug(1, "set fd %d flags %#x", fd, flags);
 
@@ -126,7 +127,7 @@ static void *thread_handle_connection(void *arg)
     if (-1 == retval)
     {
 	logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -137,7 +138,7 @@ static void *thread_handle_connection(void *arg)
 //    {
 //	debug(1, "ERROR: can not open file '%s': ", debugfile);
 //	logerror(NULL);
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 
 
@@ -175,7 +176,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -187,7 +188,7 @@ static void *thread_handle_connection(void *arg)
 	if ( !buffer )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	struct fcgi_session_s *fcgi_session = fcgi_session_new(1);
 
@@ -214,7 +215,7 @@ static void *thread_handle_connection(void *arg)
 		    else
 		    {
 			logerror("ERROR: reading from network socket");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 		else if (0 == readbytes)
@@ -266,13 +267,13 @@ static void *thread_handle_connection(void *arg)
 					    if ( !buffer )
 					    {
 						logerror("ERROR: could not allocate memory");
-						exit(EXIT_FAILURE);
+						qexit(EXIT_FAILURE);
 					    }
 					    (void) regerror (retval, &regex, buffer, len);
 
 					    debug(1, "Could not compile regular expression: %s", buffer);
 					    free(buffer);
-					    exit(EXIT_FAILURE);
+					    qexit(EXIT_FAILURE);
 					}
 
 					/* Execute regular expression */
@@ -299,13 +300,13 @@ static void *thread_handle_connection(void *arg)
 						if ( !buffer )
 						{
 						    logerror("ERROR: could not allocate memory");
-						    exit(EXIT_FAILURE);
+						    qexit(EXIT_FAILURE);
 						}
 						(void) regerror (retval, &regex, buffer, len);
 
 						debug(1, "Could not match regular expression: %s", buffer);
 						free(buffer);
-						exit(EXIT_FAILURE);
+						qexit(EXIT_FAILURE);
 					    }
 					}
 					regfree(&regex);
@@ -404,7 +405,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -437,7 +438,7 @@ static void *thread_handle_connection(void *arg)
 		else
 		{
 		    logerror("ERROR: writing to network socket");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 	    }
 
@@ -520,7 +521,7 @@ static void *thread_handle_connection(void *arg)
 	if (-1 == retval)
 	{
 	    logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	/* leave the original child socket and create a new one on the opposite
 	 * side.
@@ -529,14 +530,14 @@ static void *thread_handle_connection(void *arg)
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not create socket to child process");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
 	retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not connect to child process");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 
@@ -549,7 +550,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -558,7 +559,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -567,7 +568,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -576,7 +577,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -588,7 +589,7 @@ static void *thread_handle_connection(void *arg)
 	if ( !buffer )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 
@@ -643,7 +644,7 @@ static void *thread_handle_connection(void *arg)
 
 		default:
 		    logerror("ERROR: %s() calling poll", __FUNCTION__);
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		    // no break needed
 		}
 		break;
@@ -696,7 +697,7 @@ static void *thread_handle_connection(void *arg)
 			else
 			{
 			    logerror("ERROR: writing to child process socket");
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 		    }
 		    can_write_unixsock = 0;
@@ -721,7 +722,7 @@ static void *thread_handle_connection(void *arg)
 			else
 			{
 			    logerror("ERROR: reading from network socket (%d)", errno);
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 		    }
 		    else if (0 == readbytes)
@@ -747,7 +748,7 @@ static void *thread_handle_connection(void *arg)
 			else
 			{
 			    logerror("ERROR: writing to child process socket");
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 		    }
 		    can_read_networksock = 0;
@@ -771,7 +772,7 @@ static void *thread_handle_connection(void *arg)
 		    else
 		    {
 			logerror("ERROR: reading from child process socket");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 		else if (0 == readbytes)
@@ -796,7 +797,7 @@ static void *thread_handle_connection(void *arg)
 		    else
 		    {
 			logerror("ERROR: writing to network socket");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 
@@ -819,7 +820,7 @@ static void *thread_handle_connection(void *arg)
     if (-1 == retval)
     {
 	logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     printlog("[%lu] done connection, %ld.%03ld sec", thread_id, ts.tv_sec, ts.tv_nsec/(1000*1000));
     statistic_add_connection(&ts);
@@ -848,7 +849,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     if ( !targs )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     targs->new_accepted_inet_fd = netfd;
 
@@ -874,7 +875,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     {
 	errno = retval;
 	logerror("ERROR: init thread attributes");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     /* detach connection thread from the main thread. Doing this to collect
      * resources after this thread ends. Because there is no join() waiting
@@ -885,7 +886,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     {
 	errno = retval;
 	logerror("ERROR: setting attribute thread detached");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     pthread_t thread;
@@ -894,7 +895,7 @@ void connection_manager_handle_connection_request(int netfd, const struct sockad
     {
 	errno = retval;
 	logerror("ERROR: creating thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     pthread_attr_destroy(&attr);
 

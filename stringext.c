@@ -37,6 +37,7 @@
 #include <assert.h>
 
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
 
 
 /* Copy content of s1, s2, ... into a new allocated string.
@@ -70,7 +71,7 @@ char *anstrcat(int n, ...)
     {
 	/* malloc failed. exit */
 	logerror("ERROR: malloc failed");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     *astr = '\0';
 
@@ -121,7 +122,7 @@ void strnbcat(char **buffer, int *len, const char *str)
     {
 	/* possible endless loop. exit with error */
 	printlog("ERROR: possible endless loop in resize() algorithm. exit");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     if ( newlen != *len )
     {
@@ -131,7 +132,7 @@ void strnbcat(char **buffer, int *len, const char *str)
 	{
 	    /* realloc failed. exit */
 	    logerror("ERROR: realloc failed");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
     }
     strcat(*buffer, str);
@@ -183,7 +184,7 @@ void arraycat(void *dataarray, int *nelem, int *nlen, const void *data, int size
 	{
 	    /* realloc failed. exit */
 	    logerror("ERROR: realloc failed");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	*((datatype_t **)dataarray) = myarray;
@@ -267,7 +268,7 @@ int membcat(void **buffer, int *buffersize, int *bufferlen, const void *src, int
 	    {
 		/* realloc failed. exit */
 		logerror("ERROR: realloc failed");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    *buffer = mybuffer;
 	    *buffersize = mybuffersize;

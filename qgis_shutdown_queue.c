@@ -106,7 +106,7 @@ static void *qgis_shutdown_thread(void *arg)
 	if (retval)
 	{
 	    logerror("ERROR: retrieving time");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	pid_t *pidlist;
@@ -144,7 +144,7 @@ static void *qgis_shutdown_thread(void *arg)
 		    else
 		    {
 			logerror("ERROR: calling kill(%d, SIGTERM)", pid);
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 		else
@@ -156,14 +156,14 @@ static void *qgis_shutdown_thread(void *arg)
 		    if (-1 == retval)
 		    {
 			printlog("ERROR: can not set state to pid %d, unknown", pid);
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 
 		    retval = db_reset_signal_timer(pid);
 		    if (-1 == retval)
 		    {
 			logerror("ERROR: setting the time value");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 		break;
@@ -188,7 +188,7 @@ static void *qgis_shutdown_thread(void *arg)
 			else
 			{
 			    logerror("ERROR: calling kill(%d, SIGTERM)", pid);
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 		    }
 		    else {
@@ -199,14 +199,14 @@ static void *qgis_shutdown_thread(void *arg)
 			if (-1 == retval)
 			{
 			    printlog("ERROR: can not set state to pid %d, unknown", pid);
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 
 			retval = db_reset_signal_timer(pid);
 			if (-1 == retval)
 			{
 			    logerror("ERROR: setting the time value");
-			    exit(EXIT_FAILURE);
+			    qexit(EXIT_FAILURE);
 			}
 		    }
 		}
@@ -237,7 +237,7 @@ static void *qgis_shutdown_thread(void *arg)
 
 	    default:
 		printlog("ERROR: unexpected state value (%d) in shutdown list", state);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	db_free_list_process(pidlist, len);
@@ -260,7 +260,7 @@ static void *qgis_shutdown_thread(void *arg)
 	{
 	    errno = retval;
 	    logerror("ERROR: can not lock mutex");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	/* if did did not get a call to qgis_shutdown_add_process() or
@@ -286,7 +286,7 @@ static void *qgis_shutdown_thread(void *arg)
 		    if (retval)
 		    {
 			logerror("ERROR: can not get clock value");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		    static const struct timespec ts_timeout = {
 			    tv_sec: 0,
@@ -319,7 +319,7 @@ static void *qgis_shutdown_thread(void *arg)
 	    {
 		errno = retval;
 		logerror("ERROR: can not wait on condition");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	else
@@ -341,7 +341,7 @@ static void *qgis_shutdown_thread(void *arg)
 	{
 	    errno = retval;
 	    logerror("ERROR: can not unlock mutex");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	if (local_do_shutdown_thread)
@@ -364,7 +364,7 @@ static void *qgis_shutdown_thread(void *arg)
     if (-1 == retval)
     {
 	logerror("ERROR: write signal data");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     debug(1, "wrote %d bytes to sig pipe", retval);
 
@@ -387,35 +387,35 @@ void qgis_shutdown_init(int main_pipe_wr)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_init");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_setclock() id %d", get_valid_clock_id());
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_cond_init(&shutdowncondition, &condattr);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_cond_init");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_condattr_destroy(&condattr);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_destroy");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_create(&shutdownthread, NULL, qgis_shutdown_thread, NULL);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: creating thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -428,7 +428,7 @@ void qgis_shutdown_delete()
     {
 	errno = retval;
 	logerror("ERROR: joining thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     shutdownthread = 0;
 }
@@ -456,7 +456,7 @@ void qgis_shutdown_add_process(pid_t pid)
     {
 	errno = retval;
 	logerror("ERROR: can not lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     has_list_change = 1;
     retval = pthread_cond_signal(&shutdowncondition);
@@ -464,14 +464,14 @@ void qgis_shutdown_add_process(pid_t pid)
     {
 	errno = retval;
 	logerror("ERROR: can not wait on condition");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_mutex_unlock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: can not unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -495,7 +495,7 @@ void qgis_shutdown_notify_changes(void)
     {
 	errno = retval;
 	logerror("ERROR: can not lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     has_list_change = 1;
     retval = pthread_cond_signal(&shutdowncondition);
@@ -503,14 +503,14 @@ void qgis_shutdown_notify_changes(void)
     {
 	errno = retval;
 	logerror("ERROR: can not wait on condition");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_mutex_unlock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: can not unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -529,7 +529,7 @@ void qgis_shutdown_wait_empty(void)
     {
 	errno = retval;
 	logerror("ERROR: can not lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     do_shutdown_thread = 1;
     retval = pthread_cond_signal(&shutdowncondition);
@@ -537,14 +537,14 @@ void qgis_shutdown_wait_empty(void)
     {
 	errno = retval;
 	logerror("ERROR: can not wait on condition");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_mutex_unlock(&shutdownmutex);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: can not unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -570,7 +570,7 @@ void qgis_shutdown_wait_empty(void)
 //    {
 //	errno = retval;
 //	logerror("ERROR: can not lock mutex");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //    has_list_change = 1;
 //    retval = pthread_cond_signal(&shutdowncondition);
@@ -578,14 +578,14 @@ void qgis_shutdown_wait_empty(void)
 //    {
 //	errno = retval;
 //	logerror("ERROR: can not wait on condition");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //    retval = pthread_mutex_unlock(&shutdownmutex);
 //    if (retval)
 //    {
 //	errno = retval;
 //	logerror("ERROR: can not unlock mutex");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //}
 

@@ -49,6 +49,7 @@
 #include <assert.h>
 
 #include "qgis_config.h"
+#include "qgis_shutdown_queue.h"
 
 //#undef HAVE_GLIBC_VERSION_2_21	/* used for testing purpose */
 
@@ -76,7 +77,7 @@ int my_vdprintf(int fd, const char *format, va_list ap)
 	if ( !buffer )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	// copy va list just in case we need to call vsnprintf twice
@@ -154,7 +155,7 @@ int logger_open_logfile(void)
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not open log file '%s'", logfilename);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	int logfd = retval;
 
@@ -164,14 +165,14 @@ int logger_open_logfile(void)
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not dup to stdout");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	retval = dup3(logfd, STDERR_FILENO, O_CLOEXEC);
 	if (-1 == retval)
 	{
 	    logerror("ERROR: can not dup to stderr");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	retval = close(logfd);
@@ -340,7 +341,7 @@ int logerror(const char *format, ...)
 	    {
 		/* malloc failed. exit */
 		logerror("ERROR: malloc failed");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    strcpy(strbuffer, timebuffer);
 	    strcat(strbuffer, format);

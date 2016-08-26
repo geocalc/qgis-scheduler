@@ -44,6 +44,7 @@
 
 #include "common.h"
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
 
 
 #define ASSEMBLE_FCGI_NUMBERS16(variable) \
@@ -202,7 +203,7 @@ int fcgi_param_parse(struct fcgi_param_s *param, const unsigned char *buffer, in
 	if ( !param->name )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	memcpy(param->name, buffer, nameLen);
 	param->name[nameLen] = '\0';
@@ -212,7 +213,7 @@ int fcgi_param_parse(struct fcgi_param_s *param, const unsigned char *buffer, in
 	if ( !param->value )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	memcpy(param->value, buffer, valueLen);
 	param->value[valueLen] = '\0';
@@ -231,7 +232,7 @@ struct fcgi_param_list_s *fcgi_param_list_new(void)
     if ( !list )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     TAILQ_INIT(&list->head);
 
@@ -267,7 +268,7 @@ void fcgi_param_list_add_param(struct fcgi_param_list_s *paramlist, struct fcgi_
 	if ( !entry )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	entry->param = param;
@@ -332,7 +333,7 @@ int fcgi_param_list_print(struct fcgi_param_list_s *paramlist)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: fprintf");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    bytes_printed += retval;
 	}
@@ -453,7 +454,7 @@ struct fcgi_message_s *fcgi_message_new(void)
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return message;
@@ -526,7 +527,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 		if ( !message->content )
 		{
 		    logerror("ERROR: could not allocate memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 	    }
 
@@ -537,7 +538,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_UNKNOWN_TYPE:
 	default:
 	    debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 
 	}
     }
@@ -608,7 +609,7 @@ int fcgi_message_parse(struct fcgi_message_s *message, const char *data, int len
 //	case FCGI_UNKNOWN_TYPE:
     default:
 	debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
 
     }
 
@@ -772,7 +773,7 @@ int fcgi_message_write(char *buffer, int len, const struct fcgi_message_s *messa
 //    case FCGI_UNKNOWN_TYPE:
     default:
 	debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return written;
@@ -864,7 +865,7 @@ int fcgi_message_print(const struct fcgi_message_s *message)
 	//    case FCGI_UNKNOWN_TYPE:
 	    default:
 		debug(1, "ERROR: unknown request id in message: %d", fcgi_message_get_requestid(message));
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
     }
@@ -880,7 +881,7 @@ struct fcgi_message_list_s *fcgi_message_list_new(void)
     if ( !messlist )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     TAILQ_INIT(&messlist->head);
 
@@ -919,7 +920,7 @@ void fcgi_message_list_add_message(struct fcgi_message_list_s *messlist, struct 
 	if ( !entry )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	entry->mess = message;
@@ -1041,7 +1042,7 @@ struct fcgi_session_s *fcgi_session_new(int keep_messages)
     if ( !session )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     session->keep_messages = keep_messages;
@@ -1272,7 +1273,7 @@ struct fcgi_message_s *fcgi_message_new_begin(uint16_t requestId, uint16_t role,
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     message->message.header.version = FCGI_VERSION_1;
@@ -1300,7 +1301,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     message->message.header.version = FCGI_VERSION_1;
@@ -1314,7 +1315,7 @@ struct fcgi_message_s *fcgi_message_new_parameter(uint16_t requestId, const char
 	if ( !message->content )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	memcpy(message->content, parameter, len);
@@ -1333,7 +1334,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     message->message.header.version = FCGI_VERSION_1;
@@ -1347,7 +1348,7 @@ struct fcgi_message_s *fcgi_message_new_stdin(uint16_t requestId, const char *st
 	if ( !message->content )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	memcpy(message->content, stdindata, len);
@@ -1366,7 +1367,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     message->message.header.version = FCGI_VERSION_1;
@@ -1380,7 +1381,7 @@ struct fcgi_message_s *fcgi_message_new_data(uint16_t requestId, const char *dat
 	if ( !message->content )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	memcpy(message->content, data, len);
@@ -1399,7 +1400,7 @@ struct fcgi_message_s *fcgi_message_new_endrequest(uint16_t requestId, uint32_t 
     if ( !message )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     message->message.header.version = FCGI_VERSION_1;

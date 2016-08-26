@@ -46,6 +46,7 @@
 #include "logger.h"
 #include "process_manager.h"
 #include "qgis_inotify.h"
+#include "qgis_shutdown_queue.h"
 
 
 
@@ -168,7 +169,7 @@ void project_manager_start_project(const char *projname)
     if ( !targs )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     targs->project_name = strdup(projname);
     targs->num = nr_of_childs_during_startup;
@@ -179,7 +180,7 @@ void project_manager_start_project(const char *projname)
     {
 	errno = retval;
 	logerror("ERROR: init thread attributes");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     /* detach connection thread from the main thread. Doing this to collect
      * resources after this thread ends. Because there is no join() waiting
@@ -190,7 +191,7 @@ void project_manager_start_project(const char *projname)
     {
 	errno = retval;
 	logerror("ERROR: setting attribute thread detached");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     pthread_t thread;
@@ -199,7 +200,7 @@ void project_manager_start_project(const char *projname)
     {
 	errno = retval;
 	logerror("ERROR: creating thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     pthread_attr_destroy(&attr);
 

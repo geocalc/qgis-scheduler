@@ -195,7 +195,7 @@ void write_pid_file(const char *path)
     if (NULL == f)
     {
 	logerror("ERROR: can not open pidfile '%s'", path);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     pid_t pid = getpid();
@@ -210,7 +210,7 @@ void remove_pid_file(const char *path)
     if (-1 == retval)
     {
 	logerror("ERROR: can not remove pidfile '%s'", path);
-	// intentionally no exit() call
+	// intentionally no qexit() call
     }
 }
 
@@ -226,7 +226,7 @@ void check_ressource_limits(void)
     if (retval)
     {
 	logerror("ERROR: can not get ressource limits");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     const unsigned long fdlimit = limits.rlim_cur;
@@ -262,7 +262,7 @@ void check_ressource_limits(void)
 	if (retval)
 	{
 	    logerror("ERROR: can not set ressource limits");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
     }
 }
@@ -302,7 +302,7 @@ void signalaction(int sig, siginfo_t *info, void *ucontext)
 	if (-1 == retval)
 	{
 	    logerror("ERROR: write signal data");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	debug(1, "wrote %d bytes to sig pipe", retval);
 	break;
@@ -341,7 +341,7 @@ int main(int argc, char **argv)
 	{
 	case 'h':
 	    usage(argv[0]);
-	    return EXIT_SUCCESS;
+	    qexit(EXIT_SUCCESS);
 	case 'd':
 	    no_daemon = 1;
 	    break;
@@ -350,10 +350,10 @@ int main(int argc, char **argv)
 	    break;
 	case 'V':
 	    print_version();
-	    return EXIT_SUCCESS;
+	    qexit(EXIT_SUCCESS);
 	default: /* '?' */
 	    usage(argv[0]);
-	    return EXIT_FAILURE;
+	    qexit(EXIT_FAILURE);
 	}
     }
 
@@ -370,7 +370,7 @@ int main(int argc, char **argv)
     else
     {
 	logerror("ERROR: can not canonicalize path '%s'", config_path);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -379,7 +379,7 @@ int main(int argc, char **argv)
     if (retval)
     {
 	logerror("ERROR: can not load config file");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -412,7 +412,7 @@ int main(int argc, char **argv)
 	if (s != 0)
 	{
 	    debug(1, "getaddrinfo: %s", gai_strerror(s));
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	/* getaddrinfo() returns a list of address structures.
@@ -449,7 +449,7 @@ int main(int argc, char **argv)
 	{ /* No address succeeded */
 	    //debug(1, "Could not bind"); // TODO better message
 	    logerror("ERROR: could not create network socket");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	freeaddrinfo(result); /* No longer needed */
@@ -461,7 +461,7 @@ int main(int argc, char **argv)
     if (retval)
     {
 	logerror("ERROR: can not listen to socket");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -480,7 +480,7 @@ int main(int argc, char **argv)
 	    if (retval)
 	    {
 		logerror("ERROR: can not change root directory to '%s'", chrootpath);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
     }
@@ -521,7 +521,7 @@ int main(int argc, char **argv)
 			break;
 		    default:
 			logerror("ERROR: isatty");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 
 		    /* is no error.
@@ -532,7 +532,7 @@ int main(int argc, char **argv)
 		    {
 			const char *logfile = config_get_logfile();
 			logerror("ERROR: can not set owner of logfile '%s' to %s", logfile, chuser);
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		}
 
@@ -541,14 +541,14 @@ int main(int argc, char **argv)
 		if (retval)
 		{
 		    logerror("ERROR: can not set gid to %d (%s)", gid, chuser);
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 
 		retval = setuid(uid);
 		if (retval)
 		{
 		    logerror("ERROR: can not set uid to %d (%s)", uid, chuser);
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 	    }
 	    else
@@ -557,7 +557,7 @@ int main(int argc, char **argv)
 		    logerror("ERROR: can not get the id of user '%s'", chuser);
 		else
 		    printlog("ERROR: can not get the id of user '%s'. exiting", chuser);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
     }
@@ -571,12 +571,12 @@ int main(int argc, char **argv)
     if (retval)
     {
 	logerror("ERROR: can not change working directory to '/'");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
     /* we need to exit the program before calling daemon() with
-     * exit(EXIT_FAILURE) if we can not write to the pid file. So the init
+     * qexit(EXIT_FAILURE) if we can not write to the pid file. So the init
      * script gets a failure return value and is able to show it to the user.
      *
      * But we need to write the pid value _after_ calling daemon(), so the pid
@@ -596,7 +596,7 @@ int main(int argc, char **argv)
 	    if (NULL == pidfile)
 	    {
 		logerror("ERROR: can not open pidfile '%s'", pidpath);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 
@@ -606,7 +606,7 @@ int main(int argc, char **argv)
 	    if (retval)
 	    {
 		logerror("ERROR: can not become daemon");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	}
@@ -637,7 +637,7 @@ int main(int argc, char **argv)
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal pipe");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	signalpipe_rd = pipes[0];
 	signalpipe_wr = pipes[1];
@@ -662,43 +662,43 @@ int main(int argc, char **argv)
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGUSR2, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGTERM, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGQUIT, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGHUP, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGINT, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	retval = sigaction(SIGCHLD, &action, NULL);
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	action.sa_flags = stdactionflags;
 	action.sa_flags |= SA_RESETHAND; // only one notification of sigsegv
@@ -706,7 +706,7 @@ int main(int argc, char **argv)
 	if (retval)
 	{
 	    logerror("ERROR: can not install signal handler");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
     }
 
@@ -774,7 +774,7 @@ int main(int argc, char **argv)
 
 	    default:
 		logerror("ERROR: %s() calling poll", __FUNCTION__);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 		// no break needed
 	    }
 	}
@@ -801,7 +801,7 @@ int main(int argc, char **argv)
 		if (-1 == retval)
 		{
 		    logerror("ERROR: reading signal data");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 		else
 		{
@@ -883,7 +883,7 @@ int main(int argc, char **argv)
 		    if (-1 == retval)
 		    {
 			logerror("ERROR: calling accept");
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		    else
 		    {
@@ -916,19 +916,19 @@ int main(int argc, char **argv)
 	    if (retval)
 	    {
 		logerror("ERROR: can not install signal handler");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    retval = sigaction(SIGQUIT, &action, NULL);
 	    if (retval)
 	    {
 		logerror("ERROR: can not install signal handler");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    retval = sigaction(SIGINT, &action, NULL);
 	    if (retval)
 	    {
 		logerror("ERROR: can not install signal handler");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	    has_restored_signal = 1;
@@ -965,5 +965,5 @@ int main(int argc, char **argv)
 
     printlog("shut down %s", basename(argv[0]));
 
-    return exitvalue;
+    qexit(exitvalue);
 }

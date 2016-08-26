@@ -252,7 +252,7 @@ static void db_global_lock(void)
     {
 	errno = retval;
 	logerror("ERROR: acquire db mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -264,7 +264,7 @@ static void db_global_unlock(void)
     {
 	errno = retval;
 	logerror("ERROR: unlock db mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -329,7 +329,7 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
 		/* unknown character found. exit */
 		srcsql--;
 		printlog("ERROR: unknown character found in sql string '%s', position %ld: '%c'", db_select_statement[sid], (long int)(srcsql - db_select_statement[sid]), *srcsql);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 
@@ -341,7 +341,7 @@ static sqlite3_stmt *db_statement_prepare(enum db_select_statement_id sid)
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: preparing sql statement '%s': %s", sql, sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     free(copysql);
@@ -356,7 +356,7 @@ static void db_statement_finalize(sqlite3_stmt *ppstmt)
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: finalizing sql statement: %s", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -384,7 +384,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	if (NULL == debug_log)
 	{
 	    logerror("ERROR: malloc");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	*debug_log = '\0';
     }
@@ -420,7 +420,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 if ( SQLITE_OK != retval )
                 {
                     printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
-                    exit(EXIT_FAILURE);
+                    qexit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
                 {
@@ -439,7 +439,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 if ( SQLITE_OK != retval )
                 {
                     printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
-                    exit(EXIT_FAILURE);
+                    qexit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
                 {
@@ -458,7 +458,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 if ( SQLITE_OK != retval )
                 {
                     printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
-                    exit(EXIT_FAILURE);
+                    qexit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
                 {
@@ -478,7 +478,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 if ( SQLITE_OK != retval )
                 {
                     printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
-                    exit(EXIT_FAILURE);
+                    qexit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
                 {
@@ -497,7 +497,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
                 if ( SQLITE_OK != retval )
                 {
                     printlog("ERROR: in sql '%s' bind column %d returned: %s", sql, col, sqlite3_errstr(retval));
-                    exit(EXIT_FAILURE);
+                    qexit(EXIT_FAILURE);
                 }
                 if (1 <= loglevel)
                 {
@@ -522,7 +522,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	    default:
 		/* unknown character found. exit */
 		printlog("ERROR: unknown character found in sql string '%s', position %ld: %c", db_select_statement[sid], (long int)(sql - db_select_statement[sid]), *sql);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
     }
@@ -553,19 +553,19 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 		if ( !type )
 		{
 		    printlog("ERROR: not enough memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 		union callback_result_t *results = calloc(ncol_result, sizeof(*results));
 		if ( !results )
 		{
 		    printlog("ERROR: not enough memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 		const char **cols = calloc(ncol_result, sizeof(*cols));
 		if ( !cols )
 		{
 		    printlog("ERROR: not enough memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 
 		int i;
@@ -596,7 +596,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 
 		    default:
 			printlog("ERROR: unknown type %d", mytype);
-			exit(EXIT_FAILURE);
+			qexit(EXIT_FAILURE);
 		    }
 		    cols[i] = sqlite3_column_name(ppstmt, i);
 		}
@@ -640,7 +640,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	if (db_exit_on_error)
 	{
 	    printlog("exiting..");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	else
 	{
@@ -659,13 +659,13 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	if (db_exit_on_error)
 	{
 	    printlog("exiting..");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	break;
 
     case SQLITE_ABORT:
 	printlog("ERROR: abort in callback function during steps of sql '%s'", db_select_statement[sid]);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
 	break;
 
     case SQLITE_OK:
@@ -676,7 +676,7 @@ static int db_select_parameter_callback(enum db_select_statement_id sid, db_call
 	{
 	    const char *sql = db_select_statement[sid];
 	    printlog("ERROR: resetting sql statement '%s': %s", sql, sqlite3_errstr(retval));
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	break;
     }
@@ -783,7 +783,7 @@ void db_init(void)
 	printlog("ERROR: calling sqlite3_config(): %s\n"
 		"Can not set thread safe access mode\n"
 		"Did you compile sqlite3 with 'SQLITE_THREADSAFE=1'?", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     retval = sqlite3_config(SQLITE_CONFIG_LOG, db_log, NULL);
@@ -791,21 +791,21 @@ void db_init(void)
     {
 	printlog("ERROR: calling sqlite3_config(): %s\n"
 		"Can not set db log function", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     retval = sqlite3_initialize();
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: calling sqlite3_initialize(): %s", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     retval = sqlite3_open(":memory:", &dbhandler);
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: calling sqlite3_open(): %s", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     debug(1, "created memory db");
 
@@ -820,28 +820,28 @@ void db_init(void)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_init");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_condattr_setclock(&condattr, get_valid_clock_id());
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_setclock() id %d", get_valid_clock_id());
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_cond_init(&idle_process_condition, &condattr);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_cond_init");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     retval = pthread_condattr_destroy(&condattr);
     if (retval)
     {
 	errno = retval;
 	logerror("ERROR: pthread_condattr_destroy");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -866,7 +866,7 @@ void db_delete(void)
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: calling sqlite3_close(): %s", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     dbhandler = NULL;
 
@@ -874,7 +874,7 @@ void db_delete(void)
     if (SQLITE_OK != retval)
     {
 	printlog("ERROR: calling sqlite3_shutdown(): %s", sqlite3_errstr(retval));
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -1050,7 +1050,7 @@ char *db_get_project_for_this_process(pid_t pid)
 //    {
 //	errno = retval;
 //	logerror("ERROR: acquire mutex lock");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //
 //    pid_t ret = db_nolock__get_process(projname, list, state);
@@ -1060,7 +1060,7 @@ char *db_get_project_for_this_process(pid_t pid)
 //    {
 //	errno = retval;
 //	logerror("ERROR: unlock mutex lock");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //
 //    return ret;
@@ -1078,7 +1078,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     {
 	errno = retval;
 	logerror("ERROR: can not lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     db_global_lock();
@@ -1104,7 +1104,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	if (-1 == retval)
 	{
 	    logerror("ERROR: clock_gettime(%d,..)", get_valid_clock_id());
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	qgis_timer_add(&mytimeout, &now);
 
@@ -1116,7 +1116,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
 	    {
 		errno = retval;
 		logerror("ERROR: can not wait on condition");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    /* else timeout: just return -1 for pid as error value */
 	    else
@@ -1145,7 +1145,7 @@ pid_t db_get_next_idle_process_for_busy_work(const char *projname, int timeoutse
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -1263,7 +1263,7 @@ int db_process_set_state_idle(pid_t pid)
     {
 	errno = retval;
 	logerror("ERROR: can not lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     db_global_lock();
@@ -1278,7 +1278,7 @@ int db_process_set_state_idle(pid_t pid)
     {
 	errno = retval;
 	logerror("ERROR: can not wait on condition");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     retval = pthread_mutex_unlock(&idle_process_mutex);
@@ -1286,7 +1286,7 @@ int db_process_set_state_idle(pid_t pid)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -2063,7 +2063,7 @@ void db_dump(void)
     if (NULL == data.buffer)
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     *data.buffer = '\0';	// empty string
 

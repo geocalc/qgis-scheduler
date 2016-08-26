@@ -147,7 +147,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 //    {
 //	debug(1, "ERROR: can not open file '%s': ", debugfile);
 //	logerror(NULL);
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 
 
@@ -161,7 +161,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     /* leave the original child socket and create a new one on the opposite
      * side.
@@ -172,7 +172,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: can not create socket to child process");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     childunixsocketfd = retval;	// refers to the socket this program connects to the child process
     retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
@@ -196,7 +196,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if ( !buffer )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	message = fcgi_message_new_begin(requestid, FCGI_RESPONDER, 0);
@@ -204,7 +204,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == len)	// TODO: be more flexible if buffer too small
 	{
 	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 //	retval = write(debugfd, buffer, len);
 	retval = write(childunixsocketfd, buffer, len);
@@ -238,7 +238,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	    {
 		// TODO: be more flexible if buffer too small
 		debug(1, "fcgi parameter buffer too small (%d)", maxbufferlen);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 
 	    }
 
@@ -263,7 +263,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == len)	// TODO: be more flexible if buffer too small
 	{
 	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 //	retval = write(debugfd, buffer, len);
 	retval = write(childunixsocketfd, buffer, len);
@@ -283,7 +283,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == len)	// TODO: be more flexible if buffer too small
 	{
 	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 //	retval = write(debugfd, buffer, len);
 	retval = write(childunixsocketfd, buffer, len);
@@ -302,7 +302,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	if (-1 == len)
 	{
 	    debug(1, "fcgi message buffer too small (%d)", maxbufferlen);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 //	retval = write(debugfd, buffer, len);
 	retval = write(childunixsocketfd, buffer, len);
@@ -378,7 +378,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
 	    else
 	    {
 		logerror("ERROR: kill(%d,0) returned", pid);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	else
@@ -424,7 +424,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     if (-1 == retval)
     {
 	logerror("ERROR: can not create socket for fcgi program");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     const int childsocket = retval;
 
@@ -446,7 +446,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     unsigned int socket_suffix_start = socket_id-1;
     retval = pthread_mutex_unlock (&socket_id_mutex);
@@ -454,7 +454,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     for (;;)
@@ -464,7 +464,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	{
 	    errno = retval;
 	    logerror("ERROR: acquire mutex");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	unsigned int socket_suffix = socket_id++;
 	retval = pthread_mutex_unlock (&socket_id_mutex);
@@ -472,7 +472,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	{
 	    errno = retval;
 	    logerror("ERROR: unlock mutex");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	if (socket_suffix == socket_suffix_start)
@@ -482,7 +482,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	     * Or we have a programmers error here..
 	     */
 	    debug(1, "ERROR: out of numbers to create socket name. exit");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	struct sockaddr_un childsockaddr;
@@ -491,7 +491,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	if (-1 == retval)
 	{
 	    logerror("ERROR: calling string format function snprintf");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	retval = bind(childsocket, (struct sockaddr *)&childsockaddr, sizeof(childsockaddr));
@@ -504,7 +504,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	    else
 	    {
 		logerror("ERROR: calling bind");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	debug(1, "start project '%s', bound socket to '\\0%s'", project_name, childsockaddr.sun_path+1);
@@ -516,7 +516,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     if (-1 == retval)
     {
 	logerror("ERROR: can not listen to socket connecting fast cgi application");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 
@@ -576,7 +576,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	    if (retval)
 	    {
 //		logerror("ERROR: can not set environment with key='%s' and value='%s'", key[i], value[i]); # no log message allowed because of locking
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	// no need to free() memory, is freed by exec()
@@ -598,7 +598,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 	if (-1 == retval)
 	{
 //	    logerror("ERROR: calling dup2"); # no log message allowed because of locking
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 
@@ -613,7 +613,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
 
 	execl(command, command, NULL);
 //	logerror("ERROR: could not execute '%s': ", command); # no log message allowed because of locking
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     else if (0 < pid)
     {
@@ -629,7 +629,7 @@ static int process_manager_thread_function_start_new_child(struct thread_start_n
     {
 	/* error */
 	logerror("ERROR: can not fork");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return 0;
@@ -686,7 +686,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
     if ( 0 > retval )
     {	// too much dying processes during init phase, do not start new processes
 	printlog("ERROR: can not get number of startup failures, function call failed for project %s", projname);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     else if (max_nr_process_crashes > retval+1)
     {
@@ -707,7 +707,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	    if ( !targs )
 	    {
 		logerror("ERROR: could not allocate memory");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    targs->project_name = strdup(projname);
 
@@ -716,7 +716,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	    {
 		errno = retval;
 		logerror("ERROR: creating thread");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    debug(1, "[%lu] started thread %lu", pthread_self(), threads[i]);
 	}
@@ -729,7 +729,7 @@ void process_manager_start_new_process_wait(int num, const char *projname, int d
 	    {
 		errno = retval;
 		logerror("ERROR: joining thread");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 
@@ -783,7 +783,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
     {
 	errno = retval;
 	logerror("ERROR: detaching thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     process_manager_start_new_process_wait(tinfo->num, tinfo->project_name, tinfo->do_exchange_processes);
@@ -814,7 +814,7 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
     if ( !targs )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     targs->num = num;
     targs->project_name = strdup(projname);
@@ -826,7 +826,7 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
     {
 	errno = retval;
 	logerror("ERROR: pthread_create");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 }
@@ -905,7 +905,7 @@ void process_manager_process_died(void)
 	    else
 	    {
 		logerror("ERROR: kill(%d,0) returned", pid);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	else

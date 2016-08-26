@@ -50,6 +50,7 @@
 #include "qgis_config.h"
 #include "logger.h"
 #include "project_manager.h"
+#include "qgis_shutdown_queue.h"
 
 
 
@@ -90,7 +91,7 @@ static void *inotify_thread_watch(void *arg)
     if ( !inotifyevent )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     assert(0 <= inotifyfd);
@@ -109,7 +110,7 @@ static void *inotify_thread_watch(void *arg)
 
 	    default:
 		logerror("ERROR: read() inotify_event");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 		// no break needed
 	    }
 	}
@@ -208,7 +209,7 @@ void qgis_inotify_init(void)
     if (-1 == retval)
     {
 	logerror("ERROR: inotify_init1");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     inotifyfd = retval;
 
@@ -217,7 +218,7 @@ void qgis_inotify_init(void)
     {
 	errno = retval;
 	logerror("ERROR: creating thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 }
@@ -232,7 +233,7 @@ void qgis_inotify_delete(void)
     {
 	errno = retval;
 	logerror("ERROR: joining thread");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     retval = close(inotifyfd);
@@ -240,7 +241,7 @@ void qgis_inotify_delete(void)
     if (-1 == retval)
     {
 	logerror("ERROR: can not close inotify fd");
-	// intentional no exit() call
+	// intentional no qexit() call
     }
 
 }
@@ -272,7 +273,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 
 	    default:
 		logerror("ERROR: accessing file '%s'", path);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	else
@@ -318,7 +319,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 		if ( !directoryname )
 		{
 		    logerror("ERROR: could not allocate memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 
 		directoryname = dirname(directoryname);
@@ -330,7 +331,7 @@ int qgis_inotify_watch_file(const char *projectname, const char *path)
 		if (-1 == retval)
 		{
 		    logerror("ERROR: inotify_add_watch");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 
 		ret = retval;
@@ -373,7 +374,7 @@ void qgis_inotify_delete_watch(const char *projectname, const char *path)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: can not remove inotify watch for watch descriptor %d", watchd);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	}
 	db_remove_inotify_path(projectname);

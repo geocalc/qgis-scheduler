@@ -47,6 +47,7 @@
 #include <libgen.h>
 
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
 #include "stringext.h"
 
 
@@ -158,7 +159,7 @@ static int load_include_file(FILE *f, const char *configpath)
     if (-1 == retval)
     {
 	logerror("ERROR: calling stat() on '%s'", configpath);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     if ((statbuff.st_mode & S_IFMT) == S_IFREG) {
@@ -194,7 +195,7 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
     if (NULL == configfile)
     {
 	logerror("ERROR: can not open configuration file '%s'", configpath);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     static const int bufferlen = 4096;
@@ -205,14 +206,14 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
 	if (ferror(configfile))
 	{
 	    logerror("ERROR: reading from '%s'", configpath);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	fwrite(buffer, 1, len, tmpf);
 	if (ferror(tmpf))
 	{
 	    logerror("ERROR: writing to temporary file '%s'", tmpfilename);
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
     }
 
@@ -220,7 +221,7 @@ static int copy_config_file(FILE *tmpf, const char *configpath, const char *tmpf
     if (EOF == retval)
     {
 	logerror("ERROR: closing file '%s'", configpath);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return 0;
@@ -255,7 +256,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
 
     case GLOB_NOSPACE:
 	printlog("ERROR: glob can not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
 
     case 0:
     {
@@ -276,7 +277,7 @@ static int glob_find_file(FILE *tmpf, const char *includepattern)
 
     default:
 	printlog("ERROR: glob returned unknown error code %d", retval);
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     globfree(&globvec);
@@ -315,14 +316,14 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    if ( !tmpfilename )
 	    {
 		printlog("ERROR: tmpnam() returned no temporary file name");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	    int tmpfd = open(tmpfilename, O_CREAT|O_WRONLY|O_EXCL|O_CLOEXEC, S_IRUSR|S_IWUSR);
 	    if (-1 == tmpfd)
 	    {
 		logerror("ERROR: can not open temporary file %s", tmpfilename);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	    /* note: fdopen() argument "mode" have to reflect the settings in open() */
@@ -330,7 +331,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    if (NULL == tmpf)
 	    {
 		logerror("ERROR: can not open file descriptor on temporary file %s", tmpfilename);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	    /* copy first configuration file "as is" including global
@@ -361,7 +362,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 	    if (EOF == retval)
 	    {
 		logerror("ERROR: can not close temporary file %s", tmpfilename);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 
 	    iniparser_freedict(config);
@@ -372,7 +373,7 @@ static dictionary *iniparser_load_with_include(const char *configpath)
 		if (-1 == retval)
 		{
 		    logerror("ERROR: can not remove temporary file %s", tmpfilename);
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 	    }
 
@@ -501,7 +502,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 		if ( !element )
 		{
 		    logerror("ERROR: could not allocate memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 		element->section = strdup(secname);
 		STAILQ_APPEND_LIST_ENTRY(sectionchanged, element, entries);
@@ -517,7 +518,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    if ( !element )
 	    {
 		logerror("ERROR: could not allocate memory");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    element->section = strdup(secname);
 	    STAILQ_APPEND_LIST_ENTRY(sectiondelete, element, entries);
@@ -553,7 +554,7 @@ static int config_has_changed(dictionary *oldconfig, dictionary *newconfig, stru
 	    if ( !element )
 	    {
 		logerror("ERROR: could not allocate memory");
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    element->section = strdup(secname);
 	    STAILQ_APPEND_LIST_ENTRY(sectionnew, element, entries);
@@ -585,7 +586,7 @@ static void config_convert_list_to_array(char ***array, struct sectionlist_s *li
     if ( !*array )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     int i = 0;
@@ -632,7 +633,7 @@ static const char *config_get_global_config_string(const char *key,  char *defau
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getstring(config_opts, key, defaultvalue);
@@ -642,7 +643,7 @@ static const char *config_get_global_config_string(const char *key,  char *defau
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -659,7 +660,7 @@ static int config_get_global_config_int(const char *key,  int defaultvalue)
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     int ret = iniparser_getint(config_opts, key, defaultvalue);
@@ -669,7 +670,7 @@ static int config_get_global_config_int(const char *key,  int defaultvalue)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -691,7 +692,7 @@ static const char *config_get_project_config_string(const char *project, const c
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     if (project)
@@ -714,7 +715,7 @@ static const char *config_get_project_config_string(const char *project, const c
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -737,7 +738,7 @@ static const char *config_get_project_only_config_string(const char *project, co
 	{
 	    errno = retval;
 	    logerror("ERROR: acquire mutex lock");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	/* NOTE: this could be faster if we use a local char array instead of
@@ -755,7 +756,7 @@ static const char *config_get_project_only_config_string(const char *project, co
 	{
 	    errno = retval;
 	    logerror("ERROR: unlock mutex lock");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
     }
 
@@ -776,7 +777,7 @@ static const char *config_get_project_numbered_config_string(const char *project
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     if (project)
@@ -791,7 +792,7 @@ static const char *config_get_project_numbered_config_string(const char *project
 	if (-1 == retval)
 	{
 	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, pkey, INVALID_STRING);
 	free (pkey);
@@ -804,7 +805,7 @@ static const char *config_get_project_numbered_config_string(const char *project
 	if (-1 == retval)
 	{
 	    logerror("ERROR: asprintf");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	ret = iniparser_getstring(config_opts, pkey, defaultvalue);
 	free (pkey);
@@ -815,7 +816,7 @@ static const char *config_get_project_numbered_config_string(const char *project
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -837,7 +838,7 @@ static int config_get_project_config_int(const char *project, const char *key, i
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     if (project)
@@ -860,7 +861,7 @@ static int config_get_project_config_int(const char *project, const char *key, i
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -904,7 +905,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     /* load the config file(s) */
@@ -945,7 +946,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 	    if (NULL == newconfig)
 	    {
 		logerror("ERROR: could not load configuration file '%s'", path);
-		exit(EXIT_FAILURE);
+		qexit(EXIT_FAILURE);
 	    }
 	    else
 	    {
@@ -958,7 +959,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
 		if ( !*sectionnew )
 		{
 		    logerror("ERROR: could not allocate memory");
-		    exit(EXIT_FAILURE);
+		    qexit(EXIT_FAILURE);
 		}
 
 		int i;
@@ -980,7 +981,7 @@ int config_load(const char *path, char ***sectionnew, char ***sectionchanged, ch
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     check_config(config_opts);
@@ -1004,7 +1005,7 @@ void config_shutdown(void)
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     iniparser_freedict(config_opts);
@@ -1014,7 +1015,7 @@ void config_shutdown(void)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     config_opts = NULL;
@@ -1030,7 +1031,7 @@ int config_get_num_projects(void)
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     int ret = iniparser_getnsec(config_opts);
@@ -1040,7 +1041,7 @@ int config_get_num_projects(void)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;
@@ -1057,7 +1058,7 @@ const char *config_get_name_project(int num)
     {
 	errno = retval;
 	logerror("ERROR: acquire mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     const char *ret = iniparser_getsecname(config_opts, num);
@@ -1067,7 +1068,7 @@ const char *config_get_name_project(int num)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex lock");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     return ret;

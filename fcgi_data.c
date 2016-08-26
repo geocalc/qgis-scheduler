@@ -41,6 +41,7 @@
 #include <assert.h>
 
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
 
 
 struct fcgi_data_s
@@ -70,7 +71,7 @@ struct fcgi_data_list_s *fcgi_data_list_new(void)
     if ( !list )
     {
 	logerror("ERROR: could not allocate memory");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
     TAILQ_INIT(&list->head);
 
@@ -106,14 +107,14 @@ void fcgi_data_add_data(struct fcgi_data_list_s *datalist, const char *data, int
 	if ( !entry )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 
 	entry->data.data = malloc(len);
 	if ( !entry->data.data )
 	{
 	    logerror("ERROR: could not allocate memory");
-	    exit(EXIT_FAILURE);
+	    qexit(EXIT_FAILURE);
 	}
 	memcpy(entry->data.data, data, len);
 	entry->data.len = len;

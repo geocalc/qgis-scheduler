@@ -15,6 +15,7 @@
 
 #include "timer.h"
 #include "logger.h"
+#include "qgis_shutdown_queue.h"
 
 
 static struct timespec uptime = {0,0};
@@ -42,7 +43,7 @@ void statistic_add_connection(const struct timespec *timeradd)
     {
 	errno = retval;
 	logerror("ERROR: lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     qgis_timer_add(&connectiontime, timeradd);
@@ -53,7 +54,7 @@ void statistic_add_connection(const struct timespec *timeradd)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
 }
@@ -66,7 +67,7 @@ void statistic_add_connection(const struct timespec *timeradd)
 //    {
 //	errno = retval;
 //	logerror("ERROR: lock mutex");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //
 //    process_crashed += num;
@@ -76,7 +77,7 @@ void statistic_add_connection(const struct timespec *timeradd)
 //    {
 //	errno = retval;
 //	logerror("ERROR: unlock mutex");
-//	exit(EXIT_FAILURE);
+//	qexit(EXIT_FAILURE);
 //    }
 //}
 
@@ -88,7 +89,7 @@ void statistic_add_process_shutdown(int num)
     {
 	errno = retval;
 	logerror("ERROR: lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     process_shutdown += num;
@@ -98,7 +99,7 @@ void statistic_add_process_shutdown(int num)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -110,7 +111,7 @@ void statistic_add_process_start(int num)
     {
 	errno = retval;
 	logerror("ERROR: lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     process_started += num;
@@ -120,7 +121,7 @@ void statistic_add_process_start(int num)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 }
 
@@ -132,7 +133,7 @@ void statistic_printlog(void)
     {
 	errno = retval;
 	logerror("ERROR: lock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     struct timespec myconntime = connectiontime;
@@ -143,7 +144,7 @@ void statistic_printlog(void)
     {
 	errno = retval;
 	logerror("ERROR: unlock mutex");
-	exit(EXIT_FAILURE);
+	qexit(EXIT_FAILURE);
     }
 
     struct timespec myuptime;
