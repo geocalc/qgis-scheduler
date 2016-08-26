@@ -35,6 +35,8 @@
 
 #include <sys/types.h>
 
+#include "common.h"
+
 /* NOTE: This is a workaround. Normally this definition belongs to the main
  *       module and not this shutdown module. But the main module has no
  *       header file, so we move the definition - visible by both modules -
@@ -55,5 +57,8 @@ void qgis_shutdown_add_all_process(const char *project_name);
 void qgis_shutdown_notify_changes(void);
 void qgis_shutdown_wait_empty(void);
 void qgis_shutdown_process_died(pid_t pid);
+
+/* exit handler */
+void qexit(int status) __attribute__ ((noreturn));
 
 #endif /* QGIS_SHUTDOWN_QUEUE_H_ */

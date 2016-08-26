@@ -590,3 +590,16 @@ void qgis_shutdown_wait_empty(void)
 //}
 
 
+void qexit(int status)
+{
+    const int do_abort = config_get_abort();
+    printlog("got config abort = %d", do_abort);
+    if ((EXIT_SUCCESS != status) && (do_abort))
+    {
+	printlog("error handler called with status %d and abort config set true. Aborting..", status);
+	abort();
+    }
+
+    exit(status);
+}
+
