@@ -832,6 +832,45 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
 }
 
 
+/* this child (pid) is no good anymore. terminate this process and start a new
+ * one to the list of available processes
+ */
+void process_manager_restart_process(pid_t pid)
+{
+    /* Don't start a new process during shutdown */
+    int retval = get_program_shutdown();
+    if (!retval)
+    {
+	/* Don't start a new process if the old one is in the shutdown list.
+	 * This means some other thread has tagged this process to be
+	 * shut down and a new process has already been started in case.
+	 */
+	enum db_process_list_e proclist = db_get_process_list(pid);
+	if (LIST_SHUTDOWN != proclist)
+	{
+	    char *projname = db_get_project_for_this_process(pid);
+	    /* Process is not in shutdown list and died during normal operation.
+	     * Restart the process if not too much startup failures
+	     */
+	    if (projname)
+	    {
+		process_manager_start_new_process_detached(1, projname, 0);
+		free(projname);
+	    }
+	    else
+	    {
+		printlog("WARNING: no project name found for pid %d. Can not start a new process", pid);
+	    }
+	}
+    }
+
+    /* change state of the process to STATE_EXIT
+     * and move the entry to the shutdown list
+     */
+    process_manager_cleanup_process(pid);
+    qgis_shutdown_add_process(pid);
+}
+
 
 /* a child process died.
  * this may happen because we cancelled its operation or
@@ -874,33 +913,7 @@ void process_manager_process_died(void)
 	    {
 		/* child process died.
 		 */
-		retval = get_program_shutdown();
-		if (!retval)
-		{
-		    enum db_process_list_e proclist = db_get_process_list(pid);
-		    if (LIST_SHUTDOWN != proclist)
-		    {
-			char *projname = db_get_project_for_this_process(pid);
-			/* Process is not in shutdown list and died during normal operation.
-			 * Restart the process if not too much startup failures
-			 */
-			if (projname)
-			{
-			    process_manager_start_new_process_detached(1, projname, 0);
-			    free(projname);
-			}
-			else
-			{
-			    printlog("WARNING: no project name found for pid %d", pid);
-			}
-		    }
-		}
-
-		/* change state of the process to STATE_EXIT
-		 * and move the entry to the shutdown list
-		 */
-		process_manager_cleanup_process(pid);
-		qgis_shutdown_add_process(pid);
+		process_manager_restart_process(pid);
 	    }
 	    else
 	    {
@@ -910,7 +923,7 @@ void process_manager_process_died(void)
 	}
 	else
 	{
-	    // process still exists, do not akt on it
+	    // process still exists, do not act on it
 	}
     }
 
