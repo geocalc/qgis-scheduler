@@ -59,6 +59,9 @@
 
 
 #define MAX_CHILD_SOCKET_CONNECTION_RETRY	5	/* := 5 seconds */
+#define MAX_CHILD_COMMUNICATION_RETRY	3	/* if the current child exits
+						 * during work then retry with
+						 * another child process */
 
 
 struct thread_connection_handler_args
@@ -436,6 +439,54 @@ static void *thread_handle_connection(void *arg)
 
 
     /* here we do point 5 */
+
+    /* we have to distinct severe errors which cause a program exit with failure code
+     * from light errors which do not need to end the scheduler service.
+     *
+     * with light errors the scheduler will continue to look for a child process
+     * to handle the request. If MAX_CHILD_COMMUNICATION_RETRY attempts have
+     * been passed the connection is aborted and an abort message is send to
+     * the web client.
+     *
+     * e.g. commmunication errors with the child process are considered light errors.
+     * memory allocation failures are considered severe errors.
+     *
+     * What to do on different errors:
+     * - If we have a network error on the child socket which is no EAGAIN then
+     *   kill the child process (i.e. move to shutdown queue) and try again
+     *   with a new child process.
+     *   If there is no more child process available or we reached the maximum
+     *   amount of retries then write an abort to the web browser and end this
+     *   thread normally.
+     * - If we have a network error on the inet socket which is no EAGAIN then
+     *   close the connection to the inet socket, close the connection to the
+     *   child process and end this thread normally.
+     * - If we have some other error (e.g. out of memory) then log the error
+     *   and exit this server programm with error code.
+     */
+
+
+    /* This little macro is used for exiting immediately in case of error or retry connecting to a child process
+     * We could always goto retry_new_child_connect and exit at the loop end. but in this case abort() would happen
+     * in an upper level and gdb would not find some information which has been available deep in the nested brackets */
+#define RETRY_OR_EXIT	do { \
+	if (MAX_CHILD_COMMUNICATION_RETRY > child_connect_retries) \
+	    goto retry_new_child_connect; \
+	else \
+	    qexit(EXIT_FAILURE); \
+    } while(0)
+#define FAULTY_CHILD_RETRY	do { \
+	goto retry_new_child_connect; \
+    } while(0)
+#define FAULTY_NET_CLIENT_STOP	do { \
+	child_connect_retries = MAX_CHILD_COMMUNICATION_RETRY; \
+	goto retry_new_child_connect; \
+    } while(0)
+
+    int child_connect_retries = 0;
+    retry_new_child_connect:
+    while (MAX_CHILD_COMMUNICATION_RETRY > child_connect_retries++)
+    {
     pid_t mypid = -1;
     if (request_project_name)
     {
@@ -903,6 +954,8 @@ static void *thread_handle_connection(void *arg)
 
 	db_process_set_state_idle(mypid);
 
+    }
+    break;	// successful communication until this line, continue as usual
     }
 //    close(debugfd);
 
