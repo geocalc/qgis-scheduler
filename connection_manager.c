@@ -146,11 +146,22 @@ static int msleep(unsigned int milliseconds, int do_resume)
 }
 
 
+/* send an overload message to the network client (i.e. web browser)
+ * and abort the request.
+ * This may be send anytime to the net client during normal processing.
+ * After that one should expect that the communication has been closed
+ * by the net client.
+ */
 static int send_fcgi_abort_to_web_client(int inetsocketfd, int requestId)
 {
     char sendbuffer[sizeof(FCGI_EndRequestRecord)];
     struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
     int retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
+    if (1 > retval)
+    {
+	printlog("ERROR: could not write fcgi message to buffer");
+	qexit(EXIT_FAILURE);
+    }
 
     int writebytes = write(inetsocketfd, sendbuffer, retval);
     debug(1, "wrote %d btes to network socket", writebytes);
