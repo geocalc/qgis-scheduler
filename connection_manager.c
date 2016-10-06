@@ -58,6 +58,7 @@
 #include "qgis_shutdown_queue.h"
 
 
+#define CHILD_SOCKET_CONNECTION_RETRY	5	/* := 5 seconds */
 
 
 struct thread_connection_handler_args
@@ -566,14 +567,40 @@ static void *thread_handle_connection(void *arg)
 	    logerror("ERROR: can not create socket to child process");
 	    qexit(EXIT_FAILURE);
 	}
-	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
-	retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-	if (-1 == retval)
-	{
-	    logerror("ERROR: can not connect to child process");
-	    qexit(EXIT_FAILURE);
-	}
 
+	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
+	// try to connect 5 times == 5 seconds. exit with error if it does not work
+	{
+	    int i;
+	    for (i=0; i<CHILD_SOCKET_CONNECTION_RETRY; i++)
+	    {
+		retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+		if (-1 == retval)
+		{
+		    if (EAGAIN == errno)
+		    {
+			// programm has been too fast between socket() and connect() ?
+			logerror("WARNING: can not connect to child process, %d. try", i+1);
+			int mretval = msleep(1000, 1);
+			if (-1 == mretval)
+			{
+			    logerror("ERROR: calling nanosleep");
+			    qexit(EXIT_FAILURE);
+			}
+			continue;
+		    }
+		    logerror("ERROR: can not connect to child process");
+		    qexit(EXIT_FAILURE);
+		}
+		break; // connected successfully, go on
+	    }
+	    /* if still not connected after 5 tests, exit with error */
+	    if (-1 == retval)
+	    {
+		logerror("ERROR: can not connect to child process");
+		qexit(EXIT_FAILURE);
+	    }
+	}
 
 	/* get the maximum read write socket buffer size */
 	int maxbufsize = default_max_transfer_buffer_size;
