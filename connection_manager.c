@@ -71,7 +71,7 @@ struct thread_connection_handler_args
 static const int default_max_transfer_buffer_size = 4*1024; //INT_MAX;
 static const int max_wait_for_idle_process = 5;
 
-static int change_file_mode_blocking(int fd, int is_blocking)
+static int change_file_mode_block(int fd, int is_blocking)
 {
     assert(fd>=0);
 
@@ -99,6 +99,15 @@ static int change_file_mode_blocking(int fd, int is_blocking)
 
     return retval;
 }
+static int change_file_mode_blocking(int fd)
+{
+    return change_file_mode_block(fd, 1);
+}
+static int change_file_mode_nonblocking(int fd)
+{
+    return change_file_mode_block(fd, 0);
+}
+
 
 /* sleep for milliseconds.
  * if do_resume != 0 then restart the sleep if it has been interrupted.
@@ -229,7 +238,7 @@ static void *thread_handle_connection(void *arg)
 
 
 	/* set read to blocking mode */
-	retval = change_file_mode_blocking(inetsocketfd, 1);
+	retval = change_file_mode_blocking(inetsocketfd);
 
 	int has_finished = 0;
 	while ( !has_finished )
@@ -497,7 +506,7 @@ static void *thread_handle_connection(void *arg)
 	}
 
 	/* set read to non-blocking mode */
-	retval = change_file_mode_blocking(inetsocketfd, 0);
+	retval = change_file_mode_nonblocking(inetsocketfd);
 
 	/* change the connection flag of the fastcgi connection to not
 	 * FCGI_KEEP_CONN. This way the child process closes the unix socket
