@@ -99,7 +99,41 @@ static int change_file_mode_blocking(int fd, int is_blocking)
     return retval;
 }
 
+/* sleep for milliseconds.
+ * if do_resume != 0 then restart the sleep if it has been interrupted.
+ * propagate the return value of nanosleep()
+ *
+ * note: use this instead of sleep() to circumvent problems with sleep in
+ *       multi threaded environments implemented in different kernels.
+ *       see: http://stackoverflow.com/questions/22162521/is-it-safe-to-call-sleep3-usleep3-or-nanosleep2-in-thread
+ */
+static int msleep(unsigned int milliseconds, int do_resume)
+{
+    int retval = 0;
+    struct timespec time_requested, time_returned;
 
+    time_requested.tv_sec = milliseconds/1000;
+    time_requested.tv_nsec = (milliseconds%1000)*1000*1000;
+
+    int i;	// savety belt against endless loop
+    for (i=0; i<1000*1000; i++)
+    {
+	retval = nanosleep(&time_requested, &time_returned);
+	if (-1 == retval && do_resume)
+	{
+	    if (EINTR == errno)
+	    {
+		time_requested = time_returned;
+		continue;
+	    }
+	    break;
+	}
+	/* return from function if no error happened */
+	break;
+    }
+
+    return retval;
+}
 
 
 static void *thread_handle_connection(void *arg)
