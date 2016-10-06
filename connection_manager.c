@@ -146,6 +146,40 @@ static int msleep(unsigned int milliseconds, int do_resume)
 }
 
 
+static int send_fcgi_abort_to_web_client(int inetsocketfd, int requestId)
+{
+    char sendbuffer[sizeof(FCGI_EndRequestRecord)];
+    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
+    int retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
+
+    int writebytes = write(inetsocketfd, sendbuffer, retval);
+    debug(1, "wrote %d btes to network socket", writebytes);
+    if (-1 == writebytes)
+    {
+	if (ECONNRESET == errno)
+	{
+	    /* network client ended this connection. exit this thread */
+	    debug(1, "errno %d, connection reset by network peer, closing connection", errno);
+	}
+	else
+	{
+	    logerror("ERROR: writing to network socket");
+	    qexit(EXIT_FAILURE);
+	}
+    }
+
+    /* we are done with the connection. The status
+     * is send back to the web server. we can close
+     * down and leave.
+     */
+    fcgi_message_delete(sendmessage);
+
+    return writebytes;
+}
+
+
+
+
 static void *thread_handle_connection(void *arg)
 {
     /* the main thread has been notified about data on the server network fd.
@@ -156,7 +190,7 @@ static void *thread_handle_connection(void *arg)
      */
     assert(arg);
     struct thread_connection_handler_args *tinfo = arg;
-    int inetsocketfd = tinfo->new_accepted_inet_fd;
+    const int inetsocketfd = tinfo->new_accepted_inet_fd;
     struct sockaddr_un sockaddr;
     socklen_t sockaddrlen = sizeof(sockaddr);
     const pthread_t thread_id = pthread_self();
@@ -466,31 +500,7 @@ static void *thread_handle_connection(void *arg)
 	 */
 	if (FCGI_RESPONDER == role)
 	{
-	    char sendbuffer[sizeof(FCGI_EndRequestRecord)];
-	    struct fcgi_message_s *sendmessage = fcgi_message_new_endrequest(requestId, 0, FCGI_OVERLOADED);
-	    retval = fcgi_message_write(sendbuffer, sizeof(sendbuffer), sendmessage);
-
-	    int writebytes = write(inetsocketfd, sendbuffer, retval);
-	    debug(1, "wrote %d btes to network socket", writebytes);
-	    if (-1 == writebytes)
-	    {
-		if (ECONNRESET == errno)
-		{
-		    /* network client ended this connection. exit this thread */
-		    debug(1, "errno %d, connection reset by network peer, closing connection", errno);
-		}
-		else
-		{
-		    logerror("ERROR: writing to network socket");
-		    qexit(EXIT_FAILURE);
-		}
-	    }
-
-	    /* we are done with the connection. The status
-	     * is send back to the web server. we can close
-	     * down and leave.
-	     */
-	    fcgi_message_delete(sendmessage);
+	    send_fcgi_abort_to_web_client(inetsocketfd, requestId);
 	}
 
 
