@@ -474,7 +474,7 @@ static void *thread_handle_connection(void *arg)
 	 * All busy, close the network connection.
 	 * Sorry guys.
 	 */
-	printlog("[%lu] Found no free process for network request from %s. Answer overload and close connection", thread_id, tinfo->hostname);
+	printlog("[%lu] Found no free process for network request from %s for project %s. Answer overload and close connection", thread_id, tinfo->hostname, request_project_name);
 	/* NOTE: intentionally no mutex unlock here. We checked all processes,
 	 * locked and unlocked all entries. Now there is no locked mutex left.
 	 */
