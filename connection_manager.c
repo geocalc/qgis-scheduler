@@ -58,7 +58,7 @@
 #include "qgis_shutdown_queue.h"
 
 
-#define CHILD_SOCKET_CONNECTION_RETRY	5	/* := 5 seconds */
+#define MAX_CHILD_SOCKET_CONNECTION_RETRY	5	/* := 5 seconds */
 
 
 struct thread_connection_handler_args
@@ -602,7 +602,7 @@ static void *thread_handle_connection(void *arg)
 	// try to connect 5 times == 5 seconds. exit with error if it does not work
 	{
 	    int i;
-	    for (i=0; i<CHILD_SOCKET_CONNECTION_RETRY; i++)
+	    for (i=0; i<MAX_CHILD_SOCKET_CONNECTION_RETRY; i++)
 	    {
 		retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
 		if (-1 == retval)
