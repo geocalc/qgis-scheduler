@@ -424,6 +424,14 @@ static void *thread_handle_connection(void *arg)
 	{
 	    requestId = fcgi_session_get_requestid(fcgi_session);
 	    role = fcgi_session_get_role(fcgi_session);
+	    /* filter messages not being FCGI_RESPONDER
+	     * and immediately answer with abort message
+	     */
+	    if (FCGI_RESPONDER != role)
+	    {
+		/* invalidate project name, later answer with abort request */
+		request_project_name = NULL;
+	    }
 	}
 
 	free(buffer);
