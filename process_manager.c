@@ -798,6 +798,7 @@ static void *process_manager_thread_start_process_detached(void *arg)
 /* starts a new thread in detached state, which in turn calls start_new_process_wait() */
 void process_manager_start_new_process_detached(int num, const char *projname, int do_exchange_processes)
 {
+    debug(1, "start new %d process%s for project %s, exchange=%d", num, (num>1?"es":""), projname, do_exchange_processes);
     /* Start the process creation thread in detached state because
      * we do not want to wait for it. Different from the handling
      * during the program startup there is no join() waiting for
@@ -837,6 +838,8 @@ void process_manager_start_new_process_detached(int num, const char *projname, i
  */
 void process_manager_restart_process(pid_t pid)
 {
+    debug(1, "restart process %d", pid);
+
     /* Don't start a new process during shutdown */
     int retval = get_program_shutdown();
     if (!retval)
@@ -867,7 +870,7 @@ void process_manager_restart_process(pid_t pid)
     /* change state of the process to STATE_EXIT
      * and move the entry to the shutdown list
      */
-    process_manager_cleanup_process(pid);
+//    process_manager_cleanup_process(pid);
     qgis_shutdown_add_process(pid);
 }
 
