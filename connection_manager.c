@@ -536,33 +536,14 @@ static void *thread_handle_connection(void *arg)
 	 */
 
 
-	/* get the maximum read write socket buffer size */
-	int maxbufsize = default_max_transfer_buffer_size;
-	{
-	    int sockbufsize = 0;
-	    socklen_t size = sizeof(sockbufsize);
-	    retval = getsockopt(inetsocketfd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, &size);
-	    if (-1 == retval)
-	    {
-		logerror("ERROR: getsockopt");
-		qexit(EXIT_FAILURE);
-	    }
-	    maxbufsize = min(sockbufsize, maxbufsize);
-
-
-	    debug(1, "set maximum transfer buffer to %d", maxbufsize);
-	}
-
-
-
 	/* parse and check the incoming message. If it is a
 	 * session initiation message from the web server then
 	 * immediately answer with an overload message and end
 	 * this thread.
 	 */
-	if (FCGI_RESPONDER == role)
 	{
 	    send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+	    FAULTY_NET_CLIENT_STOP;
 	}
 
 
