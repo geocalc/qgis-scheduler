@@ -479,6 +479,8 @@ static void *thread_handle_connection(void *arg)
 	    qexit(EXIT_FAILURE); \
     } while(0)
 #define FAULTY_CHILD_RETRY	do { \
+	if (MAX_CHILD_COMMUNICATION_RETRY <= child_connect_retries) \
+	    send_fcgi_abort_to_web_client(inetsocketfd, requestId); \
 	goto retry_new_child_connect; \
     } while(0)
 #define FAULTY_NET_CLIENT_STOP	do { \
@@ -616,12 +618,19 @@ static void *thread_handle_connection(void *arg)
 	/* get the address of the socket transferred to the child process,
 	 * then connect to it.
 	 */
-	childunixsocketfd = db_get_process_socket(mypid);//qgis_process_get_socketfd(proc);	// refers to the socket the child process accept()s from
+	childunixsocketfd = db_get_process_socket(mypid);	// refers to the socket the child process accept()s from
+	if (-1 == childunixsocketfd)
+	{
+	    printlog("[%lu] WARNING: DB returned socket '-1' for child process '%d'. Dump this and try again with next process", thread_id, mypid);
+	    process_manager_restart_process(mypid);
+	    FAULTY_CHILD_RETRY;
+	}
 	retval = getsockname(childunixsocketfd, (struct sockaddr *)&sockaddr, &sockaddrlen);
 	if (-1 == retval)
 	{
-	    logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
-	    qexit(EXIT_FAILURE);
+	    logerror("[%lu] WARNING: retrieving the name of child process socket %d", thread_id, childunixsocketfd);
+	    process_manager_restart_process(mypid);
+	    FAULTY_CHILD_RETRY;
 	}
 	/* leave the original child socket and create a new one on the opposite
 	 * side.
@@ -629,8 +638,9 @@ static void *thread_handle_connection(void *arg)
 	retval = socket(AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
 	if (-1 == retval)
 	{
-	    logerror("ERROR: can not create socket to child process");
-	    qexit(EXIT_FAILURE);
+	    logerror("[%lu] ERROR: can not create socket to child process", thread_id);
+	    // currently something is going wrong, try again and close session if it does not work
+	    FAULTY_CHILD_RETRY;
 	}
 
 	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
@@ -655,18 +665,23 @@ static void *thread_handle_connection(void *arg)
 			continue;
 		    }
 		    logerror("ERROR: can not connect to child process");
-		    qexit(EXIT_FAILURE);
+		    process_manager_restart_process(mypid);
+		    close(childunixsocketfd);
+		    FAULTY_CHILD_RETRY;
 		}
 		break; // connected successfully, go on
 	    }
-	    /* if still not connected after 5 tests, exit with error */
+	    /* if still not connected after 5 tests, try a different child process or exit with error */
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: can not connect to child process");
-		qexit(EXIT_FAILURE);
+		process_manager_restart_process(mypid);
+		close(childunixsocketfd);
+		FAULTY_CHILD_RETRY;
 	    }
 	}
 
+	char *buffer = NULL;
 	/* get the maximum read write socket buffer size */
 	int maxbufsize = default_max_transfer_buffer_size;
 	{
@@ -676,7 +691,9 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		qexit(EXIT_FAILURE);
+		process_manager_restart_process(mypid);
+		close(childunixsocketfd);
+		FAULTY_CHILD_RETRY;
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -685,7 +702,9 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		qexit(EXIT_FAILURE);
+		process_manager_restart_process(mypid);
+		close(childunixsocketfd);
+		FAULTY_CHILD_RETRY;
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -694,7 +713,7 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		qexit(EXIT_FAILURE);
+		goto close_child_socket__end_session;
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
@@ -703,14 +722,14 @@ static void *thread_handle_connection(void *arg)
 	    if (-1 == retval)
 	    {
 		logerror("ERROR: getsockopt");
-		qexit(EXIT_FAILURE);
+		goto close_child_socket__end_session;
 	    }
 	    maxbufsize = min(sockbufsize, maxbufsize);
 
 	    debug(1, "set maximum transfer buffer to %d", maxbufsize);
 
 	}
-	char *buffer = malloc(maxbufsize);
+	buffer = malloc(maxbufsize);
 	assert(buffer);
 	if ( !buffer )
 	{
@@ -768,6 +787,14 @@ static void *thread_handle_connection(void *arg)
 		    debug(1, "received interrupt");
 		    break;
 
+		case EINVAL:
+		    /* The nfds value exceeds the RLIMIT_NOFILE value.
+		     * Close this session and return from function
+		     */
+		    logerror("WARNING: %s() calling poll", __FUNCTION__);
+		    send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+		    break;
+
 		default:
 		    logerror("ERROR: %s() calling poll", __FUNCTION__);
 		    qexit(EXIT_FAILURE);
@@ -818,13 +845,16 @@ static void *thread_handle_connection(void *arg)
 			{
 			    /* child process ended this connection. exit this thread */
 			    debug(1, "errno %d, connection reset by child socket, closing connection", errno);
-			    break;
+			    logerror("WARNING: connection reset by child socket, closing connection");
+//			    break;
 			}
 			else
 			{
 			    logerror("ERROR: writing to child process socket");
-			    qexit(EXIT_FAILURE);
+//			    qexit(EXIT_FAILURE);
 			}
+			send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+			break;
 		    }
 		    can_write_unixsock = 0;
 		}
@@ -843,13 +873,16 @@ static void *thread_handle_connection(void *arg)
 			{
 			    /* network client ended this connection. exit this thread */
 			    debug(1, "errno %d, connection reset by network peer, closing connection", errno);
-			    break;
+			    logerror("WARNING: connection reset by child socket, closing connection");
+//			    break;
 			}
 			else
 			{
 			    logerror("ERROR: reading from network socket (%d)", errno);
-			    qexit(EXIT_FAILURE);
+//			    qexit(EXIT_FAILURE);
 			}
+//			send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+			break;
 		    }
 		    else if (0 == readbytes)
 		    {
@@ -869,13 +902,16 @@ static void *thread_handle_connection(void *arg)
 			{
 			    /* child process ended this connection. exit this thread */
 			    debug(1, "errno %d, connection reset by child socket, closing connection", errno);
-			    break;
+			    logerror("WARNING: connection reset by child socket, closing connection");
+//			    break;
 			}
 			else
 			{
 			    logerror("ERROR: writing to child process socket");
-			    qexit(EXIT_FAILURE);
+//			    qexit(EXIT_FAILURE);
 			}
+			send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+			break;
 		    }
 		    can_read_networksock = 0;
 		    can_write_unixsock = 0;
@@ -893,13 +929,16 @@ static void *thread_handle_connection(void *arg)
 		    {
 			/* child process ended this connection. exit this thread */
 			debug(1, "errno %d, connection reset by child socket, closing connection", errno);
-			break;
+			logerror("WARNING: connection reset by child socket, closing connection");
+//			break;
 		    }
 		    else
 		    {
 			logerror("ERROR: reading from child process socket");
-			qexit(EXIT_FAILURE);
+//			qexit(EXIT_FAILURE);
 		    }
+		    send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+		    break;
 		}
 		else if (0 == readbytes)
 		{
@@ -918,13 +957,16 @@ static void *thread_handle_connection(void *arg)
 		    {
 			/* network client ended this connection. exit this thread */
 			debug(1, "errno %d, connection reset by network peer, closing connection", errno);
-			break;
+			logerror("WARNING: connection reset by child socket, closing connection");
+//			break;
 		    }
 		    else
 		    {
 			logerror("ERROR: writing to network socket");
-			qexit(EXIT_FAILURE);
+//			qexit(EXIT_FAILURE);
 		    }
+//		    send_fcgi_abort_to_web_client(inetsocketfd, requestId);
+		    break;
 		}
 
 		can_read_unixsock = 0;
@@ -932,6 +974,7 @@ static void *thread_handle_connection(void *arg)
 	    }
 
 	}
+	close_child_socket__end_session:
 	retval = close (childunixsocketfd);
 	debug(1, "closed child socket fd %d, retval %d, errno %d", childunixsocketfd, retval, errno);
 	free(buffer);
