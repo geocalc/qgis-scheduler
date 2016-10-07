@@ -177,8 +177,8 @@ static int send_fcgi_abort_to_web_client(int inetsocketfd, int requestId)
 	}
 	else
 	{
-	    logerror("ERROR: writing to network socket");
-	    qexit(EXIT_FAILURE);
+	    logerror("WARNING: writing to network socket");
+//	    qexit(EXIT_FAILURE);
 	}
     }
 
