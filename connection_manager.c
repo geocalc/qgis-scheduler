@@ -298,17 +298,12 @@ static void *thread_handle_connection(void *arg)
 		debug(1, "read %d", readbytes);
 		if (-1 == readbytes)
 		{
-		    if (ECONNRESET == errno)
-		    {
-			/* network client ended this connection. exit this thread */
-			debug(1, "errno %d, connection reset by network peer, closing connection", errno);
-			break;
-		    }
-		    else
-		    {
-			logerror("ERROR: reading from network socket");
-			qexit(EXIT_FAILURE);
-		    }
+		    logerror("WARNING: reading from network socket");
+		    /* do not abort the program because of an invalid network read.
+		     * just cancel all further action and clean up below.
+		     * TODO: do not send an abort message below, makes no sense anymore
+		     */
+		    break;
 		}
 		else if (0 == readbytes)
 		{
