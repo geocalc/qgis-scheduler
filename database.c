@@ -737,12 +737,20 @@ static int db_nolock__process_set_state(pid_t pid, enum db_process_state_e state
 {
     int ret = 0;
 
-    // we need to type cast values to a "guaranteed" 64 bit value
-    // because the vararg parser assumes type "long long int" with "%l"
-    int mystate = state;
-    int mypid = pid;
-    long long int mythreadid = threadid;
-    db_select_parameter(DB_UPDATE_PROCESS_STATE, mystate, mythreadid, mypid);
+    if (0 > pid)
+    {
+	// do not execute DB update command with invalid pid
+	ret = -1;
+    }
+    else
+    {
+	// we need to type cast values to a "guaranteed" 64 bit value
+	// because the vararg parser assumes type "long long int" with "%l"
+	int mystate = state;
+	int mypid = pid;
+	long long int mythreadid = threadid;
+	db_select_parameter(DB_UPDATE_PROCESS_STATE, mystate, mythreadid, mypid);
+    }
 
     return ret;
 }
