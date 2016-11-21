@@ -449,7 +449,7 @@ void qgis_shutdown_add_process(pid_t pid)
 
     db_move_process_to_list(LIST_SHUTDOWN, pid);
 
-    debug(1, "add one process to shutdown list");
+    debug(1, "add process %d to shutdown list", pid);
 
     retval = pthread_mutex_lock(&shutdownmutex);
     if (retval)
