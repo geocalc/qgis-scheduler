@@ -1,0 +1,90 @@
+Routines to install the qgis scheduler
+
+
+Install on Ubuntu:
+
+Download iniparser from https://github.com/ndevilla/iniparser
+Extract tar file into source or temp directory, execute "make"
+Copy libiniparser.so.0 and libiniparser.a into /usr/local/lib
+Softlink libiniparser.so.0 to libiniparser.so (cd /usr/local/lib; ln -s libiniparser.so.0 libiniparser.so)
+If you are curious you may test the installation by executing 'ld -liniparser --verbose'
+Copy iniparser.h (and dictionary.h) into /usr/local/include
+
+To install sqlite3 in Ubuntu-14
+execute 'apt-get install sqlite3-dev'
+To install sqlite3 in Ubuntu-16
+execute 'apt-get install libsqlite3-dev'
+
+To install fastcgi.h execute 'apt-get install libfcgi-dev'
+
+
+If no configure script is available then 
+install  'apt-get install autoconf-archive'
+and 'apt-get install autoconf'
+and execute 'autoreconf --install'
+
+Execute in this directory './configure', 'make', 'make install'
+
+
+Install on Gentoo:
+
+Download iniparser from https://github.com/ndevilla/iniparser
+Extract tar file into source or temp directory, execute "make"
+Copy libiniparser.so.0 and libiniparser.a into /usr/local/lib
+Softlink libiniparser.so.0 to libiniparser.so (cd /usr/local/lib; ln -s libiniparser.so.0 libiniparser.so)
+If you are curious you may test the installation by executing 'ld -liniparser --verbose'
+Copy iniparser.h (and dictionary.h) into /usr/local/include
+
+Execute 'emerge -a dev-libs/fcgi'
+Execute 'emerge -a dev-db/sqlite'
+
+If no configure script is available then 
+execute 'emerge -a sys-devel/autoconf sys-devel/autoconf-archive'
+and execute 'autoreconf --install'
+
+Execute in this directory './configure', 'make', 'make install'
+
+
+
+Use with apache:
+
+The scheduler connects via fcgi network socket with the web server. The usual 
+connection of the apache fcgi module happens via unix sockets. The scheduler
+uses network sockets. The apache fcgi module cannot use network sockets, so
+you have to install the proxy_fcgi module.
+
+Install on Ubuntu:
+
+Execute 'apt-get install apache2'
+Enable the fcgi proxy module 'a2enmod proxy_fcgi'
+Use the following rule in /etc/apache2/sites-available/default.conf
+        <IfModule proxy_fcgi_module>
+                ProxyPass "/cgi-bin/qgis_mapserv.fcgi" "fcgi://localhost:10177/
+        </IfModule>
+The default network port in qgis-scheduler.conf is already set to
+'port=10177'
+
+Install on Gentoo:
+
+Add the proxy_fcgi use flag to the apache module, i.e. execute 
+'echo www-servers/apache proxy_fcgi >> /etc/portage/package.use'
+Execute 'emerge -a www-servers/apache'
+
+
+Use the following rule in /etc/apache2/vhosts.d/default_vhost.include
+        <IfModule proxy_fcgi_module>
+                ProxyPass "/cgi-bin/qgis_mapserv.fcgi" "fcgi://localhost:10177/
+        </IfModule>
+The default network port in qgis-scheduler.conf is already set to
+'port=10177'
+
+
+
+
+Notes:
+
+The domain www.fastcgi.com closed down.
+If your package manger can't find fastcgi.h then search for fastcgi.h with google et. al.
+You may find this on https://github.com/LuaDist/fcgi/blob/master/include/fastcgi.h or similar pages
+Download fastcgi.h
+Copy fastcgi.h into /usr/local/includes
