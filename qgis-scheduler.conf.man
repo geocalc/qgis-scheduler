@@ -1,0 +1,326 @@
+.TH QGIS-SCHEDULER.CONF 5
+.SH NAME
+qgis-scheduler.conf \- configuration file for the qgis-schedulerd
+.SH DESCRIPTION
+.PP
+This describes the syntax of the configuration file for the
+qgis-schedulerd. \
+The syntax is like this:
+.LP
+globalvariable=value
+.br
+[projectname1]
+.br
+projectvariable=value
+.br
+[projectname2]
+.br
+projectvariable=value
+.br
+[projectname3]
+.br
+projectvariable=value
+.LP
+Some variables are only glocal options (like "port", "listen") and not
+recognized in the project sections. \
+All other variables can be specified in the global and project section. \
+The data specified in the project section superseeds the data in the global
+section.
+.SH OPTIONS
+.TP
+.BR listen
+set \'*' to accept all incoming connections,
+set \'localhost' to accept connections from localhost only.
+.br
+default: '*'
+.br
+global option only
+.TP
+.BR port
+The network port to listen to.
+.br
+default: 10177
+.br
+global option only
+.TP
+.BR chuser
+Drop root priviledges and change user id to this user.
+.br
+default: '' (keep current user)
+.br
+global option only
+.TP
+.BR chroot
+Change root to the given path. 
+.br
+Note: This is useless without additional setting "chuser" and generates a
+warning.
+.br
+default: '' (keep current root setting)
+.br
+global option only
+.TP
+.BR pidfile
+Path to the file where the pid of the daemon is written to.
+.br
+default: '' (no file)
+.br
+global option only
+.TP
+.BR process
+The binary to start to fulfill the fcgi request. \
+If the setting is left empty the scheduler writes an error to the log.
+.br
+default: '' (none)
+.br
+global and project option
+.TP
+.BR process_args
+Further arguments to the process. 
+.br
+Note: Currently not implemented.
+.br
+default: '' (none)
+.br
+global and project option
+.TP
+.BR min_proc
+Minimal number of idle cgi proccess. More processes need more memory and
+more file descriptors. And more processes can handle more connections in
+parallel.
+.br
+Note: The scheduler will start more cgi processes 
+if web clients are waiting for a connection. \
+So the min_proc is the initial number of processes which may increase during
+the run.
+.br
+default: 1
+.br
+global and project option
+.TP
+.BR max_proc
+Maximum number of processes to keep in memory. If more processes have been
+started the extended number will be killed if the processes get to the idle
+state.
+.br
+Note: Currently not implemented.
+.br
+default: 20
+.br
+global and project option
+.TP
+.BR proc_read_timeout
+Timeout value in seconds. If the scheduler waites more than proc_read_timeout
+seconds for an answer from the cgi process the process is considered hanging
+and need to be killed and started anew.
+.br
+default: 270 (seconds)
+.br
+global and project option
+.TP
+.BR proc_term_timeout
+Timeout value in seconds. If the cgis process has not ended within
+proc_term_timeout seconds after sending
+SIGTERM the process gets a SIGKILL signal.
+.br
+default: 10 (seconds)
+.br
+global and project option
+.TP
+.BR scan_param ", " scan_regex
+These parameters describe the filter to recognise which  project this
+request belongs to. The example goes like this:
+.br
+[map]
+.br
+scan_param=QUERY_STRING
+.br
+scan_regex='map=.*card\.qgs'
+.br
+Here we scan for the fcgi parameter 'QUERY_STRING'. In this parameter we
+expect the data described by the regular expression 'map=.*card\.qgs'. If
+it matches then we know the request belongs to project 'map'.
+.br
+default: '' (none)
+.br
+global and project option
+.TP
+.BR cwd
+Set the working directory for the cgi process.
+.br
+default: '/'
+.br
+global and project option
+.TP
+.BR config_file
+Set the configuration file of the cgi process. If the configuration file
+changes the cgi processes will be killed and restarted. The number of started
+processes equal the number of currently running and idle processes for this
+project.
+.br
+Note: This is special to the qgis fcgi service.
+.br
+default: '' (none)
+.br
+global and project option
+.TP
+.BR initkey ", " initvalue
+Specify fcgi variables to initialize the qgis program. This
+setting causes the qgis service to load, preprocess and cache data  for
+the map. If no init values have been specified 
+the first map request could last longer than normal. The
+initialization keys and values are numbered like this:
+.br
+initkey1=key
+.br
+initvalue1=value
+.br
+initkey2=key
+.br
+initvalue2=value
+.br
+[...]
+.br
+default: ''
+.br
+global and project option
+.TP
+.BR envkey ", " envvalue
+Specify additional environment settings for the fcgi process. The
+environment keys and values are numbered like this:
+.br
+envkey1=key
+.br
+envvalue1=value
+.br
+envkey2=key
+.br
+envvalue2=value
+.br
+[...]
+.br
+default: ''
+.br
+global and project option
+.TP
+.BR logfile
+Where to write the logging information. \
+If the scheduler gets signal SIGHUP the log file is closed and reopened. \
+Use this to archive the current log file and write a new one.
+.br
+default: '' (none, write to stdout)
+.br
+global option only
+.TP
+.BR debuglevel
+Set to 1 to print out aditional debug information to the log output channel.
+.br
+Note: This raises the amount of data logged significantly.
+.br
+default: 0
+.br
+global and project option
+.TP
+.BR include
+Include more config files. With this setting one can split up the config
+file into multiple project configurations. \
+The include statement is evaluated only  at the first level.
+.br
+default: '' (none)
+.br
+global and project option
+.TP
+.BR abort_on_error
+This is a debug option. If set to 1 the program will core dump in case of an
+error. \
+Otherwise exit with error code -1.
+.br
+default: 0 (exit with -1)
+.br
+global option only
+.SH EXAMPLE
+This is an example for a service running in Ubuntu. \
+The log directory needs to have write proviledges for user 'nobody'. \
+Please note that the man page causes line breaks. There are
+no line breaks in the data for the variable definition.
+.LP
+chuser=nobody
+.br
+logfile=/var/log/qgis-scheduler/qgis-scheduler.log
+.br
+pidfile=/var/run/qgis-scheduler.pid
+.br
+process=/usr/bin/qgis_mapserv.fcgi
+.br
+# QGis expects its WMS file in the working directory
+.br
+cwd=/usr/lib/cgi-bin
+.LP
+envkey0=LC_ALL
+.br
+envvalue0="en_US.UTF-8"
+.br
+envkey1=LANG
+.br
+envvalue1="en_US.UTF-8"
+.br
+# let QGis write log messages
+.br
+envkey2=QGIS_DEBUG
+.br
+envvalue2=1
+.br
+envkey3=QGIS_SERVER_LOG_FILE
+.br
+envvalue3=/var/log/qgis-scheduler/qgis-server.log
+.br
+envkey4=QGIS_SERVER_LOG_LEVEL
+.br
+envvalue4=0
+.br
+envkey5=PYTHONIOENCODING
+.br
+envvalue5=UTF-8
+.LP
+initkey0=QUERY_STRING
+.br
+initkey1=REQUEST_URI
+.br
+initkey2=SCRIPT_NAME
+.br
+initvalue2=/qgis_mapserv.fcgi
+.br
+initkey3=SERVER_NAME
+.br
+initvalue3=localhost
+.br
+initkey4=SERVER_PORT
+.br
+initvalue4=80
+.LP
+scan_param=QUERY_STRING
+.LP
+[mapA]
+.br
+# This card is used frequently
+.br
+min_proc=5
+.br
+initvalue0=map=/path/to/myconfigA.qgs&SERVICE=WMS&VERSION=1.3&REQUEST=GetProjectSettings
+.br
+initvalue1=/qgis_mapserv.fcgi?map=/path/to/myconfigB.qgs&SERVICE=WMS&VERSION=1.3&REQUEST=GetProjectSettings
+.br
+scan_regex='map=.*cardA\.qgs'
+.LP
+[mapB]
+.br
+initvalue0=map=/path/to/myconfigB.qgs&SERVICE=WMS&VERSION=1.3&REQUEST=GetProjectSettings
+.br
+initvalue1=/qgis_mapserv.fcgi?map=/path/to/myconfigB.qgs&SERVICE=WMS&VERSION=1.3&REQUEST=GetProjectSettings
+.br
+scan_regex='map=.*cardB\.qgs'
+.SH AUTHOR
+Jörg Habenicht <jh@mwerk.net>, Jörg Habenicht <j.habenicht@gmx.de>
+.SH "SEE ALSO"
+.BR qgis (1),
+.BR qgis-schedulerd (1)

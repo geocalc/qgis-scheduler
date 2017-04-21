@@ -1,0 +1,56 @@
+.TH QGIS-SCHEDULERD 1
+.SH NAME
+qgis-schedulerd \- schedule the fcgi requests for the QGis server to
+prepared QGis server daemons
+.SH SYNOPSIS
+.B qgis-schedulerd
+[\fB\-h\fR]
+[\fB\-V\fR]
+[\fB\-d\fR]
+[\fB\-c\fR \fICONFIGFILE\fR]
+.SH DESCRIPTION
+.B qgis-schedulerd
+This daemon sits in between the web server and the QGis server daemon.
+It recognizes the qgis config from the web client request and schedules the
+request to a corresponding qgis server daemon. The qgis server daemon only
+computes answers to those requests cutting down the time to reply to
+milliseconds.
+In addition the qgis server daemon gets fed a simulated request, so the
+first access to a project does not need the full time to compute the
+request.
+.SH OPTIONS
+.TP
+.BR \-h
+print this help.
+.TP
+.BR \-V
+print version.
+.TP
+.BR \-d
+do NOT become daemon.
+.TP
+.BR \-c
+use CONFIGFILE (default: 
+.I /etc/qgis-scheduler/qgis-scheduler.conf
+)
+.SH SIGNALS
+.TP
+.BR SIGHUP
+Cause the deamon process to close and reopen the log file, 
+and reload all config files. 
+Projekts which have been removed from the config files will be shut down 
+(i.e. the corresponding qgis daemon will end), 
+projekts which have been created in the config files get started.
+.TP
+.BR SIGUSR1
+Cause the daemon process to write statistics to the log file.
+.TP
+.BR SIGUSR2
+Cause the daemon process to write the internal database to the log file.
+.SH BUGS
+Probably many. This is software, you know..
+.SH AUTHOR
+Jörg Habenicht <jh@mwerk.net>, Jörg Habenicht <j.habenicht@gmx.de>
+.SH "SEE ALSO"
+.BR qgis (1)
+.BR qgis-scheduler.conf (5)
