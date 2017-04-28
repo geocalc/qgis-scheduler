@@ -52,5 +52,4 @@ Probably many. This is software, you know..
 .SH AUTHOR
 Jörg Habenicht <jh@mwerk.net>, Jörg Habenicht <j.habenicht@gmx.de>
 .SH "SEE ALSO"
-.BR qgis (1)
 .BR qgis-scheduler.conf (5)

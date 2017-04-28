@@ -9,17 +9,19 @@ The syntax is like this:
 .LP
 globalvariable=value
 .br
-[projectname1]
+projectvariable=value	# common project setting
 .br
-projectvariable=value
+[project1]
 .br
-[projectname2]
+projectvariable=value	# special project setting for project1
 .br
-projectvariable=value
+[project2]
 .br
-[projectname3]
+projectvariable=value	# special project setting for project2
 .br
-projectvariable=value
+[project3]
+.br
+# project3 got the common project setting
 .LP
 Some variables are only glocal options (like "port", "listen") and not
 recognized in the project sections. \
@@ -322,5 +324,4 @@ scan_regex='map=.*cardB\.qgs'
 .SH AUTHOR
 Jörg Habenicht <jh@mwerk.net>, Jörg Habenicht <j.habenicht@gmx.de>
 .SH "SEE ALSO"
-.BR qgis (1),
 .BR qgis-schedulerd (1)
