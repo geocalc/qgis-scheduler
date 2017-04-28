@@ -161,25 +161,31 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (-1 == retval)
     {
 	logerror("ERROR: retrieving the name of child process socket %d", childunixsocketfd);
-	qexit(EXIT_FAILURE);
+	has_child_crash = 1;
     }
     /* leave the original child socket and create a new one on the opposite
      * side.
      * create the socket in blocking mode (non SOCK_NONBLOCK) because we need the
      * read() and write() calls waiting on it.
      */
-    retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
-    if (-1 == retval)
+    if (!has_child_crash)
     {
-	logerror("ERROR: can not create socket to child process");
-	qexit(EXIT_FAILURE);
+	retval = socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0);
+	if (-1 == retval)
+	{
+	    logerror("ERROR: can not create socket to child process");
+	    has_child_crash = 1;
+	}
     }
-    childunixsocketfd = retval;	// refers to the socket this program connects to the child process
-    retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-    if (-1 == retval)
+    if (!has_child_crash)
     {
-	logerror("ERROR: init can not connect to child process");
-	has_child_crash = 1;
+	childunixsocketfd = retval;	// refers to the socket this program connects to the child process
+	retval = connect(childunixsocketfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+	if (-1 == retval)
+	{
+	    logerror("ERROR: init can not connect to child process");
+	    has_child_crash = 1;
+	}
     }
 //    debug(1, "init project '%s', connected to child via socket '\\0%s'", projname, sockaddr.sun_path+1);
 
@@ -360,7 +366,7 @@ static void process_manager_thread_function_init_new_child(struct thread_init_ne
     if (has_child_crash)
     {
 	printlog("starting new process for project %s", projname);
-	qgis_shutdown_add_process(pid);
+	process_manager_restart_process(pid);
 	process_manager_process_died_during_init(pid, projname);
     }
     else
